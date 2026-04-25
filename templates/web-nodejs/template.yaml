@@ -1,0 +1,22 @@
+# rda template metadata. Read by `rda templates show <id>`.
+# This file is excluded from the scaffolded project — it lives in the
+# bundle, not in the generated repo.
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: web-nodejs
+  display_name: Web Service (Node.js)
+  language: nodejs
+  description: |
+    Express-based web service ready to bind a Postgres database via the
+    Kubernetes Service Binding Specification. Includes a Tiltfile for
+    inner-loop development on Rancher Desktop and a BCI-based Dockerfile.
+
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier from the template metadata.
+      autoCompute: from-template-language

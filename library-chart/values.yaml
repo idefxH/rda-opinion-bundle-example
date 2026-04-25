@@ -1,0 +1,44 @@
+# Defaults that any chart depending on suse-library inherits.
+# A consuming chart's values.yaml overrides these.
+
+name: ""                  # required, no default — set by the project's values.yaml
+replicas: 1
+port: 8080
+
+image:
+  repository: registry.suse.com/bci/bci-base
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Service declarations in Service Binding Specification format.
+# Each entry mounts at /bindings/<name>/ inside the container.
+# provider=local: deploys a sidecar service with default credentials.
+# provider=external: expects a pre-existing Secret with the binding keys.
+services: {}
+# Example:
+# services:
+#   database:
+#     type: postgresql
+#     provider: local
+#   cache:
+#     type: redis
+#     provider: external
+#     secretName: shared-redis-binding
+
+resources:
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 5

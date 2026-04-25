@@ -1,0 +1,33 @@
+# Approved service types for projects in this opinion bundle.
+# rda enforces that values.yaml service declarations use only types listed here.
+
+apiVersion: rda.suse.com/v1
+kind: ServiceCatalog
+metadata:
+  name: rda-opinion-bundle-example-services
+  version: 0.1.0
+
+spec:
+  services:
+    - type_name: postgresql
+      description: PostgreSQL relational database
+      providers:
+        local:
+          # In v0 this is provisioned by the library chart's local-postgres
+          # template (a single-replica Postgres 15 deployment with default
+          # credentials suitable only for inner-loop development).
+          chart_ref: file://library-chart
+          version: 0.1.0
+        external:
+          # When provider=external the platform team must provide a Secret
+          # at the namespace following the Kubernetes Service Binding
+          # Specification. Keys: type, provider, host, port, username,
+          # password, database.
+          secret_keys:
+            - type
+            - provider
+            - host
+            - port
+            - username
+            - password
+            - database

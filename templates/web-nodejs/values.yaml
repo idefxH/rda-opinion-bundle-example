@@ -1,0 +1,46 @@
+# Project values. The defaults below produce a working dev environment;
+# override per environment via values-staging.yaml / values-prod.yaml or
+# Helm --set flags.
+
+name: {{ .Name }}
+replicas: 1
+port: 8080
+
+image:
+  repository: {{ .Name }}
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# Services bound into the application via the Kubernetes Service Binding
+# Specification. Each entry mounts at /bindings/<key>/ inside the container.
+#
+# provider=local: the library chart provisions a sidecar container with
+#   default credentials suitable only for inner-loop dev.
+# provider=external: the platform team must provision a Secret in the
+#   namespace whose data follows the Service Binding spec keys
+#   (type, provider, host, port, username, password, database).
+#
+# To remove a service, comment out the entry. To switch to external,
+# set provider=external and add secretName.
+services:
+  database:
+    type: postgresql
+    provider: local
+
+resources:
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 5

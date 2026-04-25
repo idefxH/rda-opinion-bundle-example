@@ -1,0 +1,79 @@
+{{/*
+Local Postgres provisioning. Activates when a service is declared with
+type=postgresql and provider=local. Suitable only for inner-loop dev:
+single replica, default credentials, ephemeral storage.
+*/}}
+{{- range $name, $svc := .Values.services }}
+{{- if and (eq $svc.type "postgresql") (eq $svc.provider "local") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "suse-library.name" $ }}-{{ $name }}
+  labels:
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "suse-library.name" $ }}-{{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "suse-library.name" $ }}-{{ $name }}
+    spec:
+      containers:
+        - name: postgres
+          image: "registry.suse.com/bci/postgres:15"
+          env:
+            - name: POSTGRES_DB
+              value: {{ include "suse-library.name" $ }}
+            - name: POSTGRES_USER
+              value: app
+            - name: POSTGRES_PASSWORD
+              value: localdev-do-not-use-in-prod
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "app"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "suse-library.name" $ }}-{{ $name }}
+  labels:
+    {{- include "suse-library.labels" $ | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+  selector:
+    app.kubernetes.io/name: {{ include "suse-library.name" $ }}-{{ $name }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "suse-library.name" $ }}-{{ $name }}-binding
+  labels:
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    service.binding/provisioner: rda-local
+type: Opaque
+stringData:
+  type: postgresql
+  provider: rda-local
+  host: {{ include "suse-library.name" $ }}-{{ $name }}
+  port: "5432"
+  username: app
+  password: localdev-do-not-use-in-prod
+  database: {{ include "suse-library.name" $ }}
+{{- end }}
+{{- end }}

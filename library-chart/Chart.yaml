@@ -1,0 +1,15 @@
+apiVersion: v2
+name: suse-library
+description: SUSE Rancher Developer Access library chart — composable primitives for application workloads with Service Binding Specification support.
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - suse
+  - rda
+  - library
+  - service-binding
+home: https://github.com/idefxH/rda-opinion-bundle-example
+maintainers:
+  - name: idefxH
+    email: fx.houard@gmail.com
