@@ -27,6 +27,37 @@ spec:
           env:
             - {name: SERVICE_BINDING_ROOT, value: /bindings}
             - {name: PORT, value: "{{ .Values.port }}"}
+            {{- if .Values.database.enabled }}
+            # Convenience aliases for the database binding so apps that
+            # follow the 12-factor convention (DB_HOST, DB_USER, etc.)
+            # work out of the box. Apps that prefer the Service Binding
+            # Spec can ignore these and read /bindings/database/ directly.
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "suse-library.name" . }}-database-binding
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "suse-library.name" . }}-database-binding
+                  key: port
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "suse-library.name" . }}-database-binding
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "suse-library.name" . }}-database-binding
+                  key: password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "suse-library.name" . }}-database-binding
+                  key: database
+            {{- end }}
           volumeMounts:
             {{- if .Values.database.enabled }}
             - name: binding-database
