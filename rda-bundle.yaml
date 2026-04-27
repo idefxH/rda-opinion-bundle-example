@@ -7,9 +7,10 @@ templates:
     display_name: Web Service (Node.js)
     language: nodejs
     description: |
-      Express-based web service ready to bind a Postgres database via the
-      Kubernetes Service Binding Specification. Includes a Tiltfile for
-      inner-loop development on Rancher Desktop.
+      Express-based web service ready to bind PostgreSQL (via the Service
+      Binding Specification + 12-factor env vars), and optionally
+      Prometheus and Grafana from the SUSE Application Collection.
+      Includes a Tiltfile for inner-loop development on Rancher Desktop.
     path_in_bundle: templates/web-nodejs
 
 library_chart:
@@ -17,8 +18,15 @@ library_chart:
   # production implementation supports file:// URIs only — see the v1-gap
   # issue tracking oci:// support.
   oci_ref: file://library-chart
-  version: 0.1.0
+  version: 0.7.0
 
+# Catalogue surfaced by the library chart. Each AppCo chart is referenced
+# by its real name (no alias). The local_chart_ref points at the bundled
+# library chart that wires the SBS / 12-factor projections on top.
 service_catalog:
   - type_name: postgresql
+    local_chart_ref: file://library-chart
+  - type_name: prometheus
+    local_chart_ref: file://library-chart
+  - type_name: grafana
     local_chart_ref: file://library-chart
