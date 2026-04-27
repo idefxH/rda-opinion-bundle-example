@@ -1,11 +1,12 @@
 # CNB Procfile — declares the launch processes that buildpacks register
 # with the lifecycle.
 #
-# - web: production launch. The app respects $PORT and $SERVICE_BINDING_ROOT.
-# - dev: development launch. Adds Node's `--watch` flag so file changes
-#   inside /workspace/src/ restart the process automatically. The Tilt
-#   extension passes `pack build --default-process dev` for inner-loop
-#   builds, so the local image runs in --watch mode while CI/CD images
-#   built without that flag default to `web` (production behaviour).
+# - web: production launch. Plain node, no watcher overhead.
+# - dev: development launch. Uses --watch-path=src instead of --watch
+#   so node monitors the entire src/ directory rather than just the
+#   entry file. This is more robust to Tilt's file-replacement syncs
+#   (tar | kubectl exec writes files in place; node --watch on a single
+#   file can lose its inotify handle after the replacement, causing
+#   the second reload onwards to be silently missed).
 web: node src/index.js
-dev: node --watch src/index.js
+dev: node --watch-path=src src/index.js
