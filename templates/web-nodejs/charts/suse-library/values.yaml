@@ -22,23 +22,23 @@ probes:
   readiness: {path: /ready,  initialDelaySeconds: 5,  periodSeconds: 5}
 
 # --- AppCo service: database (Postgres) ---
-# Set enabled: true to provision the AppCo Postgres chart aliased as 'database'.
-# The library's binding-secret template generates the Service Binding Spec
-# Secret at <release>-database-binding from these values, kept consistent
-# with what the postgresql sub-chart actually deploys.
+# Aliased as 'database' in suse-library/Chart.yaml. The values below are
+# passed verbatim to the AppCo postgresql sub-chart. AppCo schema (NOT
+# Bitnami): see https://apps.rancher.io/applications/postgresql.
+#
+# Resources deployed by the sub-chart are still named <release>-postgresql
+# (alias renames the values key, not the chart's internal naming).
 database:
   enabled: false
-  # Bitnami chart names resources <release>-<chart-name>; override so the
-  # postgresql sub-chart deploys as <release>-database (matching the alias
-  # in suse-library's Chart.yaml dependency entry).
-  nameOverride: database
   global:
     imagePullSecrets:
       - application-collection
-  primary:
-    persistence:
-      enabled: false       # ephemeral storage — flip to true for prod
   auth:
-    username: app
-    password: ""           # required when enabled=true; no default — must be set
-    database: app
+    # Custom application user — credentials surface in the binding secret.
+    # Required when enabled=true (no defaults).
+    database: ""
+    username: ""
+    password: ""
+  persistence:
+    enabled: false       # ephemeral storage — flip to true for prod
+  nodeCount: 1

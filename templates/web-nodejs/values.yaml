@@ -22,7 +22,6 @@ suse-library:
   # AND the Service Binding Spec secret mounted into the app container.
   database:
     enabled: true
-    nameOverride: database  # makes resources <release>-database
     auth:
       username: app
       password: localdev-do-not-use-in-prod

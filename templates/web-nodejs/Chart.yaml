@@ -8,7 +8,7 @@ keywords: [rda, {{ .Language }}]
 
 dependencies:
   - name: suse-library
-    version: 0.4.0
+    version: 0.5.0
     # Vendored at charts/suse-library/. The library chart in turn depends
     # on AppCo charts (postgresql aliased as 'database', etc.). The Tilt
     # extension's helm dep update recurses one level so suse-library's
