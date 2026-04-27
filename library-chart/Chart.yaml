@@ -1,15 +1,29 @@
 apiVersion: v2
 name: suse-library
 description: |
-  SUSE Rancher Developer Access library chart. Provides the application
-  Deployment, Service, and Service Binding Specification wiring. It does
-  NOT bundle service sub-charts — projects declare their own service
-  dependencies (typically as aliased AppCo charts) at the project level
-  so a single `helm dependency update` resolves the full graph.
+  SUSE Rancher Developer Access library chart. Encapsulates the application
+  Deployment + Service + Service Binding Spec wiring, AND references the
+  SUSE Application Collection charts that projects can opt into via
+  '<service>.enabled: true' in their values.
+
+  This is the opinion: the library chart owns the catalogue of approved
+  services and their binding conventions. Projects don't reinvent — they
+  enable.
 type: application
-version: 0.3.0
+version: 0.4.0
 appVersion: "1.0"
 keywords: [suse, rda, library, service-binding]
 home: https://github.com/idefxH/rda-opinion-bundle-example
-maintainers:
-  - {name: idefxH, email: fx.houard@gmail.com}
+maintainers: [{name: idefxH, email: fx.houard@gmail.com}]
+
+# Approved AppCo service charts. Each is aliased to a stable, semantic name
+# so the resources it deploys carry that name (e.g. <release>-database for
+# Postgres) and the binding-secret template can reference them by convention.
+# Conditions are evaluated against the library chart's values; the project
+# enables what it needs via 'suse-library.<alias>.enabled: true'.
+dependencies:
+  - name: postgresql
+    version: "0.4.4-29.1"
+    repository: oci://dp.apps.rancher.io/charts
+    alias: database
+    condition: database.enabled

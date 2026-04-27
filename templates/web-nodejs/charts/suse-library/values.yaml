@@ -1,5 +1,4 @@
-# Defaults for any chart depending on suse-library. A consuming chart's
-# values.yaml overrides these.
+# Defaults for any chart depending on suse-library.
 
 # --- application ---
 name: ""
@@ -15,28 +14,31 @@ imagePullSecrets:
   - name: application-collection
 
 resources:
-  limits: {cpu: "500m", memory: "512Mi"}
-  requests: {cpu: "50m", memory: "128Mi"}
+  limits:   {cpu: "500m", memory: "512Mi"}
+  requests: {cpu: "50m",  memory: "128Mi"}
 
 probes:
   liveness:  {path: /health, initialDelaySeconds: 10, periodSeconds: 10}
   readiness: {path: /ready,  initialDelaySeconds: 5,  periodSeconds: 5}
 
-# --- bindings ---
-# Each entry produces a Secret in Service Binding Specification format
-# at <release>-<key>-binding, mounted at /bindings/<key>/ in the app
-# container. The values below populate that Secret directly. The user is
-# responsible for ensuring the host/port/credentials match an actually-
-# deployed service (typically a sub-chart aliased to the same key in the
-# parent chart's Chart.yaml).
-bindings: {}
-# Example:
-# bindings:
-#   database:
-#     type: postgresql
-#     provider: rda-appco
-#     host: "{{ .Release.Name }}-database"
-#     port: "5432"
-#     username: app
-#     password: localdev-do-not-use-in-prod
-#     database: app
+# --- AppCo service: database (Postgres) ---
+# Set enabled: true to provision the AppCo Postgres chart aliased as 'database'.
+# The library's binding-secret template generates the Service Binding Spec
+# Secret at <release>-database-binding from these values, kept consistent
+# with what the postgresql sub-chart actually deploys.
+database:
+  enabled: false
+  # Bitnami chart names resources <release>-<chart-name>; override so the
+  # postgresql sub-chart deploys as <release>-database (matching the alias
+  # in suse-library's Chart.yaml dependency entry).
+  nameOverride: database
+  global:
+    imagePullSecrets:
+      - application-collection
+  primary:
+    persistence:
+      enabled: false       # ephemeral storage — flip to true for prod
+  auth:
+    username: app
+    password: ""           # required when enabled=true; no default — must be set
+    database: app

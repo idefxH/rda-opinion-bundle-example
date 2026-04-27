@@ -8,10 +8,8 @@ keywords: [rda, {{ .Language }}]
 
 dependencies:
   - name: suse-library
-    version: 0.3.0
-    # Vendored at charts/suse-library/ — no remote repository needed
-  - name: postgresql
-    version: "0.4.4-29.1"
-    repository: oci://dp.apps.rancher.io/charts
-    alias: database          # resources are named <release>-database
-    condition: database.enabled
+    version: 0.4.0
+    # Vendored at charts/suse-library/. The library chart in turn depends
+    # on AppCo charts (postgresql aliased as 'database', etc.). The Tilt
+    # extension's helm dep update recurses one level so suse-library's
+    # AppCo deps are pulled before the parent's helm template runs.

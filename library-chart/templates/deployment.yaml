@@ -27,14 +27,12 @@ spec:
           env:
             - {name: SERVICE_BINDING_ROOT, value: /bindings}
             - {name: PORT, value: "{{ .Values.port }}"}
-          {{- if .Values.bindings }}
           volumeMounts:
-            {{- range $name, $_ := .Values.bindings }}
-            - name: binding-{{ $name }}
-              mountPath: /bindings/{{ $name }}
+            {{- if .Values.database.enabled }}
+            - name: binding-database
+              mountPath: /bindings/database
               readOnly: true
             {{- end }}
-          {{- end }}
           livenessProbe:
             httpGet: {path: {{ .Values.probes.liveness.path }}, port: http}
             initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
@@ -44,11 +42,9 @@ spec:
             initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
-      {{- if .Values.bindings }}
       volumes:
-        {{- range $name, $_ := .Values.bindings }}
-        - name: binding-{{ $name }}
+        {{- if .Values.database.enabled }}
+        - name: binding-database
           secret:
-            secretName: {{ include "suse-library.name" $ }}-{{ $name }}-binding
+            secretName: {{ include "suse-library.name" . }}-database-binding
         {{- end }}
-      {{- end }}
