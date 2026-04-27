@@ -1,0 +1,29 @@
+apiVersion: v2
+name: suse-library
+description: |
+  SUSE Rancher Developer Access library chart — the composable opinion that
+  scaffolded projects consume as a sub-chart. Provides the application
+  Deployment, Service, and Service-Binding-Spec wiring, and pulls services
+  from SUSE Application Collection (dp.apps.rancher.io) as conditional
+  sub-charts so projects don't reinvent service deployments.
+type: application
+version: 0.2.0
+appVersion: "1.0"
+keywords:
+  - suse
+  - rda
+  - library
+  - service-binding
+home: https://github.com/idefxH/rda-opinion-bundle-example
+maintainers:
+  - name: idefxH
+    email: fx.houard@gmail.com
+
+# Service sub-charts pulled from SUSE Application Collection. Each is gated
+# by a `<name>.enabled` value so consuming projects only include what they
+# actually use.
+dependencies:
+  - name: postgresql
+    version: "0.4.4-29.1"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: postgresql.enabled

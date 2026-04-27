@@ -1,0 +1,56 @@
+# Defaults for any chart depending on suse-library. A consuming chart's
+# values.yaml overrides these.
+
+# --- application ---
+name: ""                  # required, no default
+replicas: 1
+port: 8080
+
+image:
+  repository: registry.suse.com/bci/bci-base
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# imagePullSecrets are referenced by the app Deployment AND propagated to
+# every sub-chart that supports them via global.imagePullSecrets. The default
+# secret name (rda-appco-pull) is what the SUSE Application Collection
+# Rancher Desktop extension is expected to provision; if your setup doesn't
+# auto-create it, run:
+#   kubectl create secret docker-registry application-collection \
+#     --docker-server=dp.apps.rancher.io \
+#     --docker-username='YOUR_SCC_USERNAME' \
+#     --docker-password='YOUR_SCC_PASSWORD'
+imagePullSecrets:
+  - name: application-collection
+
+# Service declarations in Service Binding Specification format.
+# Each entry mounts at /bindings/<name>/ inside the container.
+services: {}
+
+resources:
+  limits: {cpu: "500m", memory: "512Mi"}
+  requests: {cpu: "50m", memory: "128Mi"}
+
+probes:
+  liveness:  {path: /health, initialDelaySeconds: 10, periodSeconds: 10}
+  readiness: {path: /ready,  initialDelaySeconds: 5,  periodSeconds: 5}
+
+# --- AppCo PostgreSQL sub-chart ---
+# Set postgresql.enabled=true (typically driven from the project's
+# values.yaml) to provision a local Postgres via the AppCo chart.
+# The AppCo chart at oci://dp.apps.rancher.io/charts/postgresql follows the
+# Bitnami values schema: auth.{database,username,password}, primary.persistence,
+# global.imagePullSecrets, etc. The bundle's library-chart wires the binding
+# secret in templates/binding-secret.yaml from these defaults.
+postgresql:
+  enabled: false
+  global:
+    imagePullSecrets:
+      - application-collection
+  primary:
+    persistence:
+      enabled: false  # ephemeral storage suits inner-loop dev; flip to true for prod
+  auth:
+    database: app
+    username: app
+    password: localdev-do-not-use-in-prod
