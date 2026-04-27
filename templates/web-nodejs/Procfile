@@ -1,12 +1,11 @@
-# CNB Procfile — declares the launch processes that buildpacks register
-# with the lifecycle.
+# CNB Procfile — declares the launch processes that buildpacks register.
 #
 # - web: production launch. Plain node, no watcher overhead.
-# - dev: development launch. Uses --watch-path=src instead of --watch
-#   so node monitors the entire src/ directory rather than just the
-#   entry file. This is more robust to Tilt's file-replacement syncs
-#   (tar | kubectl exec writes files in place; node --watch on a single
-#   file can lose its inotify handle after the replacement, causing
-#   the second reload onwards to be silently missed).
+# - dev: development launch. nodemon with -L (legacy polling mode) so
+#   the watcher works through containerd/overlayfs filesystems where
+#   inotify events from `tar | kubectl exec` syncs aren't reliably
+#   propagated to user-space watchers. Uses pure stat() polling at
+#   1s default intervals — sufficient for save->reload UX, negligible
+#   CPU on dev builds. nodemon ships in devDependencies.
 web: node src/index.js
-dev: node --watch-path=src src/index.js
+dev: nodemon -L src/index.js
