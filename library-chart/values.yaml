@@ -1,5 +1,20 @@
 # Defaults for any chart depending on suse-library.
 
+# --- Helm globals propagated to every sub-chart ---
+# 'global.*' is special: Helm automatically merges it into every sub-chart's
+# values regardless of nesting. Putting imagePullSecrets here means the
+# AppCo postgresql sub-chart (and any future AppCo dep) sees it without
+# us having to re-set it inside each aliased block.
+#
+# The 'application-collection' Secret is provisioned by the RDA Rancher
+# Desktop extension (kubectl create secret docker-registry ...).
+# Per AppCo docs (apps.rancher.io/applications/postgresql), the canonical
+# install is:
+#   helm install ... --set global.imagePullSecrets={application-collection}
+global:
+  imagePullSecrets:
+    - application-collection
+
 # --- application ---
 name: ""
 replicas: 1
@@ -10,6 +25,8 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+# Pod-level pull secrets (for the application's own container, not the
+# AppCo sub-charts — those pick up via global.imagePullSecrets above).
 imagePullSecrets:
   - name: application-collection
 
@@ -30,11 +47,6 @@ probes:
 # (alias renames the values key, not the chart's internal naming).
 database:
   enabled: false
-  # AppCo charts honor the SUSE-specific 'globalImagePullSecret' key
-  # (singular) rather than the standard Helm 'global.imagePullSecrets'.
-  # Provisioned by the RDA Rancher Desktop extension (kubectl create secret
-  # docker-registry application-collection ...).
-  globalImagePullSecret: application-collection
   auth:
     # Custom application user — credentials surface in the binding secret.
     # Required when enabled=true (no defaults).
