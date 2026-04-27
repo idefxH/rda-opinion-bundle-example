@@ -1,11 +1,11 @@
 # CNB Procfile — declares the launch processes that buildpacks register.
 #
 # - web: production launch. Plain node, no watcher overhead.
-# - dev: development launch. nodemon with -L (legacy polling mode) so
-#   the watcher works through containerd/overlayfs filesystems where
+# - dev: development launch. nodemon with -L (legacy polling) so the
+#   watcher works through containerd/overlayfs filesystems where
 #   inotify events from `tar | kubectl exec` syncs aren't reliably
-#   propagated to user-space watchers. Uses pure stat() polling at
-#   1s default intervals — sufficient for save->reload UX, negligible
-#   CPU on dev builds. nodemon ships in devDependencies.
+#   propagated. nodemon is in `dependencies` (not devDeps) so it
+#   ships in every build — small extra MB, but no env juggling
+#   needed at pack time.
 web: node src/index.js
-dev: nodemon -L src/index.js
+dev: ./node_modules/.bin/nodemon -L src/index.js
