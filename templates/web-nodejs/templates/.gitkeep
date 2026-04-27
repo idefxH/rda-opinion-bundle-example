@@ -1,0 +1,3 @@
+# Project-level templates go here when the user wants resources beyond what
+# suse-library provides. Empty by default — all infrastructure comes from
+# the vendored sub-chart at charts/suse-library/.

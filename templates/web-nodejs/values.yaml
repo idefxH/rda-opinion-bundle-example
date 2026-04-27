@@ -1,46 +1,44 @@
-# Project values. The defaults below produce a working dev environment;
-# override per environment via values-staging.yaml / values-prod.yaml or
-# Helm --set flags.
+# Project values. Edit fields under `suse-library:` to customize. The sub-chart
+# at charts/suse-library/ provides the Deployment, Service, Service Binding
+# Spec wiring, and pulls AppCo sub-charts (e.g. PostgreSQL) when their
+# `<name>.enabled` flag is true.
 
-name: {{ .Name }}
-replicas: 1
-port: 8080
+suse-library:
+  name: {{ .Name }}
+  replicas: 1
+  port: 8080
 
-image:
-  repository: {{ .Name }}
-  tag: dev
-  pullPolicy: IfNotPresent
+  image:
+    repository: {{ .Name }}
+    tag: dev
+    pullPolicy: IfNotPresent
 
-# Services bound into the application via the Kubernetes Service Binding
-# Specification. Each entry mounts at /bindings/<key>/ inside the container.
-#
-# provider=local: the library chart provisions a sidecar container with
-#   default credentials suitable only for inner-loop dev.
-# provider=external: the platform team must provision a Secret in the
-#   namespace whose data follows the Service Binding spec keys
-#   (type, provider, host, port, username, password, database).
-#
-# To remove a service, comment out the entry. To switch to external,
-# set provider=external and add secretName.
-services:
-  database:
-    type: postgresql
-    provider: local
+  # Default imagePullSecret name. Created by the SUSE Application Collection
+  # extension in Rancher Desktop. If your environment doesn't auto-create
+  # it, run:
+  #   kubectl create secret docker-registry application-collection \
+  #     --docker-server=dp.apps.rancher.io \
+  #     --docker-username='YOUR_SCC_USERNAME' \
+  #     --docker-password='YOUR_SCC_PASSWORD'
+  imagePullSecrets:
+    - name: application-collection
 
-resources:
-  limits:
-    cpu: "500m"
-    memory: "512Mi"
-  requests:
-    cpu: "50m"
-    memory: "128Mi"
+  services:
+    database:
+      type: postgresql
+      provider: local
 
-probes:
-  liveness:
-    path: /health
-    initialDelaySeconds: 10
-    periodSeconds: 10
-  readiness:
-    path: /ready
-    initialDelaySeconds: 5
-    periodSeconds: 5
+  # AppCo PostgreSQL sub-chart (transitive: project → suse-library → postgresql).
+  # Set enabled: true to provision a local Postgres via the AppCo chart.
+  postgresql:
+    enabled: true
+    global:
+      imagePullSecrets:
+        - application-collection
+    primary:
+      persistence:
+        enabled: false  # ephemeral for inner-loop dev
+    auth:
+      database: {{ .Name }}
+      username: app
+      password: localdev-do-not-use-in-prod
