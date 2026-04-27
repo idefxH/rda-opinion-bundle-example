@@ -1,0 +1,5 @@
+# Heroku's nodejs buildpack v5.x requires an explicit Procfile to declare
+# the launch process. The 'web' process is what `pack` exports as the
+# default container CMD. The command runs from /workspace/ in the final
+# image, where the source has been copied.
+web: node src/index.js
