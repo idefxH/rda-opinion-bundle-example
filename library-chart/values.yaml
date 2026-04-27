@@ -30,9 +30,11 @@ probes:
 # (alias renames the values key, not the chart's internal naming).
 database:
   enabled: false
-  global:
-    imagePullSecrets:
-      - application-collection
+  # AppCo charts honor the SUSE-specific 'globalImagePullSecret' key
+  # (singular) rather than the standard Helm 'global.imagePullSecrets'.
+  # Provisioned by the RDA Rancher Desktop extension (kubectl create secret
+  # docker-registry application-collection ...).
+  globalImagePullSecret: application-collection
   auth:
     # Custom application user — credentials surface in the binding secret.
     # Required when enabled=true (no defaults).
