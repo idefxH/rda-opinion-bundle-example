@@ -1,10 +1,9 @@
-# Defaults for any chart depending on suse-library v0.6.
+# Defaults for any chart depending on suse-library v0.7.
 
 # --- Helm globals propagated to every sub-chart ---
 # 'global.*' is special: Helm automatically merges it into every
 # sub-chart's values regardless of nesting. Keeping imagePullSecrets
-# here means EVERY AppCo dep (postgresql, prometheus, grafana, ...)
-# picks it up without per-block repetition.
+# here means every AppCo dep picks it up without per-block repetition.
 global:
   imagePullSecrets:
     - application-collection
@@ -19,8 +18,7 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-# Pod-level pull secrets (for the application's OWN container; AppCo
-# sub-charts pick up via global.imagePullSecrets above).
+# Pod-level pull secrets for the application's OWN container.
 imagePullSecrets:
   - name: application-collection
 
@@ -33,43 +31,37 @@ probes:
   readiness: {path: /ready,  initialDelaySeconds: 5,  periodSeconds: 5}
 
 # ─────────────────────────────────────────────────────────────────────
-# CATALOGUE: enabled services from SUSE Application Collection
+# CATALOGUE: AppCo charts the project can opt into
 # ─────────────────────────────────────────────────────────────────────
-# Each block below is passed verbatim to its aliased AppCo sub-chart.
-# Set <service>.enabled: true to include it. Resources deploy as
-# <release>-<alias> (database, metrics, dashboard) thanks to Helm
-# alias resolution (which the Tilt extension's chart-version
-# alignment workaround makes work end-to-end).
+# Each block below is keyed on the AppCo chart name (no alias). Setting
+# <chart>.enabled: true pulls the chart at template time. The library
+# chart issues:
+#   - a Service Binding Spec Secret at <release>-<chart>-binding,
+#     mounted at /bindings/<chart>/<key>
+#   - 12-factor env vars projected from that Secret into the app
+#     container, using <CHART>_HOST/_PORT/... naming
+# The host always points at <release>-<chart>, which is what the
+# AppCo sub-chart deploys (no alias renaming, the convention is direct).
 
-# --- database (AppCo PostgreSQL, alias=database) ---
-database:
+postgresql:
   enabled: false
   auth:
-    # Custom application user. Required when enabled=true.
     database: ""
     username: ""
     password: ""
   persistence:
-    enabled: false       # ephemeral; flip to true for non-dev
+    enabled: false
   nodeCount: 1
 
-# --- metrics (AppCo Prometheus, alias=metrics) ---
-metrics:
+prometheus:
   enabled: false
-  # AppCo Prometheus exposes its API on port 9090 by default. Apps
-  # reading the binding get METRICS_URL=http://<release>-metrics:9090.
-  # Override server.* below to customize retention, scrape configs etc.
   server:
     persistentVolume:
-      enabled: false   # ephemeral; flip to true for non-dev
+      enabled: false
 
-# --- dashboard (AppCo Grafana, alias=dashboard) ---
-dashboard:
+grafana:
   enabled: false
-  # AppCo Grafana exposes its UI on port 3000. Apps reading the binding
-  # get GRAFANA_URL=http://<release>-dashboard:3000 plus admin creds.
-  # Default datasource: the metrics service if metrics.enabled=true.
   adminUser: admin
-  adminPassword: ""    # required when enabled=true
+  adminPassword: ""
   persistence:
-    enabled: false     # ephemeral; flip to true for non-dev
+    enabled: false

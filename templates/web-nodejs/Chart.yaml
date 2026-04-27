@@ -8,8 +8,9 @@ keywords: [rda, {{ .Language }}]
 
 dependencies:
   - name: suse-library
-    version: 0.6.0
+    version: 0.7.0
     # Vendored at charts/suse-library/. The library chart references
-    # AppCo charts (postgresql=database, prometheus=metrics,
-    # grafana=dashboard). The Tilt extension's helm-dep recursive
-    # update + chart-version alignment makes the alias propagation work.
+    # AppCo charts by their real name (postgresql, prometheus, grafana,
+    # ...) — toggle each one via suse-library.<chart>.enabled in
+    # values.yaml. The Tilt extension's chart-version alignment +
+    # recursive helm dep update make the multi-level resolution work.
