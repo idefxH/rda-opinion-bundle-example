@@ -1,5 +1,11 @@
-# Heroku's nodejs buildpack v5.x requires an explicit Procfile to declare
-# the launch process. The 'web' process is what `pack` exports as the
-# default container CMD. The command runs from /workspace/ in the final
-# image, where the source has been copied.
+# CNB Procfile — declares the launch processes that buildpacks register
+# with the lifecycle.
+#
+# - web: production launch. The app respects $PORT and $SERVICE_BINDING_ROOT.
+# - dev: development launch. Adds Node's `--watch` flag so file changes
+#   inside /workspace/src/ restart the process automatically. The Tilt
+#   extension passes `pack build --default-process dev` for inner-loop
+#   builds, so the local image runs in --watch mode while CI/CD images
+#   built without that flag default to `web` (production behaviour).
 web: node src/index.js
+dev: node --watch src/index.js
