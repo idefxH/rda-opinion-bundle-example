@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: "registry.suse.com/bci/postgres:15"
+          image: "dp.apps.rancher.io/containers/postgresql:15.17-26.1"
           env:
             - name: POSTGRES_DB
               value: {{ include "app.name" $ }}
