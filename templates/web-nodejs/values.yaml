@@ -1,8 +1,8 @@
 # Project values for {{ .Name }}.
 #
-# All knobs live under suse-library:. Toggle services on/off via
-# <service>.enabled: true|false. The library chart owns the catalogue;
-# this file just opts in.
+# Toggle services on under suse-library:.<service>:.enabled. The library
+# chart owns the catalogue (database, metrics, dashboard); this file
+# just opts in.
 
 suse-library:
   name: {{ .Name }}
@@ -17,12 +17,30 @@ suse-library:
   imagePullSecrets:
     - name: application-collection
 
-  # Approved service: PostgreSQL via AppCo. Single toggle: enabled: true.
-  # Auth values populate BOTH the postgresql sub-chart's runtime config
+  # ─── database (PostgreSQL) ─────────────────────────────────────────
+  # Auth values populate BOTH the postgres sub-chart's runtime config
   # AND the Service Binding Spec secret mounted into the app container.
+  # The library chart also projects these as DB_HOST/DB_PORT/DB_USER/
+  # DB_PASSWORD/DB_NAME env vars for 12-factor apps.
   database:
     enabled: true
     auth:
       username: app
       password: localdev-do-not-use-in-prod
       database: {{ .Name }}
+
+  # ─── metrics (Prometheus) ──────────────────────────────────────────
+  # When enabled, app gets PROMETHEUS_URL=http://<release>-metrics-server:9090
+  # and a binding mount under /bindings/metrics/. Off by default —
+  # uncomment to add a metrics stack to your dev loop.
+  # metrics:
+  #   enabled: true
+
+  # ─── dashboard (Grafana) ───────────────────────────────────────────
+  # When enabled, app gets GRAFANA_URL + admin creds and a binding
+  # mount under /bindings/dashboard/. Off by default — uncomment for
+  # full observability stack.
+  # dashboard:
+  #   enabled: true
+  #   adminUser: admin
+  #   adminPassword: localdev-do-not-use-in-prod

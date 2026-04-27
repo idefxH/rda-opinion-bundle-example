@@ -1,21 +1,15 @@
-# Defaults for any chart depending on suse-library.
+# Defaults for any chart depending on suse-library v0.6.
 
 # --- Helm globals propagated to every sub-chart ---
-# 'global.*' is special: Helm automatically merges it into every sub-chart's
-# values regardless of nesting. Putting imagePullSecrets here means the
-# AppCo postgresql sub-chart (and any future AppCo dep) sees it without
-# us having to re-set it inside each aliased block.
-#
-# The 'application-collection' Secret is provisioned by the RDA Rancher
-# Desktop extension (kubectl create secret docker-registry ...).
-# Per AppCo docs (apps.rancher.io/applications/postgresql), the canonical
-# install is:
-#   helm install ... --set global.imagePullSecrets={application-collection}
+# 'global.*' is special: Helm automatically merges it into every
+# sub-chart's values regardless of nesting. Keeping imagePullSecrets
+# here means EVERY AppCo dep (postgresql, prometheus, grafana, ...)
+# picks it up without per-block repetition.
 global:
   imagePullSecrets:
     - application-collection
 
-# --- application ---
+# --- application config ---
 name: ""
 replicas: 1
 port: 8080
@@ -25,8 +19,8 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-# Pod-level pull secrets (for the application's own container, not the
-# AppCo sub-charts — those pick up via global.imagePullSecrets above).
+# Pod-level pull secrets (for the application's OWN container; AppCo
+# sub-charts pick up via global.imagePullSecrets above).
 imagePullSecrets:
   - name: application-collection
 
@@ -38,21 +32,44 @@ probes:
   liveness:  {path: /health, initialDelaySeconds: 10, periodSeconds: 10}
   readiness: {path: /ready,  initialDelaySeconds: 5,  periodSeconds: 5}
 
-# --- AppCo service: database (Postgres) ---
-# Aliased as 'database' in suse-library/Chart.yaml. The values below are
-# passed verbatim to the AppCo postgresql sub-chart. AppCo schema (NOT
-# Bitnami): see https://apps.rancher.io/applications/postgresql.
-#
-# Resources deployed by the sub-chart are still named <release>-postgresql
-# (alias renames the values key, not the chart's internal naming).
+# ─────────────────────────────────────────────────────────────────────
+# CATALOGUE: enabled services from SUSE Application Collection
+# ─────────────────────────────────────────────────────────────────────
+# Each block below is passed verbatim to its aliased AppCo sub-chart.
+# Set <service>.enabled: true to include it. Resources deploy as
+# <release>-<alias> (database, metrics, dashboard) thanks to Helm
+# alias resolution (which the Tilt extension's chart-version
+# alignment workaround makes work end-to-end).
+
+# --- database (AppCo PostgreSQL, alias=database) ---
 database:
   enabled: false
   auth:
-    # Custom application user — credentials surface in the binding secret.
-    # Required when enabled=true (no defaults).
+    # Custom application user. Required when enabled=true.
     database: ""
     username: ""
     password: ""
   persistence:
-    enabled: false       # ephemeral storage — flip to true for prod
+    enabled: false       # ephemeral; flip to true for non-dev
   nodeCount: 1
+
+# --- metrics (AppCo Prometheus, alias=metrics) ---
+metrics:
+  enabled: false
+  # AppCo Prometheus exposes its API on port 9090 by default. Apps
+  # reading the binding get METRICS_URL=http://<release>-metrics:9090.
+  # Override server.* below to customize retention, scrape configs etc.
+  server:
+    persistentVolume:
+      enabled: false   # ephemeral; flip to true for non-dev
+
+# --- dashboard (AppCo Grafana, alias=dashboard) ---
+dashboard:
+  enabled: false
+  # AppCo Grafana exposes its UI on port 3000. Apps reading the binding
+  # get GRAFANA_URL=http://<release>-dashboard:3000 plus admin creds.
+  # Default datasource: the metrics service if metrics.enabled=true.
+  adminUser: admin
+  adminPassword: ""    # required when enabled=true
+  persistence:
+    enabled: false     # ephemeral; flip to true for non-dev

@@ -1,29 +1,54 @@
 apiVersion: v2
 name: suse-library
 description: |
-  SUSE Rancher Developer Access library chart. Encapsulates the application
-  Deployment + Service + Service Binding Spec wiring, AND references the
-  SUSE Application Collection charts that projects can opt into via
-  '<service>.enabled: true' in their values.
+  SUSE Rancher Developer Access library chart. Encapsulates the
+  application Deployment + Service + Service Binding Spec wiring AND
+  references the SUSE Application Collection charts that projects can
+  opt into via `<service>.enabled: true` in their values.
 
   This is the opinion: the library chart owns the catalogue of approved
-  services and their binding conventions. Projects don't reinvent — they
-  enable.
+  services and their binding conventions. Projects don't reinvent —
+  they enable.
+
+  CATALOGUE (v0.6):
+    - database  → AppCo PostgreSQL  (binding mounted at /bindings/database/)
+    - metrics   → AppCo Prometheus  (binding mounted at /bindings/metrics/)
+    - dashboard → AppCo Grafana     (binding mounted at /bindings/dashboard/)
+
+  Each enabled service surfaces both the Service Binding Specification
+  files and conventional 12-factor env vars (DB_HOST, PROMETHEUS_URL,
+  GRAFANA_URL, etc.) so portable apps work without learning the SBS
+  filesystem contract.
 type: application
-version: 0.5.0
+version: 0.6.0
 appVersion: "1.0"
-keywords: [suse, rda, library, service-binding]
+keywords: [suse, rda, library, service-binding, postgres, prometheus, grafana]
 home: https://github.com/idefxH/rda-opinion-bundle-example
 maintainers: [{name: idefxH, email: fx.houard@gmail.com}]
 
-# Approved AppCo service charts. Each is aliased to a stable, semantic name
-# so projects can toggle '<service>.enabled: true' under suse-library values.
-# Note: Helm's 'alias' renames the values key and condition key, but does
-# NOT rename the K8s resources — those keep the sub-chart's own naming
-# (e.g. <release>-postgresql for the AppCo postgresql chart).
+# Approved AppCo service charts. Aliases are the binding names (also the
+# resource-name suffix once helm alias resolution works correctly).
+#
+# Note: AppCo charts have a packaging quirk where the OCI artifact tag
+# (e.g. "0.4.4-29.1") differs from the chart's internal Chart.yaml
+# version (e.g. "0.4.4"). Helm's dep matching uses the INTERNAL version,
+# so the alias silently fails to resolve at template time. The Tilt
+# extension's `_align_subchart_versions.py` post-processor rewrites the
+# pulled tgz to align the internal version with the dep declaration.
+# Drop that workaround once AppCo aligns version<->tag.
 dependencies:
   - name: postgresql
     version: "0.4.4-29.1"
     repository: oci://dp.apps.rancher.io/charts
     alias: database
     condition: database.enabled
+  - name: prometheus
+    version: "29.2.1-6.1"
+    repository: oci://dp.apps.rancher.io/charts
+    alias: metrics
+    condition: metrics.enabled
+  - name: grafana
+    version: "12.2.1-8.1"
+    repository: oci://dp.apps.rancher.io/charts
+    alias: dashboard
+    condition: dashboard.enabled
