@@ -8,6 +8,23 @@ global:
   imagePullSecrets:
     - application-collection
 
+# ─── Unified DSL (apiVersion: rda.suse.com/v1alpha1) ───
+# When services[] is non-empty, the library renders binding-secrets and
+# env vars from this list (the DSL view). When empty, the library falls
+# back to the legacy <chart>.enabled gated path. See PROPOSAL.md in
+# rda-devx-catalog for the design rationale.
+#
+# Each service entry MUST have:
+#   binding: string (app-side env name root: <BINDING>_HOST etc.)
+#   type:    string (AppCo chart name; v1alpha1 supports postgresql, redis, grafana)
+# Plus type-specific auth/persistence/metrics/ingress/bootstrap fields per
+# rda-devx-catalog/SCHEMA.md. The legacy <chart>.* blocks below remain in
+# values.yaml for sub-chart resolution; the rda CLI pre-processor (Phase 1.5)
+# will keep them in sync with services[].
+apiVersion: rda.suse.com/v1alpha1
+services: []
+
+
 # --- application config ---
 name: ""
 replicas: 1
