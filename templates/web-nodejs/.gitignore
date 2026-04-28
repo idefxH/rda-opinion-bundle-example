@@ -4,3 +4,10 @@ npm-debug.log
 .tiltbuild/
 .DS_Store
 
+# Vendored Helm sub-charts — populated by `rda new` (and refreshed by
+# `rda upgrade`) from the bundle's library-chart/. No need to track.
+chart/charts/
+chart/Chart.lock
+
+# Buildpack outputs (pack build leaves these in CWD on some setups)
+*.cnb

@@ -4,3 +4,7 @@ npm-debug.log
 .tilt
 .tiltbuild
 .DS_Store
+
+# The Helm chart is not part of the container image — it deploys it.
+# Excluding it keeps the build context small.
+chart

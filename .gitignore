@@ -1,2 +1,11 @@
 # OS noise
 .DS_Store
+
+# Accidentally-pulled vendored sub-charts. The bundle ships the canonical
+# library-chart/ directly; templates/*/chart/ scaffolds are stripped of
+# their charts/ at scaffold time. If anyone runs `helm dep update` against
+# a template's chart/ for testing, gitignore the result.
+templates/*/chart/charts/
+templates/*/chart/Chart.lock
+library-chart/charts/
+library-chart/Chart.lock
