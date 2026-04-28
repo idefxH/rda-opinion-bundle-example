@@ -40,6 +40,11 @@ spec:
             - {name: SERVICE_BINDING_ROOT, value: /bindings}
             # 12-factor PORT — user code MUST respect process.env.PORT.
             - {name: PORT, value: "{{ .Values.port }}"}
+            {{- /* DSL path: project env from each services[] entry (Phase 1) */ -}}
+            {{- range $i, $svc := .Values.services }}
+            # ─── DSL binding {{ $svc.binding }} (type {{ $svc.type }}) ───
+            {{- include "suse-library.dsl.envFromBinding" (dict "svc" $svc "release" $.Release.Name) | nindent 12 }}
+            {{- end }}
             {{- if .Values.postgresql.enabled }}
             # ─── postgresql binding (12-factor projection) ───
             # Apps that prefer SBS read /bindings/postgresql/<key> instead.

@@ -23,3 +23,160 @@ revisions (otherwise existing Deployments cannot find their Pods).
 app.kubernetes.io/name: {{ include "suse-library.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{/*
+DSL helpers — added in v0.10 for the unified `services[]` block.
+
+The DSL coexists with the legacy <chart>.* blocks (Phase 1, see PROPOSAL).
+Library templates consume the DSL for binding-secret rendering, app env
+projection, and audit labels. The legacy blocks still feed the AppCo
+sub-charts via Helm's standard sub-chart values resolution.
+
+`suse-library.dsl.services` returns the project's services[] list, or
+an empty list when not declared.
+*/}}
+{{- define "suse-library.dsl.services" -}}
+{{- if .Values.services -}}
+{{- toYaml .Values.services -}}
+{{- else -}}
+[]
+{{- end -}}
+{{- end -}}
+
+{{/*
+`suse-library.dsl.findByType` returns the FIRST service of a given type, or
+nothing if none. Use as: {{- $svc := include "suse-library.dsl.findByType"
+(dict "type" "postgresql" "Values" .Values) | fromYaml -}}.
+*/}}
+{{- define "suse-library.dsl.findByType" -}}
+{{- $type := .type -}}
+{{- range $i, $svc := .Values.services -}}
+{{- if eq $svc.type $type -}}
+{{- toYaml $svc -}}
+{{- break -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+`suse-library.dsl.findByBinding` returns the FIRST service with a given
+binding name, or nothing if none.
+*/}}
+{{- define "suse-library.dsl.findByBinding" -}}
+{{- $binding := .binding -}}
+{{- range $i, $svc := .Values.services -}}
+{{- if eq $svc.binding $binding -}}
+{{- toYaml $svc -}}
+{{- break -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+`suse-library.dsl.validateConsistency` fails loud if the DSL and the legacy
+<chart>.* blocks disagree on key fields (auth.user.password vs auth.password,
+etc.). Phase 1: the dev writes both; we ensure they don't drift.
+Phase 1.5: the rda CLI pre-processor will write the legacy blocks from the
+DSL, eliminating drift.
+*/}}
+{{- define "suse-library.dsl.validateConsistency" -}}
+{{- range $i, $svc := .Values.services -}}
+{{- $type := $svc.type -}}
+{{- $legacy := index $.Values $type | default dict -}}
+{{- if eq $type "postgresql" -}}
+{{- if and $legacy.enabled (and $svc.auth $svc.auth.user) -}}
+{{- if and $svc.auth.user.password $legacy.auth -}}
+{{- if and $legacy.auth.password (ne $svc.auth.user.password $legacy.auth.password) -}}
+{{- fail (printf "DSL drift: services[type=postgresql].auth.user.password (%s) != postgresql.auth.password (%s). Phase 1 requires the two views to agree until the rda CLI pre-processor lands. See rda-devx-catalog/PROPOSAL.md." $svc.auth.user.password $legacy.auth.password) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{/* Add similar checks for redis, grafana as those types land in services[] */}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+`suse-library.dsl.envFromBinding` projects the standard <BINDING>_* env
+vars referencing the binding-secret. Used in deployment.yaml for each
+service in services[]. Yields proper YAML at the env: list level.
+
+The shape is :
+  - { name: <BINDING>_HOST,     valueFrom: { secretKeyRef: { name: <release>-<binding>-binding, key: host     } } }
+  - { name: <BINDING>_PORT,     valueFrom: { secretKeyRef: { name: <release>-<binding>-binding, key: port     } } }
+  - { name: <BINDING>_USERNAME, valueFrom: { secretKeyRef: { name: <release>-<binding>-binding, key: username } } } (when present)
+  ...
+
+The set of projected keys per service type is documented in CATALOG.md.
+*/}}
+{{- define "suse-library.dsl.envFromBinding" -}}
+{{- $svc := .svc -}}
+{{- $release := .release -}}
+{{- $bindingUpper := upper $svc.binding | replace "-" "_" -}}
+{{- $secret := printf "%s-%s-binding" $release $svc.binding -}}
+- name: {{ $bindingUpper }}_HOST
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: host } }
+- name: {{ $bindingUpper }}_PORT
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: port } }
+{{- if eq $svc.type "postgresql" }}
+- name: {{ $bindingUpper }}_USERNAME
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: username } }
+- name: {{ $bindingUpper }}_PASSWORD
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: password } }
+- name: {{ $bindingUpper }}_DATABASE
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: database } }
+{{- else if eq $svc.type "redis" }}
+- name: {{ $bindingUpper }}_PASSWORD
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: password } }
+{{- else if eq $svc.type "grafana" }}
+- name: {{ $bindingUpper }}_URL
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: url } }
+- name: {{ $bindingUpper }}_ADMIN_USER
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: adminUser } }
+- name: {{ $bindingUpper }}_ADMIN_PASSWORD
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: adminPassword } }
+{{- end }}
+{{- end -}}
+
+{{/*
+`suse-library.dsl.bindingSecretFrom` renders a SBS binding-secret for a
+single DSL service entry. Used by binding-secret.yaml.
+*/}}
+{{- define "suse-library.dsl.bindingSecretFrom" -}}
+{{- $svc := .svc -}}
+{{- $root := .root -}}
+{{- $release := $root.Release.Name -}}
+{{- $name := printf "%s-%s-binding" $release $svc.binding }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "suse-library.labels" $root | nindent 4 }}
+    service.binding/binding-name: {{ $svc.binding }}
+    service.binding/binding-type: {{ $svc.type }}
+type: Opaque
+stringData:
+  type: {{ $svc.type | quote }}
+  provider: rda-appco
+{{- if eq $svc.type "postgresql" }}
+  host: "{{ $release }}-{{ $svc.type }}"
+  port: "5432"
+  username: {{ $svc.auth.user.name | default "app" | quote }}
+  password: {{ required (printf "services[binding=%s].auth.user.password is required for type=postgresql" $svc.binding) $svc.auth.user.password | quote }}
+  database: {{ required (printf "services[binding=%s].auth.user.database is required for type=postgresql" $svc.binding) $svc.auth.user.database | quote }}
+{{- else if eq $svc.type "redis" }}
+  host: "{{ $release }}-{{ $svc.type }}-master"
+  port: "6379"
+  password: {{ required (printf "services[binding=%s].auth.password is required for type=redis" $svc.binding) $svc.auth.password | quote }}
+{{- else if eq $svc.type "grafana" }}
+  host: "{{ $release }}-{{ $svc.type }}"
+  port: "80"
+  url: "http://{{ $release }}-{{ $svc.type }}"
+  adminUser: {{ $svc.auth.admin.name | default "admin" | quote }}
+  adminPassword: {{ required (printf "services[binding=%s].auth.admin.password is required for type=grafana" $svc.binding) $svc.auth.admin.password | quote }}
+{{- else }}
+{{- fail (printf "Unsupported service type %q for binding %q in DSL v1alpha1. Add a case to suse-library.dsl.bindingSecretFrom in _helpers.tpl. Supported in this version: postgresql, redis, grafana." $svc.type $svc.binding) }}
+{{- end }}
+{{- end -}}
