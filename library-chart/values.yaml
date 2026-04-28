@@ -55,9 +55,23 @@ postgresql:
 
 prometheus:
   enabled: false
+  # Server is the only component we want by default in dev. The other
+  # components from the Prometheus community chart (node-exporter,
+  # alertmanager, pushgateway, kube-state-metrics) all bind hostPorts
+  # or duplicate cluster-wide functions; on a single-node dev cluster
+  # they collide with the system or with previous installs. Users can
+  # opt them back in per-project via values overrides.
   server:
     persistentVolume:
       enabled: false
+  alertmanager:
+    enabled: false
+  prometheus-node-exporter:
+    enabled: false
+  prometheus-pushgateway:
+    enabled: false
+  kube-state-metrics:
+    enabled: false
 
 grafana:
   enabled: false
