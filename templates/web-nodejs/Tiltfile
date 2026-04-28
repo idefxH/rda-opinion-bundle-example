@@ -15,9 +15,23 @@ v1alpha1.extension(
 )
 load('ext://suse-rda', 'suse_app')
 
+# `services` maps the actual K8s resource name (= what the AppCo chart
+# deploys) to the service type, used to surface the right port-forward.
+# - postgresql chart deploys <release>-postgresql
+# - prometheus chart deploys <release>-prometheus-server (alongside
+#   pushgateway, node-exporter, kube-state-metrics, alertmanager which
+#   the extension ignores by default)
+# - grafana chart deploys <release>-grafana
+#
+# Uncomment the lines below to opt into the matching service. Each
+# service must also be enabled in values.yaml (suse-library.<chart>.enabled).
 suse_app(
     name='{{ .Name }}',
     language='{{ .Language }}',
     port=8080,
-    services={'database': 'postgresql'},
+    services={
+        'postgresql':        'postgresql',
+        # 'prometheus-server': 'prometheus',
+        # 'grafana':           'grafana',
+    },
 )
