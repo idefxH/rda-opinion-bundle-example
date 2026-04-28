@@ -30,6 +30,26 @@ probes:
   liveness:  {path: /health, initialDelaySeconds: 10, periodSeconds: 10}
   readiness: {path: /ready,  initialDelaySeconds: 5,  periodSeconds: 5}
 
+# ─── Prometheus scrape annotations (opinionated default) ───
+# When metrics.enabled is true, the app pod is annotated with
+#   prometheus.io/scrape: "true"
+#   prometheus.io/path:   <metrics.path>      (default /metrics)
+#   prometheus.io/port:   <metrics.port>      (default .Values.port)
+# so the Prometheus chart's `kubernetes-pods` discovery picks it up
+# automatically without any extra ServiceMonitor / PodMonitor config.
+# Disable when your app does not expose a /metrics endpoint.
+metrics:
+  enabled: true
+  path: /metrics
+  # port: 8080  # defaults to .Values.port
+
+# Free-form pod annotations merged into the Deployment's pod template.
+# Use for app-specific concerns (Linkerd inject, Istio sidecar config,
+# ingress-nginx auth annotations propagated to pods, etc.). Prometheus
+# scrape annotations live in the metrics block above; setting the same
+# keys here will override them.
+podAnnotations: {}
+
 # ─────────────────────────────────────────────────────────────────────
 # CATALOGUE: AppCo charts the project can opt into
 # ─────────────────────────────────────────────────────────────────────
