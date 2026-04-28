@@ -50,6 +50,21 @@ metrics:
 # keys here will override them.
 podAnnotations: {}
 
+# ─── Ingress (optional) ───
+# When enabled, the library chart emits a single Ingress fronting the
+# application Service. Path rules are simple by default — one path per
+# host, all routed to the app's `http` port. Override `path`/`pathType`
+# for a different routing convention; use `annotations` to plug into
+# Traefik/nginx-specific behaviour (auth, rewrites, rate limits).
+ingress:
+  enabled: false
+  ingressClassName: ""        # e.g. "traefik" on Rancher Desktop, "nginx" elsewhere
+  hosts: []                   # e.g. - demo.localhost
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls: []                     # e.g. - {hosts: [demo.example.com], secretName: demo-tls}
+
 # ─────────────────────────────────────────────────────────────────────
 # CATALOGUE: AppCo charts the project can opt into
 # ─────────────────────────────────────────────────────────────────────
