@@ -156,6 +156,13 @@ metadata:
     {{- include "suse-library.labels" $root | nindent 4 }}
     service.binding/binding-name: {{ $svc.binding }}
     service.binding/binding-type: {{ $svc.type }}
+  annotations:
+    # rda.suse.com/source documents which DSL key this resource was generated from.
+    # Manifesto principle: learning. Devs who inspect a Secret can trace it back
+    # to their values.yaml without having to dive into helper code.
+    # See idefxH/rda-devx-catalog/PROPOSAL.md (Manifesto re-read amendment).
+    rda.suse.com/source: "services[binding={{ $svc.binding }}].type={{ $svc.type }}"
+    rda.suse.com/helper: "suse-library.dsl.bindingSecretFrom"
 type: Opaque
 stringData:
   type: {{ $svc.type | quote }}
