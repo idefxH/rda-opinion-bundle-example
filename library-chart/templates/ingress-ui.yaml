@@ -1,0 +1,62 @@
+{{/*
+  Auto-Ingress for catalogued UI services (bundle issue #8).
+
+  When a catalogued chart with a UI is enabled AND its `<chart>.ui.expose`
+  is true, the library renders an Ingress at:
+
+    <chart>.<release>.localhost  (default host)
+
+  Overrides per chart:
+    <chart>.ui.expose: false   — opt out
+    <chart>.ui.host: "..."     — custom host
+    <chart>.ui.path: "/"       — alternate path (default /)
+
+  Implementation: option 1 in the issue (library renders the Ingress
+  itself, knowing the chart's Service name + UI port from a per-chart
+  registry below). Option 2 (delegate to sub-chart's own ingress.*) is
+  rejected for now because the sub-charts' Ingress shapes differ enough
+  that maintaining a values-injection table is more brittle than just
+  rendering one consistent Ingress here.
+
+  The registry below mirrors CATALOG.md's connectivity dimension. To
+  add a new UI chart: add an entry to $uiCharts AND a `ui.expose: true`
+  default in values.yaml under that chart.
+*/}}
+{{- $uiCharts := dict
+  "grafana"    (dict "service" "grafana" "port" 80)
+  "prometheus" (dict "service" "prometheus-server" "port" 80)
+-}}
+{{- $rel := include "suse-library.name" . -}}
+{{- range $chart, $cfg := $uiCharts }}
+{{- $vals := index $.Values $chart | default dict -}}
+{{- if and (index $vals "enabled") (ne (index ($vals.ui | default dict) "expose") false) }}
+{{- $ui := $vals.ui | default dict -}}
+{{- $host := $ui.host | default (printf "%s.%s.localhost" $chart $rel) -}}
+{{- $path := $ui.path | default "/" -}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-%s-ui" $rel $chart }}
+  labels:
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    rda.suse.com/ui-for-chart: {{ $chart | quote }}
+  annotations:
+    rda.suse.com/source: {{ printf "%s.ui.expose" $chart | quote }}
+spec:
+  {{- with $.Values.ingress.ingressClassName }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: {{ $path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ printf "%s-%s" $rel $cfg.service }}
+                port:
+                  number: {{ $cfg.port }}
+{{- end }}
+{{- end }}

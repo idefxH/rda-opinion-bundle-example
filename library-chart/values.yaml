@@ -132,6 +132,15 @@ prometheus:
   server:
     persistentVolume:
       enabled: false
+  # Auto-Ingress for the Prometheus UI. When prometheus.enabled is
+  # true, the library renders an Ingress at prometheus.<release>.localhost
+  # so the dev opens the expression browser from a browser without
+  # configuring a host explicitly. Override:
+  #   prometheus.ui.expose: false  # opt out
+  #   prometheus.ui.host: "..."    # custom host
+  # Refs bundle issue #8.
+  ui:
+    expose: true
   alertmanager:
     enabled: false
   prometheus-node-exporter:
@@ -152,3 +161,10 @@ grafana:
   # opinion bundle's value prop.
   metrics:
     enabled: true
+  # Auto-Ingress for the Grafana UI. When grafana.enabled is true, the
+  # library renders an Ingress at grafana.<release>.localhost. Override:
+  #   grafana.ui.expose: false  # opt out
+  #   grafana.ui.host: "..."    # custom host
+  # Refs bundle issue #8.
+  ui:
+    expose: true
