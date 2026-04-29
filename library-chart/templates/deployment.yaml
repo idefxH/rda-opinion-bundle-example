@@ -45,43 +45,37 @@ spec:
             # ─── DSL binding {{ $svc.binding }} (type {{ $svc.type }}) ───
             {{- include "suse-library.dsl.envFromBinding" (dict "svc" $svc "release" $.Release.Name) | nindent 12 }}
             {{- end }}
+            {{- /*
+                Legacy bindings (one block per chart). Each `if` arm calls a
+                category helper from _helpers.tpl (issue #5). New legacy
+                charts plug in here with a single line — no copy-paste of
+                the full env-var shape.
+            */}}
             {{- if .Values.postgresql.enabled }}
-            # ─── postgresql binding (12-factor projection) ───
+            # ─── postgresql binding (12-factor projection, sql-db category) ───
             # Apps that prefer SBS read /bindings/postgresql/<key> instead.
             # Both <CHART>_* (verbose, unambiguous) and DB_* (semantic
             # alias for portable SQL libs like Sequelize, Prisma, pg)
             # are projected from the same Secret.
-            - {name: POSTGRESQL_HOST,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: host}}}
-            - {name: POSTGRESQL_PORT,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: port}}}
-            - {name: POSTGRESQL_USER,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: username}}}
-            - {name: POSTGRESQL_PASSWORD, valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: password}}}
-            - {name: POSTGRESQL_DATABASE, valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: database}}}
-            # Semantic SQL aliases — first SQL chart enabled wins.
-            - {name: DB_HOST,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: host}}}
-            - {name: DB_PORT,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: port}}}
-            - {name: DB_USER,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: username}}}
-            - {name: DB_PASSWORD, valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: password}}}
-            - {name: DB_NAME,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-postgresql-binding, key: database}}}
+            {{- include "suse-library.legacy.envForSqlDb" (dict "chart" "postgresql" "release" (include "suse-library.name" .)) | nindent 12 }}
             {{- end }}
             {{- if .Values.prometheus.enabled }}
-            # ─── prometheus binding (12-factor projection) ───
-            - {name: PROMETHEUS_URL, valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-prometheus-binding, key: url}}}
+            # ─── prometheus binding (12-factor projection, url-only category) ───
+            {{- include "suse-library.legacy.envForUrlOnly" (dict "chart" "prometheus" "release" (include "suse-library.name" .)) | nindent 12 }}
             {{- end }}
             {{- if .Values.grafana.enabled }}
-            # ─── grafana binding (12-factor projection) ───
-            - {name: GRAFANA_URL,            valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-grafana-binding, key: url}}}
-            - {name: GRAFANA_ADMIN_USER,     valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-grafana-binding, key: adminUser}}}
-            - {name: GRAFANA_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: {{ include "suse-library.name" . }}-grafana-binding, key: adminPassword}}}
+            # ─── grafana binding (12-factor projection, ui-with-admin category) ───
+            {{- include "suse-library.legacy.envForUiWithAdmin" (dict "chart" "grafana" "release" (include "suse-library.name" .)) | nindent 12 }}
             {{- end }}
           volumeMounts:
             {{- if .Values.postgresql.enabled }}
-            - {name: binding-postgresql, mountPath: /bindings/postgresql, readOnly: true}
+            {{- include "suse-library.legacy.bindingMount" (dict "chart" "postgresql") | nindent 12 }}
             {{- end }}
             {{- if .Values.prometheus.enabled }}
-            - {name: binding-prometheus, mountPath: /bindings/prometheus, readOnly: true}
+            {{- include "suse-library.legacy.bindingMount" (dict "chart" "prometheus") | nindent 12 }}
             {{- end }}
             {{- if .Values.grafana.enabled }}
-            - {name: binding-grafana, mountPath: /bindings/grafana, readOnly: true}
+            {{- include "suse-library.legacy.bindingMount" (dict "chart" "grafana") | nindent 12 }}
             {{- end }}
           livenessProbe:
             httpGet: {path: {{ .Values.probes.liveness.path }}, port: http}
@@ -94,14 +88,11 @@ spec:
           resources: {{ toYaml .Values.resources | nindent 12 }}
       volumes:
         {{- if .Values.postgresql.enabled }}
-        - name: binding-postgresql
-          secret: {secretName: {{ include "suse-library.name" . }}-postgresql-binding}
+        {{- include "suse-library.legacy.bindingVolume" (dict "chart" "postgresql" "release" (include "suse-library.name" .)) | nindent 8 }}
         {{- end }}
         {{- if .Values.prometheus.enabled }}
-        - name: binding-prometheus
-          secret: {secretName: {{ include "suse-library.name" . }}-prometheus-binding}
+        {{- include "suse-library.legacy.bindingVolume" (dict "chart" "prometheus" "release" (include "suse-library.name" .)) | nindent 8 }}
         {{- end }}
         {{- if .Values.grafana.enabled }}
-        - name: binding-grafana
-          secret: {secretName: {{ include "suse-library.name" . }}-grafana-binding}
+        {{- include "suse-library.legacy.bindingVolume" (dict "chart" "grafana" "release" (include "suse-library.name" .)) | nindent 8 }}
         {{- end }}

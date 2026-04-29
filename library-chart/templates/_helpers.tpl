@@ -339,3 +339,192 @@ stringData:
   adminPassword: {{ required (printf "services[binding=%s].auth.admin.password is required for type=grafana" $svc.binding) $svc.auth.admin.password | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+─── Legacy-path helpers (issue #5) ──────────────────────────────────────
+
+The DSL services[] path is the future; the legacy `<chart>.enabled` path
+is what lets bundles <= v0.9 still render. Each helper below replaces a
+hand-rolled block of binding-secret + env-projection + volume wiring per
+chart. New legacy charts plug in by adding `<chart>.enabled` flags in
+values.yaml and one call site in deployment.yaml / binding-secret.yaml.
+
+Categories (matching the issue's taxonomy):
+  - sql-db       postgresql, mariadb, mysql       (host/port/user/password/database + DB_* aliases)
+  - url-only     prometheus                        (just URL)
+  - ui-with-admin grafana                          (URL + admin user/password)
+
+These helpers will be removed in Phase 1.5 when the rda CLI pre-processor
+auto-generates the legacy blocks from services[].
+*/}}
+
+{{/*
+suse-library.legacy.envForSqlDb — emit env vars for a SQL-database binding.
+Args (dict):
+  chart   string  AppCo chart name (e.g. "postgresql")
+  release string  release name (output of `include "suse-library.name" .`)
+Side effect: emits 10 env vars — 5 chart-prefixed (POSTGRESQL_*) + 5 DB_*
+semantic aliases. The aliases are emitted exactly once per call: callers
+wanting multiple SQL services must serialise — only the first SQL chart
+should pull DB_* aliases (the rest collide).
+*/}}
+{{- define "suse-library.legacy.envForSqlDb" -}}
+{{- $chart := .chart -}}
+{{- $rel := .release -}}
+{{- $upper := upper $chart -}}
+- {name: {{ $upper }}_HOST,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: host}}}
+- {name: {{ $upper }}_PORT,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: port}}}
+- {name: {{ $upper }}_USER,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: username}}}
+- {name: {{ $upper }}_PASSWORD, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: password}}}
+- {name: {{ $upper }}_DATABASE, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: database}}}
+- {name: DB_HOST,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: host}}}
+- {name: DB_PORT,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: port}}}
+- {name: DB_USER,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: username}}}
+- {name: DB_PASSWORD, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: password}}}
+- {name: DB_NAME,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: database}}}
+{{- end -}}
+
+{{/*
+suse-library.legacy.envForUrlOnly — emit a single <CHART>_URL env var.
+Args (dict): chart, release. Used by url-only services like prometheus.
+*/}}
+{{- define "suse-library.legacy.envForUrlOnly" -}}
+{{- $chart := .chart -}}
+{{- $rel := .release -}}
+{{- $upper := upper $chart -}}
+- {name: {{ $upper }}_URL, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: url}}}
+{{- end -}}
+
+{{/*
+suse-library.legacy.envForUiWithAdmin — emit URL + ADMIN_USER + ADMIN_PASSWORD.
+Args (dict): chart, release. Used by UI services with an admin login (grafana).
+*/}}
+{{- define "suse-library.legacy.envForUiWithAdmin" -}}
+{{- $chart := .chart -}}
+{{- $rel := .release -}}
+{{- $upper := upper $chart -}}
+- {name: {{ $upper }}_URL,            valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: url}}}
+- {name: {{ $upper }}_ADMIN_USER,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: adminUser}}}
+- {name: {{ $upper }}_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: adminPassword}}}
+{{- end -}}
+
+{{/*
+suse-library.legacy.bindingMount — emit the volumeMount line for a chart's
+SBS binding directory. Args (dict): chart.
+*/}}
+{{- define "suse-library.legacy.bindingMount" -}}
+- {name: binding-{{ .chart }}, mountPath: /bindings/{{ .chart }}, readOnly: true}
+{{- end -}}
+
+{{/*
+suse-library.legacy.bindingVolume — emit the volume entry for a chart's
+SBS binding Secret. Args (dict): chart, release.
+*/}}
+{{- define "suse-library.legacy.bindingVolume" -}}
+- name: binding-{{ .chart }}
+  secret: {secretName: {{ .release }}-{{ .chart }}-binding}
+{{- end -}}
+
+{{/*
+suse-library.legacy.sqlBindingSecret — emit a SQL-DB shaped binding Secret.
+Args (dict):
+  chart    string  AppCo chart name (postgresql, mariadb, mysql, ...)
+  port     string  port the chart's Service listens on (5432 for postgres)
+  hostSvc  string  Service name suffix the chart deploys (e.g. "<release>-postgresql")
+  root     dict    .Values + .Release passthrough (passed as the dot at the
+                   call site so `required` and labels work)
+*/}}
+{{- define "suse-library.legacy.sqlBindingSecret" -}}
+{{- $chart := .chart -}}
+{{- $port := .port -}}
+{{- $hostSvc := .hostSvc -}}
+{{- $root := .root -}}
+{{- $vals := index $root.Values $chart -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "suse-library.name" $root }}-{{ $chart }}-binding
+  labels:
+    {{- include "suse-library.labels" $root | nindent 4 }}
+    service.binding/binding-name: {{ $chart }}
+    service.binding/binding-type: {{ $chart }}
+type: Opaque
+stringData:
+  type: {{ $chart }}
+  provider: rda-appco
+  host: {{ $hostSvc | quote }}
+  port: {{ $port | quote }}
+  username: {{ required (printf "%s.auth.username is required when %s.enabled=true" $chart $chart) $vals.auth.username | quote }}
+  password: {{ required (printf "%s.auth.password is required when %s.enabled=true" $chart $chart) $vals.auth.password | quote }}
+  database: {{ required (printf "%s.auth.database is required when %s.enabled=true" $chart $chart) $vals.auth.database | quote }}
+{{- end -}}
+
+{{/*
+suse-library.legacy.urlBindingSecret — emit a URL-only binding Secret.
+Args (dict):
+  chart    string  AppCo chart name (prometheus, ...)
+  port     string  Service port (typically "80")
+  hostSvc  string  Service name (e.g. "<release>-prometheus-server")
+  root     dict    .Values + .Release passthrough
+*/}}
+{{- define "suse-library.legacy.urlBindingSecret" -}}
+{{- $chart := .chart -}}
+{{- $port := .port -}}
+{{- $hostSvc := .hostSvc -}}
+{{- $root := .root -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "suse-library.name" $root }}-{{ $chart }}-binding
+  labels:
+    {{- include "suse-library.labels" $root | nindent 4 }}
+    service.binding/binding-name: {{ $chart }}
+    service.binding/binding-type: {{ $chart }}
+type: Opaque
+stringData:
+  type: {{ $chart }}
+  provider: rda-appco
+  host: {{ $hostSvc | quote }}
+  port: {{ $port | quote }}
+  url: "http://{{ $hostSvc }}"
+{{- end -}}
+
+{{/*
+suse-library.legacy.uiBindingSecret — emit a UI-with-admin binding Secret.
+Args (dict):
+  chart       string  AppCo chart name (grafana, ...)
+  port        string  Service port (typically "80")
+  hostSvc     string  Service name (e.g. "<release>-grafana")
+  adminUser   string  default admin username (typically "admin")
+  adminField  string  the Values key holding the admin password (e.g. "adminPassword")
+  root        dict    .Values + .Release passthrough
+*/}}
+{{- define "suse-library.legacy.uiBindingSecret" -}}
+{{- $chart := .chart -}}
+{{- $port := .port -}}
+{{- $hostSvc := .hostSvc -}}
+{{- $adminUser := .adminUser -}}
+{{- $adminField := .adminField -}}
+{{- $root := .root -}}
+{{- $vals := index $root.Values $chart -}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "suse-library.name" $root }}-{{ $chart }}-binding
+  labels:
+    {{- include "suse-library.labels" $root | nindent 4 }}
+    service.binding/binding-name: {{ $chart }}
+    service.binding/binding-type: {{ $chart }}
+type: Opaque
+stringData:
+  type: {{ $chart }}
+  provider: rda-appco
+  host: {{ $hostSvc | quote }}
+  port: {{ $port | quote }}
+  url: "http://{{ $hostSvc }}"
+  adminUser: {{ index $vals "adminUser" | default $adminUser | quote }}
+  adminPassword: {{ required (printf "%s.%s is required when %s.enabled=true" $chart $adminField $chart) (index $vals $adminField) | quote }}
+{{- end -}}
