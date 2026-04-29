@@ -66,6 +66,16 @@ cd payment-service && tilt up
 - The default Dockerfile uses BCI base images. The `pack` buildpack-based
   build path lands when the SUSE-AppCo buildpacks are productized.
 
+## Catalogue
+
+The library chart's catalogue (which AppCo charts you can opt into via `services[]` or `<chart>.enabled`) is documented at [`idefxH/rda-devx-catalog`](https://github.com/idefxH/rda-devx-catalog):
+
+- [`SCHEMA.md`](https://github.com/idefxH/rda-devx-catalog/blob/main/SCHEMA.md) — the unified DSL shape (`services[].type`, `auth.*`, `persistence.*`, ...).
+- [`CATALOG.md`](https://github.com/idefxH/rda-devx-catalog/blob/main/CATALOG.md) — per-chart reference covering all 12 DevX dimensions (connectivity, auth, persistence, UI, metrics, logs, OIDC, RBAC, tracing, CRDs, bootstrap, resource budget) plus the DSL ↔ chart-values mapping for each catalogued chart.
+- [`cookbooks/`](https://github.com/idefxH/rda-devx-catalog/tree/main/cookbooks) — concrete project archetype recipes.
+
+Read CATALOG.md before adding a new chart to the bundle — every chart needs the 12 dimensions answered.
+
 ## Persistence model
 
 The library chart's catalogue draws a line between **stateful** and **observability/cache** services:
