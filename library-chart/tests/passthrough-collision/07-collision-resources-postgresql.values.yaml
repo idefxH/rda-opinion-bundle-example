@@ -1,0 +1,17 @@
+services:
+  - binding: database
+    type: postgresql
+    auth:
+      user:
+        name: app
+        password: dev-pw
+        database: demo
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    passthrough:
+      primary:
+        resources:
+          requests:
+            cpu: 500m

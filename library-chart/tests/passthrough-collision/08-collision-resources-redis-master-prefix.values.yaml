@@ -1,0 +1,13 @@
+services:
+  - binding: cache
+    type: redis
+    auth:
+      password: dev-pw
+    resources:
+      limits:
+        memory: 1Gi
+    passthrough:
+      master:
+        resources:
+          limits:
+            memory: 2Gi
