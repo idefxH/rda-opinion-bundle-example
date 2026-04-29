@@ -44,8 +44,8 @@ Then:
 ```bash
 rda templates list
 rda templates show web-nodejs
-rda new payment-service --template web-nodejs
-cd payment-service && tilt up
+rda new my-app --template web-nodejs   # 'my-app' is your application's name; pick anything domain-meaningful
+cd my-app && tilt up
 ```
 
 ## v0 scope (what works, what doesn't)
