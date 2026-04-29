@@ -139,6 +139,91 @@ The set of projected keys per service type is documented in CATALOG.md.
 {{- end -}}
 
 {{/*
+`suse-library.dsl.validatePassthrough` fails loud when a service entry sets
+the same AppCo chart path both via the unified DSL fields and via the
+service's `passthrough:` block. The DSL is the recommended path; passthrough
+is the escape hatch for fields the DSL doesn't cover. When they collide,
+silently dropping either value would hide developer intent — so we fail
+with both locations and a "pick one" hint.
+
+Documented in idefxH/rda-docs/concepts/passthrough.md (rule #3) and
+idefxH/rda-docs/concepts/dsl.md (Validation check #4). Implementation of
+idefxH/rda-opinion-bundle-example#37.
+
+Sentinel pattern: `_RDA_NONE_` distinguishes "not set" from "set to a
+falsy value" (e.g. `enabled: false`). A non-sentinel value on both sides
+of a known DSL↔passthrough mapping triggers the fail.
+*/}}
+{{- define "suse-library.dsl.validatePassthrough" -}}
+{{- $sentinel := "_RDA_NONE_" -}}
+{{- range $i, $svc := .Values.services -}}
+{{- $type := $svc.type -}}
+{{- $pt := $svc.passthrough | default dict -}}
+{{- if eq $type "postgresql" -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.enabled" "ptPath" "persistence.enabled" "dslKeys" (list "persistence" "enabled") "ptKeys" (list "persistence" "enabled")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.size" "ptPath" "persistence.size" "dslKeys" (list "persistence" "size") "ptKeys" (list "persistence" "size")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "metrics.enabled" "ptPath" "metrics.enabled" "dslKeys" (list "metrics" "enabled") "ptKeys" (list "metrics" "enabled")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.password" "ptPath" "auth.postgresPassword" "dslKeys" (list "auth" "admin" "password") "ptKeys" (list "auth" "postgresPassword")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.name" "ptPath" "auth.username" "dslKeys" (list "auth" "user" "name") "ptKeys" (list "auth" "username")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.password" "ptPath" "auth.password" "dslKeys" (list "auth" "user" "password") "ptKeys" (list "auth" "password")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.database" "ptPath" "auth.database" "dslKeys" (list "auth" "user" "database") "ptKeys" (list "auth" "database")) -}}
+{{- else if eq $type "redis" -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.password" "ptPath" "auth.password" "dslKeys" (list "auth" "password") "ptKeys" (list "auth" "password")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.enabled" "ptPath" "master.persistence.enabled" "dslKeys" (list "persistence" "enabled") "ptKeys" (list "master" "persistence" "enabled")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "metrics.enabled" "ptPath" "metrics.enabled" "dslKeys" (list "metrics" "enabled") "ptKeys" (list "metrics" "enabled")) -}}
+{{- else if eq $type "grafana" -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.name" "ptPath" "adminUser" "dslKeys" (list "auth" "admin" "name") "ptKeys" (list "adminUser")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.password" "ptPath" "adminPassword" "dslKeys" (list "auth" "admin" "password") "ptKeys" (list "adminPassword")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "ingress.enabled" "ptPath" "ingress.enabled" "dslKeys" (list "ingress" "enabled") "ptKeys" (list "ingress" "enabled")) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+`suse-library.dsl._collide` is the per-pair check called from validatePassthrough.
+Inputs: svc, pt (passthrough block), sentinel, dslPath/ptPath (display strings
+for the error message), dslKeys/ptKeys (lists of nested key names for `dig`).
+
+Note: helm's `dig` walks N keys with a final default. We pass our sentinel as
+the default so we can distinguish "not set" from "set to a falsy value".
+*/}}
+{{- define "suse-library.dsl._collide" -}}
+{{- $svc := .svc -}}
+{{- $pt := .pt -}}
+{{- $sentinel := .sentinel -}}
+{{- $dslVal := include "suse-library.dsl._dig" (dict "obj" $svc "keys" .dslKeys "sentinel" $sentinel) -}}
+{{- $ptVal := include "suse-library.dsl._dig" (dict "obj" $pt "keys" .ptKeys "sentinel" $sentinel) -}}
+{{- if and (ne $dslVal $sentinel) (ne $ptVal $sentinel) -}}
+{{- fail (printf "services[binding=%s].%s is set both via the DSL (=%s) and via passthrough.%s (=%s). Pick one. The DSL is the recommended path; use passthrough only for fields the DSL doesn't cover. See idefxH/rda-docs/concepts/passthrough.md." $svc.binding .dslPath $dslVal .ptPath $ptVal) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+`suse-library.dsl._dig` walks a nested map by a list of keys and returns the
+leaf value as a string, or the sentinel string when any intermediate key is
+missing. Helm's built-in `dig` works for known-depth lookups but is awkward
+for variable-length lists; this wrapper keeps the call sites uniform.
+*/}}
+{{- define "suse-library.dsl._dig" -}}
+{{- $obj := .obj -}}
+{{- $sentinel := .sentinel -}}
+{{- $found := true -}}
+{{- $cur := $obj -}}
+{{- range $k := .keys -}}
+{{- if and $found (kindIs "map" $cur) (hasKey $cur $k) -}}
+{{- $cur = index $cur $k -}}
+{{- else -}}
+{{- $found = false -}}
+{{- end -}}
+{{- end -}}
+{{- if $found -}}
+{{- $cur | toString -}}
+{{- else -}}
+{{- $sentinel -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 `suse-library.dsl.bindingSecretFrom` renders a SBS binding-secret for a
 single DSL service entry. Used by binding-secret.yaml.
 */}}

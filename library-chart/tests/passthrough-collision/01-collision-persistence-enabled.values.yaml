@@ -1,0 +1,13 @@
+services:
+  - binding: database
+    type: postgresql
+    auth:
+      user:
+        name: app
+        password: dev-pw
+        database: demo
+    persistence:
+      enabled: true
+    passthrough:
+      persistence:
+        enabled: false
