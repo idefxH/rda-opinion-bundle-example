@@ -101,8 +101,17 @@ postgresql:
     database: ""
     username: ""
     password: ""
+  # Stateful service: persist by default so seeded data survives `tilt down`.
+  # Reproduction risk is high otherwise — devs lose trust in the dev loop
+  # when they rebuild and their data is gone. Refs bundle issue #7.
+  # Override locally with `postgresql.persistence.enabled: false` for the
+  # rare clean-slate-every-time workflow. Nuke accumulated PVCs across
+  # re-installs with:
+  #   kubectl delete pvc -l app.kubernetes.io/instance=<release>
+  # Default size is 1Gi (down from the AppCo chart's 8Gi) — laptop-friendly.
   persistence:
-    enabled: false
+    enabled: true
+    size: 1Gi
   nodeCount: 1
   # Out-of-the-box monitoring is the opinion bundle's value prop. Setting
   # metrics.enabled: true at the library layer means downstream projects

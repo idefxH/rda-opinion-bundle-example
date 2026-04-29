@@ -66,6 +66,34 @@ cd payment-service && tilt up
 - The default Dockerfile uses BCI base images. The `pack` buildpack-based
   build path lands when the SUSE-AppCo buildpacks are productized.
 
+## Persistence model
+
+The library chart's catalogue draws a line between **stateful** and **observability/cache** services:
+
+| Service     | `persistence.enabled` default | Why                                                                                |
+|-------------|-------------------------------|------------------------------------------------------------------------------------|
+| postgresql  | `true` (size: 1Gi)            | Seeded data must survive `tilt down` — devs lose trust if their data evaporates.   |
+| grafana     | `false`                       | Dashboards/datasources are config, not data. Re-seed from sidecar configmaps.      |
+| prometheus  | `false`                       | Scrape data is regenerated within minutes; persisting it on a laptop is overkill.  |
+
+The pattern: **flip persistence on for any chart whose value lives in seeded rows / blobs**, leave it off for anything whose state is regenerable from configuration.
+
+Override locally with `<chart>.persistence.enabled: false` (or `true`) in your project's `values.yaml`.
+
+### Nuke recipe — clean slate
+
+PVCs accumulate across re-installs (Helm doesn't delete them automatically). When you want a clean slate:
+
+```bash
+kubectl delete pvc -l app.kubernetes.io/instance=<release-name>
+# or for everything in a namespace:
+kubectl delete pvc --all -n <namespace>
+```
+
+Run this *after* `tilt down` / `helm uninstall` and *before* re-installing.
+
+`rda doctor` will surface a warning when accumulated PVCs grow past a threshold (issue tracked separately).
+
 ## License
 
 Apache-2.0 (templates, library chart, code skeletons).
