@@ -1,0 +1,11 @@
+services:
+  - binding: database
+    type: postgresql
+    auth:
+      user:
+        name: app
+        password: dev-from-dsl
+        database: demo
+    passthrough:
+      auth:
+        password: dev-from-passthrough

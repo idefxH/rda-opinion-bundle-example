@@ -1,0 +1,11 @@
+services:
+  - binding: cache
+    type: redis
+    auth:
+      password: dev-pw
+    persistence:
+      enabled: false
+    passthrough:
+      master:
+        persistence:
+          enabled: true
