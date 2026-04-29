@@ -1,0 +1,13 @@
+services:
+  - binding: legacy-events
+    type: postgresql
+    provisioning: external
+    endpoint:
+      host: legacy-postgres.corp.local
+      port: 5432
+      scheme: tcp
+    auth:
+      user:
+        name: app
+        password: dev-pw
+        database: legacy

@@ -1,0 +1,14 @@
+defaults:
+  shared_services:
+    grafana:
+      host: grafana.platform-services
+      port: 3000
+      scheme: https
+services:
+  - binding: app-dashboards
+    type: grafana
+    provisioning: shared
+    auth:
+      admin:
+        name: admin
+        password: dev

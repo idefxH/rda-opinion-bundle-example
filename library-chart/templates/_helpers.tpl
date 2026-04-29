@@ -159,6 +159,15 @@ of a known DSL↔passthrough mapping triggers the fail.
 {{- range $i, $svc := .Values.services -}}
 {{- $type := $svc.type -}}
 {{- $pt := $svc.passthrough | default dict -}}
+{{- $provisioning := $svc.provisioning | default "local" -}}
+{{/*
+   Skip collision checks for non-local services: when provisioning is shared
+   or external, the AppCo sub-chart for $svc.type is NOT deployed for this
+   binding, so passthrough has no sub-chart values to collide with. Devs who
+   write passthrough on a shared/external service have only themselves to
+   blame; we can't usefully check the collision.
+*/}}
+{{- if ne $provisioning "local" -}}{{- continue -}}{{- end -}}
 {{- if eq $type "postgresql" -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.enabled" "ptPath" "persistence.enabled" "dslKeys" (list "persistence" "enabled") "ptKeys" (list "persistence" "enabled")) -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.size" "ptPath" "persistence.size" "dslKeys" (list "persistence" "size") "ptKeys" (list "persistence" "size")) -}}
@@ -238,12 +247,64 @@ for variable-length lists; this wrapper keeps the call sites uniform.
 {{/*
 `suse-library.dsl.bindingSecretFrom` renders a SBS binding-secret for a
 single DSL service entry. Used by binding-secret.yaml.
+
+The host/port resolution depends on `services[].provisioning`:
+
+  - `local` (default): per-type convention (`<release>-<type>` for postgresql
+    and grafana, `<release>-<type>-master` for redis). The library deploys a
+    sub-chart and the binding-secret points at it.
+
+  - `shared`: read from `.Values.defaults.shared_services[<type>]`, which
+    the corp overlay populates with the canonical platform-services
+    endpoints. Fails loud if the overlay has no entry for this type.
+
+  - `external`: read from the per-service `endpoint:` block. Fails loud if
+    `endpoint:` is missing or incomplete.
+
+Credentials (auth.*) are sourced from the DSL the same way regardless of
+provisioning: the platform team manages the Vault path, projects reference
+it by path. See rda-docs/operator.md Step 6 for the pattern.
 */}}
 {{- define "suse-library.dsl.bindingSecretFrom" -}}
 {{- $svc := .svc -}}
 {{- $root := .root -}}
 {{- $release := $root.Release.Name -}}
-{{- $name := printf "%s-%s-binding" $release $svc.binding }}
+{{- $name := printf "%s-%s-binding" $release $svc.binding -}}
+{{- $provisioning := $svc.provisioning | default "local" -}}
+{{- if not (or (eq $provisioning "local") (or (eq $provisioning "shared") (eq $provisioning "external"))) -}}
+{{- fail (printf "services[binding=%s].provisioning must be 'local', 'shared', or 'external' (got %q). See rda-docs/concepts/dsl.md#provisioning." $svc.binding $provisioning) -}}
+{{- end -}}
+{{- /* Resolve host/port/scheme depending on provisioning. */ -}}
+{{- $host := "" -}}
+{{- $port := "" -}}
+{{- $scheme := "" -}}
+{{- if eq $provisioning "local" -}}
+  {{- if eq $svc.type "postgresql" -}}{{- $host = printf "%s-%s" $release $svc.type -}}{{- $port = "5432" -}}
+  {{- else if eq $svc.type "redis" -}}{{- $host = printf "%s-%s-master" $release $svc.type -}}{{- $port = "6379" -}}
+  {{- else if eq $svc.type "grafana" -}}{{- $host = printf "%s-%s" $release $svc.type -}}{{- $port = "80" -}}{{- $scheme = "http" -}}
+  {{- else -}}{{- fail (printf "Unsupported service type %q for binding %q in DSL v1alpha1 (provisioning=local). Supported types: postgresql, redis, grafana." $svc.type $svc.binding) -}}
+  {{- end -}}
+{{- else if eq $provisioning "shared" -}}
+  {{- /* dig() requires plain map[string]interface{}, but $root.Values is chartutil.Values; walk via index instead */ -}}
+  {{- $defaults := index $root.Values "defaults" | default dict -}}
+  {{- $sharedRoot := index $defaults "shared_services" | default dict -}}
+  {{- $sharedMap := index $sharedRoot $svc.type | default dict -}}
+  {{- $sharedHost := index $sharedMap "host" | default "" -}}
+  {{- if eq $sharedHost "" -}}
+  {{- fail (printf "services[binding=%s].provisioning=shared but the overlay has no defaults.shared_services.%s.host. Either configure the overlay (rda-docs/operator.md Step 6 → 'Pre-fill the endpoints in the overlay') or set provisioning: external with an explicit endpoint:." $svc.binding $svc.type) -}}
+  {{- end -}}
+  {{- $host = $sharedHost -}}
+  {{- $port = index $sharedMap "port" | default "" | toString -}}
+  {{- $scheme = index $sharedMap "scheme" | default "http" -}}
+{{- else if eq $provisioning "external" -}}
+  {{- $ep := $svc.endpoint | default dict -}}
+  {{- if eq (index $ep "host" | default "") "" -}}
+  {{- fail (printf "services[binding=%s].provisioning=external requires endpoint: { host, port, scheme } on the service entry." $svc.binding) -}}
+  {{- end -}}
+  {{- $host = $ep.host -}}
+  {{- $port = $ep.port | default "" | toString -}}
+  {{- $scheme = $ep.scheme | default "http" -}}
+{{- end -}}
 ---
 apiVersion: v1
 kind: Secret
@@ -253,34 +314,28 @@ metadata:
     {{- include "suse-library.labels" $root | nindent 4 }}
     service.binding/binding-name: {{ $svc.binding }}
     service.binding/binding-type: {{ $svc.type }}
+    rda.suse.com/provisioning: {{ $provisioning | quote }}
   annotations:
     # rda.suse.com/source documents which DSL key this resource was generated from.
     # Manifesto principle: learning. Devs who inspect a Secret can trace it back
     # to their values.yaml without having to dive into helper code.
-    # See idefxH/rda-devx-catalog/PROPOSAL.md (Manifesto re-read amendment).
-    rda.suse.com/source: "services[binding={{ $svc.binding }}].type={{ $svc.type }}"
+    rda.suse.com/source: "services[binding={{ $svc.binding }}].type={{ $svc.type }}.provisioning={{ $provisioning }}"
     rda.suse.com/helper: "suse-library.dsl.bindingSecretFrom"
 type: Opaque
 stringData:
   type: {{ $svc.type | quote }}
   provider: rda-appco
+  host: {{ $host | quote }}
+  port: {{ $port | quote }}
 {{- if eq $svc.type "postgresql" }}
-  host: "{{ $release }}-{{ $svc.type }}"
-  port: "5432"
   username: {{ $svc.auth.user.name | default "app" | quote }}
   password: {{ required (printf "services[binding=%s].auth.user.password is required for type=postgresql" $svc.binding) $svc.auth.user.password | quote }}
   database: {{ required (printf "services[binding=%s].auth.user.database is required for type=postgresql" $svc.binding) $svc.auth.user.database | quote }}
 {{- else if eq $svc.type "redis" }}
-  host: "{{ $release }}-{{ $svc.type }}-master"
-  port: "6379"
   password: {{ required (printf "services[binding=%s].auth.password is required for type=redis" $svc.binding) $svc.auth.password | quote }}
 {{- else if eq $svc.type "grafana" }}
-  host: "{{ $release }}-{{ $svc.type }}"
-  port: "80"
-  url: "http://{{ $release }}-{{ $svc.type }}"
+  url: {{ printf "%s://%s:%s" $scheme $host $port | quote }}
   adminUser: {{ $svc.auth.admin.name | default "admin" | quote }}
   adminPassword: {{ required (printf "services[binding=%s].auth.admin.password is required for type=grafana" $svc.binding) $svc.auth.admin.password | quote }}
-{{- else }}
-{{- fail (printf "Unsupported service type %q for binding %q in DSL v1alpha1. Add a case to suse-library.dsl.bindingSecretFrom in _helpers.tpl. Supported in this version: postgresql, redis, grafana." $svc.type $svc.binding) }}
 {{- end }}
 {{- end -}}
