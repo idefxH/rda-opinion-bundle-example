@@ -47,10 +47,15 @@ spec:
             {{- end }}
             {{- /*
                 Legacy bindings (one block per chart). Each `if` arm calls a
-                category helper from _helpers.tpl (issue #5). New legacy
-                charts plug in here with a single line — no copy-paste of
-                the full env-var shape.
+                category helper from _helpers.tpl (issue #5). The whole
+                legacy block is gated on `not services` so it doesn't double
+                up with the DSL path's env vars when both layers fire (the
+                DSL path's binding-secret has different keys + name shape
+                than the legacy one, so duplicate env names referencing
+                different Secrets would crash on render). Mirrors the
+                either/or branch in binding-secret.yaml.
             */}}
+            {{- if not .Values.services }}
             {{- if .Values.postgresql.enabled }}
             # ─── postgresql binding (12-factor projection, sql-db category) ───
             # Apps that prefer SBS read /bindings/postgresql/<key> instead.
@@ -67,7 +72,24 @@ spec:
             # ─── grafana binding (12-factor projection, ui-with-admin category) ───
             {{- include "suse-library.legacy.envForUiWithAdmin" (dict "chart" "grafana" "release" (include "suse-library.name" .)) | nindent 12 }}
             {{- end }}
+            {{- end }}
           volumeMounts:
+            {{- /*
+                DSL binding mounts (Phase 1). Each services[] entry that
+                isn't `provisioning: external` mounts its binding-secret at
+                /bindings/<binding>/, so apps following the Service Binding
+                Spec convention find their credentials there. external
+                services have no Secret to mount (the dev wired the
+                connection details elsewhere).
+            */}}
+            {{- range $i, $svc := .Values.services }}
+            {{- $prov := $svc.provisioning | default "local" }}
+            {{- if ne $prov "external" }}
+            - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
+            {{- end }}
+            {{- end }}
+            {{- /* Legacy mounts gated on not services (same rule as env block above). */}}
+            {{- if not .Values.services }}
             {{- if .Values.postgresql.enabled }}
             {{- include "suse-library.legacy.bindingMount" (dict "chart" "postgresql") | nindent 12 }}
             {{- end }}
@@ -76,6 +98,7 @@ spec:
             {{- end }}
             {{- if .Values.grafana.enabled }}
             {{- include "suse-library.legacy.bindingMount" (dict "chart" "grafana") | nindent 12 }}
+            {{- end }}
             {{- end }}
           livenessProbe:
             httpGet: {path: {{ .Values.probes.liveness.path }}, port: http}
@@ -87,6 +110,19 @@ spec:
             periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
       volumes:
+        {{- /*
+            DSL binding volumes — one Secret-backed volume per non-external
+            services[] entry. Pairs with the volumeMounts loop above.
+        */}}
+        {{- range $i, $svc := .Values.services }}
+        {{- $prov := $svc.provisioning | default "local" }}
+        {{- if ne $prov "external" }}
+        - name: {{ printf "binding-%s" $svc.binding }}
+          secret: {secretName: {{ printf "%s-%s-binding" (include "suse-library.name" $) $svc.binding }}}
+        {{- end }}
+        {{- end }}
+        {{- /* Legacy volumes gated on not services (same rule as env / mounts above). */}}
+        {{- if not .Values.services }}
         {{- if .Values.postgresql.enabled }}
         {{- include "suse-library.legacy.bindingVolume" (dict "chart" "postgresql" "release" (include "suse-library.name" .)) | nindent 8 }}
         {{- end }}
@@ -95,4 +131,5 @@ spec:
         {{- end }}
         {{- if .Values.grafana.enabled }}
         {{- include "suse-library.legacy.bindingVolume" (dict "chart" "grafana" "release" (include "suse-library.name" .)) | nindent 8 }}
+        {{- end }}
         {{- end }}
