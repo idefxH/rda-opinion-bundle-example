@@ -43,7 +43,7 @@ spec:
             {{- /* DSL path: project env from each services[] entry (Phase 1) */ -}}
             {{- range $i, $svc := .Values.services }}
             # ─── DSL binding {{ $svc.binding }} (type {{ $svc.type }}) ───
-            {{- include "suse-library.dsl.envFromBinding" (dict "svc" $svc "release" $.Release.Name) | nindent 12 }}
+            {{- include "suse-library.dsl.envFromBinding" (dict "svc" $svc "release" $.Release.Name "root" $) | nindent 12 }}
             {{- end }}
             {{- /*
                 Legacy bindings (one block per chart). Each `if` arm calls a
