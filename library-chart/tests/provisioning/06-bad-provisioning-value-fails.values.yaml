@@ -1,0 +1,9 @@
+services:
+  - binding: typo
+    type: postgresql
+    provisioning: shred           # not a valid value
+    auth:
+      user:
+        name: app
+        password: x
+        database: y

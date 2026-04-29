@@ -1,0 +1,20 @@
+defaults:
+  shared_services:
+    postgresql:
+      host: pg.platform-services
+      port: 5432
+      scheme: tcp
+services:
+  - binding: shared-pg
+    type: postgresql
+    provisioning: shared
+    persistence:
+      enabled: true
+    passthrough:
+      persistence:
+        enabled: false             # would collide if local; ignored when shared
+    auth:
+      user:
+        name: app
+        password: x
+        database: y

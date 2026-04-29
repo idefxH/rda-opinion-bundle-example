@@ -1,0 +1,8 @@
+services:
+  - binding: payments-db
+    type: postgresql
+    auth:
+      user:
+        name: app
+        password: dev-pw
+        database: payments

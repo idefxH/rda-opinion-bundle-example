@@ -1,0 +1,9 @@
+services:
+  - binding: vault
+    type: postgresql
+    provisioning: shared          # no defaults.shared_services configured → must fail loud
+    auth:
+      user:
+        name: app
+        password: x
+        database: y
