@@ -104,6 +104,13 @@ postgresql:
   persistence:
     enabled: false
   nodeCount: 1
+  # Out-of-the-box monitoring is the opinion bundle's value prop. Setting
+  # metrics.enabled: true at the library layer means downstream projects
+  # get the postgres_exporter sidecar by default; the chart's own default
+  # is false. Override locally with `postgresql.metrics.enabled: false`
+  # if your project explicitly does not want it. Refs bundle issue #6.
+  metrics:
+    enabled: true
 
 prometheus:
   enabled: false
@@ -131,3 +138,8 @@ grafana:
   adminPassword: ""
   persistence:
     enabled: false
+  # Self-monitoring on by default (Grafana exposes /metrics for its own
+  # process). Refs bundle issue #6 — out-of-the-box monitoring is the
+  # opinion bundle's value prop.
+  metrics:
+    enabled: true
