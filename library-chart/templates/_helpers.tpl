@@ -1,212 +1,244 @@
 {{/*
-Common name of the project. Defaults to the release name if .Values.name is unset.
+Helpers for the SUSE library chart.
+
+Phase 2.5 (data-driven catalog): the per-chart shape of the unified DSL
+is read from `library-chart/dsl-mappings.yaml`, not hardcoded if/else
+arms. Adding a new chart = one YAML entry; the helpers below loop over
+it generically.
+
+The legacy.* helpers further down still target the pre-DSL gated path
+(<chart>.enabled). They cover postgresql, prometheus, grafana — the same
+catalogue the DSL covers, but rendered without services[]. Phase 1.5
+will deprecate the legacy path entirely.
 */}}
+
 {{- define "suse-library.name" -}}
-{{- default .Release.Name .Values.name | trunc 63 | trimSuffix "-" -}}
+{{- default .Release.Name .Values.name -}}
 {{- end -}}
 
-{{/*
-Common labels applied to every resource produced by this library.
-*/}}
 {{- define "suse-library.labels" -}}
 app.kubernetes.io/name: {{ include "suse-library.name" . }}
-app.kubernetes.io/managed-by: {{ .Release.Service | default "rda" }}
+app.kubernetes.io/managed-by: {{ .Release.Service | default "Helm" }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 rda.suse.com/library-version: {{ .Chart.Version }}
 {{- end -}}
 
-{{/*
-Selector labels — subset of common labels that should not change across
-revisions (otherwise existing Deployments cannot find their Pods).
-*/}}
 {{- define "suse-library.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "suse-library.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
+{{/* ──────────────────────────────────────────────────────────────────────
+    DSL helpers (data-driven from dsl-mappings.yaml)
+    ────────────────────────────────────────────────────────────────────── */}}
+
 {{/*
-DSL helpers — added in v0.10 for the unified `services[]` block.
+suse-library.dsl.loadMappings — load and parse library-chart/dsl-mappings.yaml.
+Cached for the duration of the render. The file lives at the chart root, NOT
+under templates/, so .Files.Get returns its raw text.
+*/}}
+{{- define "suse-library.dsl.loadMappings" -}}
+{{- $raw := .Files.Get "dsl-mappings.yaml" -}}
+{{- if eq $raw "" -}}{{- fail "dsl-mappings.yaml not found at chart root" -}}{{- end -}}
+{{- $raw | fromYaml | toJson -}}
+{{- end -}}
 
-The DSL coexists with the legacy <chart>.* blocks (Phase 1, see PROPOSAL).
-Library templates consume the DSL for binding-secret rendering, app env
-projection, and audit labels. The legacy blocks still feed the AppCo
-sub-charts via Helm's standard sub-chart values resolution.
+{{/*
+suse-library.dsl.resolveMapping — given a chart name (e.g. "postgresql") and a
+root context (.), look up the chart's mapping entry for the version actually
+vendored in the project. The version is read from .Chart.Dependencies (the
+library-chart's declared deps). The first versions[] entry whose `constraint`
+matches via semverCompare wins. When no version is found (e.g. dep was added
+without rebuilding the lock), the first versions[] entry is used as fallback.
 
-`suse-library.dsl.services` returns the project's services[] list, or
-an empty list when not declared.
+Args (dict): chart, root.
+Returns the entry (a dict) as a JSON string; the caller uses fromJson to
+unwrap. We trade JSON ferrying for sub-template return semantics — Helm
+named templates can only return strings.
+
+Fails loud if the chart isn't in dsl-mappings.yaml.
+*/}}
+{{- define "suse-library.dsl.resolveMapping" -}}
+{{- $chart := .chart -}}
+{{- $root := .root -}}
+{{- $mappings := include "suse-library.dsl.loadMappings" $root | fromJson -}}
+{{- $charts := index $mappings "charts" | default dict -}}
+{{- $entry := index $charts $chart -}}
+{{- if not $entry -}}
+{{- fail (printf "dsl-mappings.yaml has no entry for chart %q. Add one or fix the services[].type. See library-chart/dsl-mappings.yaml." $chart) -}}
+{{- end -}}
+{{- $versions := index $entry "versions" | default list -}}
+{{- if eq (len $versions) 0 -}}
+{{- fail (printf "dsl-mappings.yaml: charts.%s.versions[] is empty" $chart) -}}
+{{- end -}}
+{{- /* Find the actual vendored version from .Chart.Dependencies */ -}}
+{{- $vendored := "" -}}
+{{- range $dep := $root.Chart.Dependencies -}}
+  {{- if eq $dep.Name $chart -}}{{- $vendored = $dep.Version -}}{{- end -}}
+{{- end -}}
+{{- $picked := dict -}}
+{{- if ne $vendored "" -}}
+  {{- range $v := $versions -}}
+    {{- $constraint := index $v "constraint" -}}
+    {{- /* semverCompare returns true when version satisfies constraint. */ -}}
+    {{- if and (eq (kindOf $picked) "map") (eq (len $picked) 0) -}}
+      {{- if semverCompare $constraint (semver $vendored | toString) -}}
+        {{- $picked = $v -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Fallback: first entry. Logged via a no-op so devs see it in --debug. */ -}}
+{{- if and (eq (kindOf $picked) "map") (eq (len $picked) 0) -}}
+  {{- $picked = first $versions -}}
+{{- end -}}
+{{- $picked | toJson -}}
+{{- end -}}
+
+{{/*
+suse-library.dsl.services — return the services[] list, defaulting to empty.
+Mirrors the pattern used by other DSL helpers — a single point to fix when
+the location of services[] changes (e.g. moves under a sub-key).
 */}}
 {{- define "suse-library.dsl.services" -}}
 {{- if .Values.services -}}
-{{- toYaml .Values.services -}}
+{{- toJson .Values.services -}}
 {{- else -}}
 []
 {{- end -}}
 {{- end -}}
 
 {{/*
-`suse-library.dsl.findByType` returns the FIRST service of a given type, or
-nothing if none. Use as: {{- $svc := include "suse-library.dsl.findByType"
-(dict "type" "postgresql" "Values" .Values) | fromYaml -}}.
+suse-library.dsl.findByType — return the first services[] entry of the given
+type, or empty dict. Used by callers that want to know "do we have any
+postgresql binding in this project?".
 */}}
 {{- define "suse-library.dsl.findByType" -}}
-{{- $type := .type -}}
-{{- range $i, $svc := .Values.services -}}
-{{- if eq $svc.type $type -}}
-{{- toYaml $svc -}}
-{{- break -}}
+{{- $needle := .type -}}
+{{- $found := dict -}}
+{{- range $svc := .Values.services -}}
+  {{- if and (eq (kindOf $found) "map") (eq (len $found) 0) -}}
+    {{- if eq $svc.type $needle -}}{{- $found = $svc -}}{{- end -}}
+  {{- end -}}
 {{- end -}}
-{{- end -}}
+{{- $found | toJson -}}
 {{- end -}}
 
 {{/*
-`suse-library.dsl.findByBinding` returns the FIRST service with a given
-binding name, or nothing if none.
+suse-library.dsl.findByBinding — return the services[] entry matching binding
+name, or empty dict. Used by `rda explain` and the dsl helper unit tests.
 */}}
 {{- define "suse-library.dsl.findByBinding" -}}
-{{- $binding := .binding -}}
-{{- range $i, $svc := .Values.services -}}
-{{- if eq $svc.binding $binding -}}
-{{- toYaml $svc -}}
-{{- break -}}
+{{- $needle := .binding -}}
+{{- $found := dict -}}
+{{- range $svc := .Values.services -}}
+  {{- if and (eq (kindOf $found) "map") (eq (len $found) 0) -}}
+    {{- if eq $svc.binding $needle -}}{{- $found = $svc -}}{{- end -}}
+  {{- end -}}
 {{- end -}}
-{{- end -}}
+{{- $found | toJson -}}
 {{- end -}}
 
 {{/*
-`suse-library.dsl.validateConsistency` fails loud if the DSL and the legacy
-<chart>.* blocks disagree on key fields (auth.user.password vs auth.password,
-etc.). Phase 1: the dev writes both; we ensure they don't drift.
-Phase 1.5: the rda CLI pre-processor will write the legacy blocks from the
-DSL, eliminating drift.
+suse-library.dsl.validateConsistency — sanity checks on services[]. Phase 1
+checks:
+  - every entry has a non-empty `binding`
+  - every entry has a recognised `type` (must be in dsl-mappings.yaml)
+  - bindings are unique within services[]
 */}}
 {{- define "suse-library.dsl.validateConsistency" -}}
+{{- $mappings := include "suse-library.dsl.loadMappings" . | fromJson -}}
+{{- $known := index $mappings "charts" | default dict -}}
+{{- $seen := dict -}}
 {{- range $i, $svc := .Values.services -}}
-{{- $type := $svc.type -}}
-{{- $legacy := index $.Values $type | default dict -}}
-{{- if eq $type "postgresql" -}}
-{{- if and $legacy.enabled (and $svc.auth $svc.auth.user) -}}
-{{- if and $svc.auth.user.password $legacy.auth -}}
-{{- if and $legacy.auth.password (ne $svc.auth.user.password $legacy.auth.password) -}}
-{{- fail (printf "DSL drift: services[type=postgresql].auth.user.password (%s) != postgresql.auth.password (%s). Phase 1 requires the two views to agree until the rda CLI pre-processor lands. See rda-devx-catalog/PROPOSAL.md." $svc.auth.user.password $legacy.auth.password) -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{/* Add similar checks for redis, grafana as those types land in services[] */}}
+  {{- if eq (toString $svc.binding) "" -}}
+  {{- fail (printf "services[%d] has no binding name. Each entry must set 'binding: <name>'." $i) -}}
+  {{- end -}}
+  {{- if not (hasKey $known $svc.type) -}}
+  {{- $supported := keys $known | sortAlpha -}}
+  {{- fail (printf "services[binding=%s].type=%q is not catalogued. Supported types (from dsl-mappings.yaml): %s." $svc.binding $svc.type (join ", " $supported)) -}}
+  {{- end -}}
+  {{- if hasKey $seen $svc.binding -}}
+  {{- fail (printf "duplicate binding %q in services[]: each entry needs a unique binding name." $svc.binding) -}}
+  {{- end -}}
+  {{- $_ := set $seen $svc.binding true -}}
 {{- end -}}
 {{- end -}}
 
 {{/*
-`suse-library.dsl.envFromBinding` projects the standard <BINDING>_* env
-vars referencing the binding-secret. Used in deployment.yaml for each
-service in services[]. Yields proper YAML at the env: list level.
+suse-library.dsl.envFromBinding — project env vars from a binding-secret.
+For every key declared in the chart's binding_secret list, emit a
+{ name: <BINDING>_<KEY>, valueFrom: { secretKeyRef: { ... } } } entry.
 
-The shape is :
-  - { name: <BINDING>_HOST,     valueFrom: { secretKeyRef: { name: <release>-<binding>-binding, key: host     } } }
-  - { name: <BINDING>_PORT,     valueFrom: { secretKeyRef: { name: <release>-<binding>-binding, key: port     } } }
-  - { name: <BINDING>_USERNAME, valueFrom: { secretKeyRef: { name: <release>-<binding>-binding, key: username } } } (when present)
-  ...
-
-The set of projected keys per service type is documented in CATALOG.md.
+Args (dict): svc, release.
 */}}
 {{- define "suse-library.dsl.envFromBinding" -}}
 {{- $svc := .svc -}}
 {{- $release := .release -}}
 {{- $bindingUpper := upper $svc.binding | replace "-" "_" -}}
 {{- $secret := printf "%s-%s-binding" $release $svc.binding -}}
-- name: {{ $bindingUpper }}_HOST
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: host } }
-- name: {{ $bindingUpper }}_PORT
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: port } }
-{{- if eq $svc.type "postgresql" }}
-- name: {{ $bindingUpper }}_USERNAME
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: username } }
-- name: {{ $bindingUpper }}_PASSWORD
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: password } }
-- name: {{ $bindingUpper }}_DATABASE
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: database } }
-{{- else if eq $svc.type "redis" }}
-- name: {{ $bindingUpper }}_PASSWORD
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: password } }
-{{- else if eq $svc.type "grafana" }}
-- name: {{ $bindingUpper }}_URL
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: url } }
-- name: {{ $bindingUpper }}_ADMIN_USER
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: adminUser } }
-- name: {{ $bindingUpper }}_ADMIN_PASSWORD
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: adminPassword } }
+{{- $mapping := include "suse-library.dsl.resolveMapping" (dict "chart" $svc.type "root" .root) | fromJson -}}
+{{- range $entry := index $mapping "binding_secret" }}
+{{- if not (index $entry "skip_env" | default false) }}
+{{- /* The env var name uses upper-snake-case: camelCase secret keys (adminUser)
+       become ADMIN_USER, kebab-case keys (admin-user) become ADMIN_USER too.
+       Sprig's `snakecase` does the camelCase split; replace handles dashes. */ -}}
+{{- $envKey := (index $entry "key" | snakecase | upper | replace "-" "_") }}
+- name: {{ printf "%s_%s" $bindingUpper $envKey }}
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: {{ index $entry "key" }} } }
+{{- end }}
 {{- end }}
 {{- end -}}
 
 {{/*
-`suse-library.dsl.validatePassthrough` fails loud when a service entry sets
-the same AppCo chart path both via the unified DSL fields and via the
-service's `passthrough:` block. The DSL is the recommended path; passthrough
-is the escape hatch for fields the DSL doesn't cover. When they collide,
-silently dropping either value would hide developer intent — so we fail
-with both locations and a "pick one" hint.
+suse-library.dsl.validatePassthrough — fail loud when a service entry sets
+the same path both via the DSL and via `passthrough:`.
 
-Documented in idefxH/rda-docs/concepts/passthrough.md (rule #3) and
-idefxH/rda-docs/concepts/dsl.md (Validation check #4). Implementation of
-idefxH/rda-opinion-bundle-example#37.
+The list of DSL→passthrough collisions to check comes from each chart's
+values_mapping in dsl-mappings.yaml. The DSL key is the LHS; the
+passthrough key is the RHS minus the chart's name prefix (e.g. for redis
+the YAML says `redis.master.persistence.enabled` — under `passthrough:`
+on a redis service the user would write `master.persistence.enabled`).
 
 Sentinel pattern: `_RDA_NONE_` distinguishes "not set" from "set to a
-falsy value" (e.g. `enabled: false`). A non-sentinel value on both sides
-of a known DSL↔passthrough mapping triggers the fail.
+falsy value".
 */}}
 {{- define "suse-library.dsl.validatePassthrough" -}}
 {{- $sentinel := "_RDA_NONE_" -}}
+{{- $mappings := include "suse-library.dsl.loadMappings" . | fromJson -}}
+{{- $charts := index $mappings "charts" | default dict -}}
 {{- range $i, $svc := .Values.services -}}
 {{- $type := $svc.type -}}
 {{- $pt := $svc.passthrough | default dict -}}
 {{- $provisioning := $svc.provisioning | default "local" -}}
-{{/*
-   Skip collision checks for non-local services: when provisioning is shared
-   or external, the AppCo sub-chart for $svc.type is NOT deployed for this
-   binding, so passthrough has no sub-chart values to collide with. Devs who
-   write passthrough on a shared/external service have only themselves to
-   blame; we can't usefully check the collision.
-*/}}
+{{- /* Skip non-local: no sub-chart deployed = no passthrough collision possible */ -}}
 {{- if ne $provisioning "local" -}}{{- continue -}}{{- end -}}
-{{- if eq $type "postgresql" -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.enabled" "ptPath" "persistence.enabled" "dslKeys" (list "persistence" "enabled") "ptKeys" (list "persistence" "enabled")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.size" "ptPath" "persistence.size" "dslKeys" (list "persistence" "size") "ptKeys" (list "persistence" "size")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "metrics.enabled" "ptPath" "metrics.enabled" "dslKeys" (list "metrics" "enabled") "ptKeys" (list "metrics" "enabled")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.password" "ptPath" "auth.postgresPassword" "dslKeys" (list "auth" "admin" "password") "ptKeys" (list "auth" "postgresPassword")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.name" "ptPath" "auth.username" "dslKeys" (list "auth" "user" "name") "ptKeys" (list "auth" "username")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.password" "ptPath" "auth.password" "dslKeys" (list "auth" "user" "password") "ptKeys" (list "auth" "password")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.database" "ptPath" "auth.database" "dslKeys" (list "auth" "user" "database") "ptKeys" (list "auth" "database")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.cpu" "ptPath" "primary.resources.requests.cpu" "dslKeys" (list "resources" "requests" "cpu") "ptKeys" (list "primary" "resources" "requests" "cpu")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.memory" "ptPath" "primary.resources.requests.memory" "dslKeys" (list "resources" "requests" "memory") "ptKeys" (list "primary" "resources" "requests" "memory")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.cpu" "ptPath" "primary.resources.limits.cpu" "dslKeys" (list "resources" "limits" "cpu") "ptKeys" (list "primary" "resources" "limits" "cpu")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.memory" "ptPath" "primary.resources.limits.memory" "dslKeys" (list "resources" "limits" "memory") "ptKeys" (list "primary" "resources" "limits" "memory")) -}}
-{{- else if eq $type "redis" -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.password" "ptPath" "auth.password" "dslKeys" (list "auth" "password") "ptKeys" (list "auth" "password")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.enabled" "ptPath" "master.persistence.enabled" "dslKeys" (list "persistence" "enabled") "ptKeys" (list "master" "persistence" "enabled")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "metrics.enabled" "ptPath" "metrics.enabled" "dslKeys" (list "metrics" "enabled") "ptKeys" (list "metrics" "enabled")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.cpu" "ptPath" "master.resources.requests.cpu" "dslKeys" (list "resources" "requests" "cpu") "ptKeys" (list "master" "resources" "requests" "cpu")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.memory" "ptPath" "master.resources.requests.memory" "dslKeys" (list "resources" "requests" "memory") "ptKeys" (list "master" "resources" "requests" "memory")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.cpu" "ptPath" "master.resources.limits.cpu" "dslKeys" (list "resources" "limits" "cpu") "ptKeys" (list "master" "resources" "limits" "cpu")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.memory" "ptPath" "master.resources.limits.memory" "dslKeys" (list "resources" "limits" "memory") "ptKeys" (list "master" "resources" "limits" "memory")) -}}
-{{- else if eq $type "grafana" -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.name" "ptPath" "adminUser" "dslKeys" (list "auth" "admin" "name") "ptKeys" (list "adminUser")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.password" "ptPath" "adminPassword" "dslKeys" (list "auth" "admin" "password") "ptKeys" (list "adminPassword")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "ingress.enabled" "ptPath" "ingress.enabled" "dslKeys" (list "ingress" "enabled") "ptKeys" (list "ingress" "enabled")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.cpu" "ptPath" "resources.requests.cpu" "dslKeys" (list "resources" "requests" "cpu") "ptKeys" (list "resources" "requests" "cpu")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.memory" "ptPath" "resources.requests.memory" "dslKeys" (list "resources" "requests" "memory") "ptKeys" (list "resources" "requests" "memory")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.cpu" "ptPath" "resources.limits.cpu" "dslKeys" (list "resources" "limits" "cpu") "ptKeys" (list "resources" "limits" "cpu")) -}}
-{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.memory" "ptPath" "resources.limits.memory" "dslKeys" (list "resources" "limits" "memory") "ptKeys" (list "resources" "limits" "memory")) -}}
+{{- $entry := index $charts $type | default dict -}}
+{{- $versions := index $entry "versions" | default list -}}
+{{- if eq (len $versions) 0 -}}{{- continue -}}{{- end -}}
+{{- /* Use the first versions[] entry for collision keys — version-specific
+       collisions across chart majors are rare; if needed, future work can
+       reuse resolveMapping's lookup logic here. */ -}}
+{{- $first := first $versions -}}
+{{- $vmap := index $first "values_mapping" | default dict -}}
+{{- $prefix := printf "%s." $type -}}
+{{- range $dslPath, $valuesPath := $vmap -}}
+  {{- /* Strip the chart-name prefix from the chart-level values path to
+         get the passthrough sub-path (passthrough is rooted at the chart). */ -}}
+  {{- if hasPrefix $prefix $valuesPath -}}
+    {{- $ptPath := trimPrefix $prefix $valuesPath -}}
+    {{- $dslKeys := splitList "." $dslPath -}}
+    {{- $ptKeys := splitList "." $ptPath -}}
+    {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" $dslPath "ptPath" $ptPath "dslKeys" $dslKeys "ptKeys" $ptKeys) -}}
+  {{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
 
 {{/*
-`suse-library.dsl._collide` is the per-pair check called from validatePassthrough.
-Inputs: svc, pt (passthrough block), sentinel, dslPath/ptPath (display strings
-for the error message), dslKeys/ptKeys (lists of nested key names for `dig`).
-
-Note: helm's `dig` walks N keys with a final default. We pass our sentinel as
-the default so we can distinguish "not set" from "set to a falsy value".
+suse-library.dsl._collide — per-pair check called from validatePassthrough.
+Inputs: svc, pt (passthrough block), sentinel, dslPath/ptPath (display
+strings), dslKeys/ptKeys (lists of nested key names for `dig`).
 */}}
 {{- define "suse-library.dsl._collide" -}}
 {{- $svc := .svc -}}
@@ -220,10 +252,8 @@ the default so we can distinguish "not set" from "set to a falsy value".
 {{- end -}}
 
 {{/*
-`suse-library.dsl._dig` walks a nested map by a list of keys and returns the
-leaf value as a string, or the sentinel string when any intermediate key is
-missing. Helm's built-in `dig` works for known-depth lookups but is awkward
-for variable-length lists; this wrapper keeps the call sites uniform.
+suse-library.dsl._dig — walk a nested map by a list of keys, return leaf as
+string or sentinel if any key is missing.
 */}}
 {{- define "suse-library.dsl._dig" -}}
 {{- $obj := .obj -}}
@@ -245,25 +275,23 @@ for variable-length lists; this wrapper keeps the call sites uniform.
 {{- end -}}
 
 {{/*
-`suse-library.dsl.bindingSecretFrom` renders a SBS binding-secret for a
-single DSL service entry. Used by binding-secret.yaml.
+suse-library.dsl.bindingSecretFrom — render a SBS binding-secret for a single
+DSL service entry. Used by binding-secret.yaml.
 
-The host/port resolution depends on `services[].provisioning`:
+Data-driven: the binding_secret list in dsl-mappings.yaml drives the
+stringData. Each entry is one of:
+  - {key, literal: <const>}        # always emit this exact string
+  - {key, template: "..."}         # tpl-rendered with $.Release.Name in scope
+  - {key, from_dsl: <dsl-path>, required: bool, default: <fallback>}
 
-  - `local` (default): per-type convention (`<release>-<type>` for postgresql
-    and grafana, `<release>-<type>-master` for redis). The library deploys a
-    sub-chart and the binding-secret points at it.
+Provisioning:
+  - local    : host = chart's mapping.service.host (templated), port = mapping.service.port
+  - shared   : host/port from .Values.defaults.shared_services[<type>] (overlay)
+  - external : host/port from $svc.endpoint (dev fills in)
 
-  - `shared`: read from `.Values.defaults.shared_services[<type>]`, which
-    the corp overlay populates with the canonical platform-services
-    endpoints. Fails loud if the overlay has no entry for this type.
-
-  - `external`: read from the per-service `endpoint:` block. Fails loud if
-    `endpoint:` is missing or incomplete.
-
-Credentials (auth.*) are sourced from the DSL the same way regardless of
-provisioning: the platform team manages the Vault path, projects reference
-it by path. See rda-docs/operator.md Step 6 for the pattern.
+The mapping's binding_secret host/port are overridden when provisioning is
+shared/external, because in those cases the host doesn't follow the
+local-deploy convention.
 */}}
 {{- define "suse-library.dsl.bindingSecretFrom" -}}
 {{- $svc := .svc -}}
@@ -274,18 +302,19 @@ it by path. See rda-docs/operator.md Step 6 for the pattern.
 {{- if not (or (eq $provisioning "local") (or (eq $provisioning "shared") (eq $provisioning "external"))) -}}
 {{- fail (printf "services[binding=%s].provisioning must be 'local', 'shared', or 'external' (got %q). See rda-docs/concepts/dsl.md#provisioning." $svc.binding $provisioning) -}}
 {{- end -}}
-{{- /* Resolve host/port/scheme depending on provisioning. */ -}}
+{{- $mapping := include "suse-library.dsl.resolveMapping" (dict "chart" $svc.type "root" $root) | fromJson -}}
+{{- /* Resolve host / port / scheme depending on provisioning */ -}}
 {{- $host := "" -}}
 {{- $port := "" -}}
 {{- $scheme := "" -}}
 {{- if eq $provisioning "local" -}}
-  {{- if eq $svc.type "postgresql" -}}{{- $host = printf "%s-%s" $release $svc.type -}}{{- $port = "5432" -}}
-  {{- else if eq $svc.type "redis" -}}{{- $host = printf "%s-%s-master" $release $svc.type -}}{{- $port = "6379" -}}
-  {{- else if eq $svc.type "grafana" -}}{{- $host = printf "%s-%s" $release $svc.type -}}{{- $port = "80" -}}{{- $scheme = "http" -}}
-  {{- else -}}{{- fail (printf "Unsupported service type %q for binding %q in DSL v1alpha1 (provisioning=local). Supported types: postgresql, redis, grafana." $svc.type $svc.binding) -}}
-  {{- end -}}
+  {{- $svcSpec := index $mapping "service" | default dict -}}
+  {{- $hostTpl := index $svcSpec "host" | default "" -}}
+  {{- if eq $hostTpl "" -}}{{- fail (printf "dsl-mappings.yaml: charts.%s.versions[*].service.host is missing" $svc.type) -}}{{- end -}}
+  {{- $host = tpl $hostTpl $root -}}
+  {{- $port = (index $svcSpec "port" | default "") | toString -}}
+  {{- $scheme = index $svcSpec "scheme" | default "http" -}}
 {{- else if eq $provisioning "shared" -}}
-  {{- /* dig() requires plain map[string]interface{}, but $root.Values is chartutil.Values; walk via index instead */ -}}
   {{- $defaults := index $root.Values "defaults" | default dict -}}
   {{- $sharedRoot := index $defaults "shared_services" | default dict -}}
   {{- $sharedMap := index $sharedRoot $svc.type | default dict -}}
@@ -305,6 +334,10 @@ it by path. See rda-docs/operator.md Step 6 for the pattern.
   {{- $port = $ep.port | default "" | toString -}}
   {{- $scheme = $ep.scheme | default "http" -}}
 {{- end -}}
+{{- /* Render the Secret. Always start with --- on its own line, including
+       a leading newline so consecutive includes from a range loop don't
+       get glued together (fixes the multi-service rendering bug). */ -}}
+
 ---
 apiVersion: v1
 kind: Secret
@@ -323,51 +356,44 @@ metadata:
     rda.suse.com/helper: "suse-library.dsl.bindingSecretFrom"
 type: Opaque
 stringData:
-  type: {{ $svc.type | quote }}
-  provider: rda-appco
-  host: {{ $host | quote }}
-  port: {{ $port | quote }}
-{{- if eq $svc.type "postgresql" }}
-  username: {{ $svc.auth.user.name | default "app" | quote }}
-  password: {{ required (printf "services[binding=%s].auth.user.password is required for type=postgresql" $svc.binding) $svc.auth.user.password | quote }}
-  database: {{ required (printf "services[binding=%s].auth.user.database is required for type=postgresql" $svc.binding) $svc.auth.user.database | quote }}
-{{- else if eq $svc.type "redis" }}
-  password: {{ required (printf "services[binding=%s].auth.password is required for type=redis" $svc.binding) $svc.auth.password | quote }}
-{{- else if eq $svc.type "grafana" }}
-  url: {{ printf "%s://%s:%s" $scheme $host $port | quote }}
-  adminUser: {{ $svc.auth.admin.name | default "admin" | quote }}
-  adminPassword: {{ required (printf "services[binding=%s].auth.admin.password is required for type=grafana" $svc.binding) $svc.auth.admin.password | quote }}
+{{- range $bsEntry := index $mapping "binding_secret" }}
+  {{- $key := index $bsEntry "key" }}
+  {{- /* Connectivity keys (host/port/url) are sourced from the provisioning
+         resolution above ($host/$port/$scheme), not from the mapping's
+         literal/template — the mapping's values are the local-deploy
+         convention; shared/external need the overlay/endpoint values. */ -}}
+  {{- if eq $key "host" }}
+  {{ $key }}: {{ $host | quote }}
+  {{- else if eq $key "port" }}
+  {{ $key }}: {{ $port | quote }}
+  {{- else if eq $key "url" }}
+  {{ $key }}: {{ printf "%s://%s:%s" $scheme $host $port | quote }}
+  {{- else if hasKey $bsEntry "literal" }}
+  {{ $key }}: {{ index $bsEntry "literal" | quote }}
+  {{- else if hasKey $bsEntry "template" }}
+  {{ $key }}: {{ tpl (index $bsEntry "template") $root | quote }}
+  {{- else if hasKey $bsEntry "from_dsl" }}
+  {{- $dslPath := index $bsEntry "from_dsl" }}
+  {{- $keys := splitList "." $dslPath }}
+  {{- $val := include "suse-library.dsl._dig" (dict "obj" $svc "keys" $keys "sentinel" "_RDA_NONE_") }}
+  {{- $required := index $bsEntry "required" | default false }}
+  {{- $default := index $bsEntry "default" | default "" }}
+  {{- if eq $val "_RDA_NONE_" }}
+  {{- if $required }}
+  {{- fail (printf "services[binding=%s].%s is required for type=%s (per dsl-mappings.yaml)" $svc.binding $dslPath $svc.type) }}
+  {{- end }}
+  {{ $key }}: {{ $default | quote }}
+  {{- else }}
+  {{ $key }}: {{ $val | quote }}
+  {{- end }}
+  {{- end }}
 {{- end }}
 {{- end -}}
 
-{{/*
-─── Legacy-path helpers (issue #5) ──────────────────────────────────────
+{{/* ──────────────────────────────────────────────────────────────────────
+    Legacy-path helpers (issue #5) — pre-DSL <chart>.enabled gated path.
+    ────────────────────────────────────────────────────────────────────── */}}
 
-The DSL services[] path is the future; the legacy `<chart>.enabled` path
-is what lets bundles <= v0.9 still render. Each helper below replaces a
-hand-rolled block of binding-secret + env-projection + volume wiring per
-chart. New legacy charts plug in by adding `<chart>.enabled` flags in
-values.yaml and one call site in deployment.yaml / binding-secret.yaml.
-
-Categories (matching the issue's taxonomy):
-  - sql-db       postgresql, mariadb, mysql       (host/port/user/password/database + DB_* aliases)
-  - url-only     prometheus                        (just URL)
-  - ui-with-admin grafana                          (URL + admin user/password)
-
-These helpers will be removed in Phase 1.5 when the rda CLI pre-processor
-auto-generates the legacy blocks from services[].
-*/}}
-
-{{/*
-suse-library.legacy.envForSqlDb — emit env vars for a SQL-database binding.
-Args (dict):
-  chart   string  AppCo chart name (e.g. "postgresql")
-  release string  release name (output of `include "suse-library.name" .`)
-Side effect: emits 10 env vars — 5 chart-prefixed (POSTGRESQL_*) + 5 DB_*
-semantic aliases. The aliases are emitted exactly once per call: callers
-wanting multiple SQL services must serialise — only the first SQL chart
-should pull DB_* aliases (the rest collide).
-*/}}
 {{- define "suse-library.legacy.envForSqlDb" -}}
 {{- $chart := .chart -}}
 {{- $rel := .release -}}
@@ -384,10 +410,6 @@ should pull DB_* aliases (the rest collide).
 - {name: DB_NAME,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: database}}}
 {{- end -}}
 
-{{/*
-suse-library.legacy.envForUrlOnly — emit a single <CHART>_URL env var.
-Args (dict): chart, release. Used by url-only services like prometheus.
-*/}}
 {{- define "suse-library.legacy.envForUrlOnly" -}}
 {{- $chart := .chart -}}
 {{- $rel := .release -}}
@@ -395,10 +417,6 @@ Args (dict): chart, release. Used by url-only services like prometheus.
 - {name: {{ $upper }}_URL, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: url}}}
 {{- end -}}
 
-{{/*
-suse-library.legacy.envForUiWithAdmin — emit URL + ADMIN_USER + ADMIN_PASSWORD.
-Args (dict): chart, release. Used by UI services with an admin login (grafana).
-*/}}
 {{- define "suse-library.legacy.envForUiWithAdmin" -}}
 {{- $chart := .chart -}}
 {{- $rel := .release -}}
@@ -408,32 +426,15 @@ Args (dict): chart, release. Used by UI services with an admin login (grafana).
 - {name: {{ $upper }}_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: adminPassword}}}
 {{- end -}}
 
-{{/*
-suse-library.legacy.bindingMount — emit the volumeMount line for a chart's
-SBS binding directory. Args (dict): chart.
-*/}}
 {{- define "suse-library.legacy.bindingMount" -}}
 - {name: binding-{{ .chart }}, mountPath: /bindings/{{ .chart }}, readOnly: true}
 {{- end -}}
 
-{{/*
-suse-library.legacy.bindingVolume — emit the volume entry for a chart's
-SBS binding Secret. Args (dict): chart, release.
-*/}}
 {{- define "suse-library.legacy.bindingVolume" -}}
 - name: binding-{{ .chart }}
   secret: {secretName: {{ .release }}-{{ .chart }}-binding}
 {{- end -}}
 
-{{/*
-suse-library.legacy.sqlBindingSecret — emit a SQL-DB shaped binding Secret.
-Args (dict):
-  chart    string  AppCo chart name (postgresql, mariadb, mysql, ...)
-  port     string  port the chart's Service listens on (5432 for postgres)
-  hostSvc  string  Service name suffix the chart deploys (e.g. "<release>-postgresql")
-  root     dict    .Values + .Release passthrough (passed as the dot at the
-                   call site so `required` and labels work)
-*/}}
 {{- define "suse-library.legacy.sqlBindingSecret" -}}
 {{- $chart := .chart -}}
 {{- $port := .port -}}
@@ -460,14 +461,6 @@ stringData:
   database: {{ required (printf "%s.auth.database is required when %s.enabled=true" $chart $chart) $vals.auth.database | quote }}
 {{- end -}}
 
-{{/*
-suse-library.legacy.urlBindingSecret — emit a URL-only binding Secret.
-Args (dict):
-  chart    string  AppCo chart name (prometheus, ...)
-  port     string  Service port (typically "80")
-  hostSvc  string  Service name (e.g. "<release>-prometheus-server")
-  root     dict    .Values + .Release passthrough
-*/}}
 {{- define "suse-library.legacy.urlBindingSecret" -}}
 {{- $chart := .chart -}}
 {{- $port := .port -}}
@@ -491,16 +484,6 @@ stringData:
   url: "http://{{ $hostSvc }}"
 {{- end -}}
 
-{{/*
-suse-library.legacy.uiBindingSecret — emit a UI-with-admin binding Secret.
-Args (dict):
-  chart       string  AppCo chart name (grafana, ...)
-  port        string  Service port (typically "80")
-  hostSvc     string  Service name (e.g. "<release>-grafana")
-  adminUser   string  default admin username (typically "admin")
-  adminField  string  the Values key holding the admin password (e.g. "adminPassword")
-  root        dict    .Values + .Release passthrough
-*/}}
 {{- define "suse-library.legacy.uiBindingSecret" -}}
 {{- $chart := .chart -}}
 {{- $port := .port -}}

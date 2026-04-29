@@ -1,0 +1,128 @@
+# DSL → chart-values mapping (data-driven library helpers).
+#
+# This file is the authoritative source for "how does a unified DSL services[]
+# entry of type X translate into the AppCo chart X's values.yaml shape, and
+# what binding-secret keys come out". The library's _helpers.tpl reads it
+# at template time via `tpl . | fromYaml`; no Go-templated if/else if arms
+# per chart anymore.
+#
+# Versioned per chart: a chart's values structure typically changes between
+# major versions (e.g. redis 7→8 reshuffles `master.*` paths). For each
+# chart we list versions[] in order; the first entry whose `constraint`
+# matches the actually-vendored chart version wins. The version is read
+# from .Chart.Dependencies at render time.
+#
+# When a chart's value structure breaks: add a new versions[] entry at the
+# top with the new constraint. Old entries stay for projects still on the
+# previous major.
+#
+# Format: apiVersion: rda.suse.com/dsl-mapping/v1alpha1
+#
+# Per-version block:
+#   constraint: <semver constraint> (Masterminds/semver — same as Helm)
+#   service:
+#     host: <Go template>      # rendered with {Release: .Release.Name}
+#     port: <int>
+#   values_mapping:            # DSL path → chart values path
+#     <dsl-path>: <values-path>
+#   binding_secret:            # ordered list, projects to <release>-<binding>-binding
+#     - key: <name>
+#       <one of: literal | template | from_dsl>
+#       required: <bool>       # default false; only meaningful for from_dsl
+#       default: <string>      # only meaningful for from_dsl
+#       skip_env: <bool>       # default false; when true, the key is in the
+#                              # Secret's stringData but envFromBinding does
+#                              # not project it as <BINDING>_<KEY> (used for
+#                              # metadata keys like type / provider that the
+#                              # app shouldn't see as env vars)
+#
+# The CATALOG.md doc in rda-devx-catalog should stay aligned with this file.
+# Phase 2.5 will add a CI check that asserts CATALOG.md mentions every chart
+# present here.
+
+apiVersion: rda.suse.com/dsl-mapping/v1alpha1
+
+charts:
+  postgresql:
+    versions:
+      - constraint: ">=0.4.0 <1.0.0"
+        # AppCo postgresql 0.4.x (internal Bitnami chart 13.x lineage).
+        # Service is named <release>-postgresql (no -primary / -master suffix).
+        service:
+          host: "{{ .Release.Name }}-postgresql"
+          port: 5432
+        values_mapping:
+          auth.user.name: postgresql.auth.username
+          auth.user.password: postgresql.auth.password
+          auth.user.database: postgresql.auth.database
+          auth.admin.password: postgresql.auth.postgresPassword
+          persistence.enabled: postgresql.persistence.enabled
+          persistence.size: postgresql.persistence.resources.requests.storage
+          metrics.enabled: postgresql.metrics.enabled
+          resources.requests.cpu: postgresql.primary.resources.requests.cpu
+          resources.requests.memory: postgresql.primary.resources.requests.memory
+          resources.limits.cpu: postgresql.primary.resources.limits.cpu
+          resources.limits.memory: postgresql.primary.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: postgresql, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-postgresql"}
+          - {key: port, literal: "5432"}
+          - {key: username, from_dsl: auth.user.name, default: app}
+          - {key: password, from_dsl: auth.user.password, required: true}
+          - {key: database, from_dsl: auth.user.database, required: true}
+
+  redis:
+    versions:
+      - constraint: ">=21.0.0"
+        # AppCo redis 21.x (Bitnami 17.x lineage). Service has -master suffix
+        # because the chart deploys a primary/replicas split. The DSL
+        # persistence.enabled / metrics.enabled paths lift onto master.* under
+        # the hood — see values_mapping.
+        service:
+          host: "{{ .Release.Name }}-redis-master"
+          port: 6379
+        values_mapping:
+          auth.password: redis.auth.password
+          persistence.enabled: redis.master.persistence.enabled
+          persistence.size: redis.master.persistence.size
+          metrics.enabled: redis.metrics.enabled
+          resources.requests.cpu: redis.master.resources.requests.cpu
+          resources.requests.memory: redis.master.resources.requests.memory
+          resources.limits.cpu: redis.master.resources.limits.cpu
+          resources.limits.memory: redis.master.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: redis, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-redis-master"}
+          - {key: port, literal: "6379"}
+          - {key: password, from_dsl: auth.password, required: true}
+
+  grafana:
+    versions:
+      - constraint: ">=12.0.0"
+        # AppCo grafana 12.x. Service maps port 80 (chart default) to pod
+        # port 3000. The library's auto-Ingress (issue #8) uses port 80.
+        service:
+          host: "{{ .Release.Name }}-grafana"
+          port: 80
+        values_mapping:
+          auth.admin.name: grafana.adminUser
+          auth.admin.password: grafana.adminPassword
+          ingress.enabled: grafana.ingress.enabled
+          ingress.host: grafana.ingress.hosts[0]
+          metrics.enabled: grafana.grafana.ini.metrics.enabled
+          persistence.enabled: grafana.persistence.enabled
+          persistence.size: grafana.persistence.size
+          resources.requests.cpu: grafana.resources.requests.cpu
+          resources.requests.memory: grafana.resources.requests.memory
+          resources.limits.cpu: grafana.resources.limits.cpu
+          resources.limits.memory: grafana.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: grafana, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-grafana"}
+          - {key: port, literal: "80"}
+          - {key: url, template: "http://{{ .Release.Name }}-grafana:80"}
+          - {key: adminUser, from_dsl: auth.admin.name, default: admin}
+          - {key: adminPassword, from_dsl: auth.admin.password, required: true}
