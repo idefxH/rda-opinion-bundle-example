@@ -1,0 +1,5 @@
+services: []
+grafana:
+  enabled: true
+  adminPassword: x
+  ui: {expose: false}

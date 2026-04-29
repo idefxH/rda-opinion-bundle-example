@@ -1,0 +1,6 @@
+services: []
+grafana:
+  enabled: true
+  adminPassword: x
+prometheus:
+  enabled: true

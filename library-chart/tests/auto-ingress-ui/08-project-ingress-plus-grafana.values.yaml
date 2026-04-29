@@ -1,0 +1,8 @@
+services: []
+ingress:
+  enabled: true
+  hosts:
+    - app.localhost
+grafana:
+  enabled: true
+  adminPassword: x

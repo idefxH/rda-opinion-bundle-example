@@ -1,0 +1,7 @@
+services: []
+ingress:
+  enabled: true
+  hosts:
+    - demo.localhost
+grafana: {enabled: false}
+prometheus: {enabled: false}
