@@ -167,14 +167,26 @@ of a known DSL↔passthrough mapping triggers the fail.
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.name" "ptPath" "auth.username" "dslKeys" (list "auth" "user" "name") "ptKeys" (list "auth" "username")) -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.password" "ptPath" "auth.password" "dslKeys" (list "auth" "user" "password") "ptKeys" (list "auth" "password")) -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.user.database" "ptPath" "auth.database" "dslKeys" (list "auth" "user" "database") "ptKeys" (list "auth" "database")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.cpu" "ptPath" "primary.resources.requests.cpu" "dslKeys" (list "resources" "requests" "cpu") "ptKeys" (list "primary" "resources" "requests" "cpu")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.memory" "ptPath" "primary.resources.requests.memory" "dslKeys" (list "resources" "requests" "memory") "ptKeys" (list "primary" "resources" "requests" "memory")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.cpu" "ptPath" "primary.resources.limits.cpu" "dslKeys" (list "resources" "limits" "cpu") "ptKeys" (list "primary" "resources" "limits" "cpu")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.memory" "ptPath" "primary.resources.limits.memory" "dslKeys" (list "resources" "limits" "memory") "ptKeys" (list "primary" "resources" "limits" "memory")) -}}
 {{- else if eq $type "redis" -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.password" "ptPath" "auth.password" "dslKeys" (list "auth" "password") "ptKeys" (list "auth" "password")) -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "persistence.enabled" "ptPath" "master.persistence.enabled" "dslKeys" (list "persistence" "enabled") "ptKeys" (list "master" "persistence" "enabled")) -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "metrics.enabled" "ptPath" "metrics.enabled" "dslKeys" (list "metrics" "enabled") "ptKeys" (list "metrics" "enabled")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.cpu" "ptPath" "master.resources.requests.cpu" "dslKeys" (list "resources" "requests" "cpu") "ptKeys" (list "master" "resources" "requests" "cpu")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.memory" "ptPath" "master.resources.requests.memory" "dslKeys" (list "resources" "requests" "memory") "ptKeys" (list "master" "resources" "requests" "memory")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.cpu" "ptPath" "master.resources.limits.cpu" "dslKeys" (list "resources" "limits" "cpu") "ptKeys" (list "master" "resources" "limits" "cpu")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.memory" "ptPath" "master.resources.limits.memory" "dslKeys" (list "resources" "limits" "memory") "ptKeys" (list "master" "resources" "limits" "memory")) -}}
 {{- else if eq $type "grafana" -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.name" "ptPath" "adminUser" "dslKeys" (list "auth" "admin" "name") "ptKeys" (list "adminUser")) -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "auth.admin.password" "ptPath" "adminPassword" "dslKeys" (list "auth" "admin" "password") "ptKeys" (list "adminPassword")) -}}
 {{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "ingress.enabled" "ptPath" "ingress.enabled" "dslKeys" (list "ingress" "enabled") "ptKeys" (list "ingress" "enabled")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.cpu" "ptPath" "resources.requests.cpu" "dslKeys" (list "resources" "requests" "cpu") "ptKeys" (list "resources" "requests" "cpu")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.requests.memory" "ptPath" "resources.requests.memory" "dslKeys" (list "resources" "requests" "memory") "ptKeys" (list "resources" "requests" "memory")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.cpu" "ptPath" "resources.limits.cpu" "dslKeys" (list "resources" "limits" "cpu") "ptKeys" (list "resources" "limits" "cpu")) -}}
+{{- include "suse-library.dsl._collide" (dict "svc" $svc "pt" $pt "sentinel" $sentinel "dslPath" "resources.limits.memory" "ptPath" "resources.limits.memory" "dslKeys" (list "resources" "limits" "memory") "ptKeys" (list "resources" "limits" "memory")) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

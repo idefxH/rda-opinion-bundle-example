@@ -74,6 +74,10 @@ run_one "$SCRIPT_DIR/03-no-collision-different-paths.values.yaml"   pass
 run_one "$SCRIPT_DIR/04-no-collision-deeper-passthrough.values.yaml" pass
 run_one "$SCRIPT_DIR/05-multi-service-second-collides.values.yaml"  fail "binding=database"
 run_one "$SCRIPT_DIR/06-redis-collision-master-prefix.values.yaml"  fail "binding=cache"
+# Resources dimension (#33 Phase 1):
+run_one "$SCRIPT_DIR/07-collision-resources-postgresql.values.yaml" fail "resources.requests.cpu"
+run_one "$SCRIPT_DIR/08-collision-resources-redis-master-prefix.values.yaml" fail "resources.limits.memory"
+run_one "$SCRIPT_DIR/09-no-collision-resources-only-dsl.values.yaml" pass
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
