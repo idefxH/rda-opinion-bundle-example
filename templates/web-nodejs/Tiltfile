@@ -15,7 +15,7 @@ v1alpha1.extension(
 )
 load('ext://suse-rda', 'suse_app')
 
-# Service port-forwards are auto-discovered from `chart/values.yaml`:
+# Service port-forwards are auto-discovered from `deploy/values.yaml`:
 #   - DSL path:    every entry under `services[]` (the unified DSL).
 #   - Legacy path: every catalogued chart with `<chart>.enabled: true`.
 #
@@ -27,8 +27,9 @@ load('ext://suse-rda', 'suse_app')
 suse_app(
     name='{{ .Name }}',
     language='{{ .Language }}',
+    chart_path='deploy',
 )
-# port is derived from `suse-library.port` in chart/values.yaml — the
+# port is derived from `suse-library.port` in deploy/values.yaml — the
 # library chart's deployment renders containerPort and Service targetPort
 # from there, so values.yaml stays the single source of truth. Override
 # only by editing values.yaml; pass `port=NNN` here only if you need to

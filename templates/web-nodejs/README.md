@@ -25,7 +25,7 @@ Pick a binding name that reflects the role in your domain (`payments-db`,
 rda add-service postgresql payments-db
 ```
 
-This appends a `services[]` entry to `chart/values.yaml` and flips
+This appends a `services[]` entry to `deploy/values.yaml` and flips
 `suse-library.postgresql.enabled: true` so the next `tilt up` deploys
 the SUSE Application Collection postgres sub-chart and wires the
 binding-secret to your app at `/bindings/payments-db/`.
@@ -48,7 +48,7 @@ For multiple postgresql bindings in the same project (e.g. a
 read-replica setup), pin a specific one via `DB_BINDING_NAME`:
 
 ```yaml
-# chart/values.yaml — under suse-library:
+# deploy/values.yaml — under suse-library:
 env:
   - name: DB_BINDING_NAME
     value: users-db
@@ -63,7 +63,7 @@ Crossplane, Vault dynamic secrets), set `provisioning: external` on
 the service entry and supply the endpoint:
 
 ```yaml
-# chart/values.yaml — under suse-library.services:
+# deploy/values.yaml — under suse-library.services:
 - binding: payments-db
   type: postgresql
   provisioning: external
@@ -83,12 +83,12 @@ ExternalSecrets, etc.) — see `concepts/provisioning.md` in the docs.
 - `src/index.js` — Express server. Discovers a postgresql binding by
   type; honours `DB_BINDING_NAME` for multi-DB. Returns service info
   on `/`, health on `/health`, readiness on `/ready`.
-- `chart/Chart.yaml` + `chart/values.yaml` — Helm chart with
+- `deploy/Chart.yaml` + `deploy/values.yaml` — Helm chart with
   `suse-library` as a dependency. The library renders the Deployment,
   Service, Ingress (when `ingress.enabled`), and per-service binding
   Secrets from the unified `services[]` DSL.
 - `Tiltfile` — inner-loop config. Auto-discovers port-forwards from
-  `chart/values.yaml`; nothing in this file needs to change as you
+  `deploy/values.yaml`; nothing in this file needs to change as you
   add/remove services.
 - `Dockerfile` — multi-stage build on SUSE BCI Node.js 22. When the
   SUSE-AppCo buildpacks ship, you can drop this file and switch to
