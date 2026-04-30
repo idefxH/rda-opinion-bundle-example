@@ -111,22 +111,27 @@ charts:
         # the redis container version. AppCo repackages as 2.x; if you
         # see "21.x" referenced anywhere it's the upstream Bitnami
         # convention and doesn't apply here.
-        # Service has -master suffix because the chart deploys a
-        # primary/replicas split. The DSL persistence.enabled /
-        # metrics.enabled paths lift onto master.* under the hood —
-        # see values_mapping.
+        #
+        # AppCo redis defaults to architecture=standalone (single
+        # replica), so the Service is just <release>-redis (no -master
+        # suffix — that's a Bitnami HA-mode artifact). Persistence and
+        # metrics keys are top-level under redis.* (no master.* prefix).
+        # Container resources are nested under
+        # podTemplates.containers.redis.resources because AppCo's
+        # PodTemplate-based schema separates init / app / sidecar
+        # resource budgets.
         service:
-          host: "{{ .Release.Name }}-redis-master"
+          host: "{{ .Release.Name }}-redis"
           port: 6379
         values_mapping:
           auth.password: redis.auth.password
-          persistence.enabled: redis.master.persistence.enabled
-          persistence.size: redis.master.persistence.size
+          persistence.enabled: redis.persistence.enabled
+          persistence.size: redis.persistence.resources.requests.storage
           metrics.enabled: redis.metrics.enabled
-          resources.requests.cpu: redis.master.resources.requests.cpu
-          resources.requests.memory: redis.master.resources.requests.memory
-          resources.limits.cpu: redis.master.resources.limits.cpu
-          resources.limits.memory: redis.master.resources.limits.memory
+          resources.requests.cpu: redis.podTemplates.containers.redis.resources.requests.cpu
+          resources.requests.memory: redis.podTemplates.containers.redis.resources.requests.memory
+          resources.limits.cpu: redis.podTemplates.containers.redis.resources.limits.cpu
+          resources.limits.memory: redis.podTemplates.containers.redis.resources.limits.memory
         # Redis password lives in the AOF / RDB snapshot once persistence
         # is on — flipping it after first init requires a PVC reset.
         # When persistence is off (default for redis), the auth seed
@@ -137,7 +142,7 @@ charts:
         binding_secret:
           - {key: type, literal: redis, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
-          - {key: host, template: "{{ .Release.Name }}-redis-master"}
+          - {key: host, template: "{{ .Release.Name }}-redis"}
           - {key: port, literal: "6379"}
           - {key: password, from_dsl: auth.password, required: true}
 
