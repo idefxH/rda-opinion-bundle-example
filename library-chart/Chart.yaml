@@ -18,7 +18,7 @@ description: |
   semantic aliases for portable libraries (DB_HOST when a SQL chart
   is enabled).
 type: application
-version: 0.11.2
+version: 0.11.3
 appVersion: "1.0"
 keywords: [suse, rda, library, service-binding, application-collection]
 home: https://github.com/idefxH/rda-opinion-bundle-example
@@ -40,7 +40,7 @@ dependencies:
     repository: oci://dp.apps.rancher.io/charts
     condition: postgresql.enabled
   - name: prometheus
-    version: "29.2.1-6.1"
+    version: "29.3.0-7.1"
     repository: oci://dp.apps.rancher.io/charts
     condition: prometheus.enabled
   - name: grafana
