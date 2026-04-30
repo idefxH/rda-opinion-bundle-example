@@ -140,6 +140,39 @@ name, or empty dict. Used by `rda explain` and the dsl helper unit tests.
 {{- end -}}
 
 {{/*
+suse-library.dsl.authSeed — compute a deterministic short hash of the
+auth fields that a stateful chart bakes into its PVC at first init.
+Used both:
+  - as the value of the rda.suse.com/auth-seed annotation on the
+    binding-secret (so we know what was baked the first time)
+  - as the comparison input in validateConsistency's drift check
+    (to detect that the dev edited an auth field after first deploy
+    and would need a PVC reset).
+
+Args (dict): svc, mapping (the version-resolved chart entry from
+dsl-mappings.yaml).
+
+Returns: 16-hex-char short SHA256 of the joined "path=value\n" lines.
+Empty when the chart has no auth_seed_paths declared (stateless types
+like grafana). Empty seed = no annotation emitted = no drift check.
+*/}}
+{{- define "suse-library.dsl.authSeed" -}}
+{{- $svc := .svc -}}
+{{- $mapping := .mapping -}}
+{{- $paths := index $mapping "auth_seed_paths" | default list -}}
+{{- if gt (len $paths) 0 -}}
+{{- $parts := list -}}
+{{- range $path := $paths -}}
+  {{- $keys := splitList "." $path -}}
+  {{- $val := include "suse-library.dsl._dig" (dict "obj" $svc "keys" $keys "sentinel" "_RDA_NONE_") -}}
+  {{- if eq $val "_RDA_NONE_" -}}{{- $val = "" -}}{{- end -}}
+  {{- $parts = append $parts (printf "%s=%s" $path $val) -}}
+{{- end -}}
+{{- join "\n" $parts | sha256sum | trunc 16 -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 suse-library.dsl.validateConsistency — sanity checks on services[]. Phase 1
 checks:
   - every entry has a non-empty `binding`
@@ -153,6 +186,13 @@ checks:
     they're out of sync. `rda add-service` writes both halves; this
     check catches the case where someone removes <chart>.enabled
     manually thinking it's redundant with the DSL entry.
+  - for stateful types (auth_seed_paths declared): if a binding-secret
+    already exists in the cluster (= chart was deployed before), its
+    rda.suse.com/auth-seed annotation must match the freshly-computed
+    seed. Mismatch means the dev edited an auth field after first init
+    of the PVC; chart sub-init won't re-run, the new credentials don't
+    take, runtime fails with confusing auth errors. Fail loud at
+    template time with the nuke recipe. Closes #63.
 */}}
 {{- define "suse-library.dsl.validateConsistency" -}}
 {{- $mappings := include "suse-library.dsl.loadMappings" . | fromJson -}}
@@ -180,6 +220,31 @@ checks:
   {{- if not (eq (kindOf $chartBlock) "map") -}}{{- $chartBlock = dict -}}{{- end -}}
   {{- if not (eq (index $chartBlock "enabled" | default false) true) -}}
   {{- fail (printf "services[binding=%s].type=%s, provisioning=local — but suse-library.%s.enabled is not true. The Helm dep gates the sub-chart on `condition: %s.enabled`, and condition is evaluated at dep resolution time, so the DSL entry alone can't trigger the dep. Set:\n\n    suse-library:\n      %s:\n        enabled: true\n\n(Or run `rda add-service` which writes both halves automatically.) See rda-docs/concepts/dsl.md#why-the-enabled-flag-is-not-redundant." $svc.binding $svc.type $svc.type $svc.type $svc.type) -}}
+  {{- end -}}
+  {{- /* Auth-seed drift check (#63). Fires only when:
+           1. the chart declares auth_seed_paths in dsl-mappings.yaml
+           2. an existing binding-secret carries an auth-seed annotation
+              (lookup returns non-nil — i.e. we're at apply time, not at
+               helm template --dry-run, AND the chart was deployed before)
+         First-deploy: lookup returns nil → skip silently. CI dry-runs:
+         lookup returns nil → skip silently. Re-deploy after auth edit:
+         seed mismatch → fail loud with nuke recipe. */ -}}
+  {{- $vEntry := include "suse-library.dsl.resolveMapping" (dict "chart" $svc.type "root" $) | fromJson -}}
+  {{- $authPaths := index $vEntry "auth_seed_paths" | default list -}}
+  {{- if gt (len $authPaths) 0 -}}
+    {{- $secretName := printf "%s-%s-binding" $.Release.Name $svc.binding -}}
+    {{- $namespace := $.Release.Namespace -}}
+    {{- $existing := lookup "v1" "Secret" $namespace $secretName -}}
+    {{- if $existing -}}
+      {{- $annotations := $existing.metadata.annotations | default dict -}}
+      {{- $existingSeed := index $annotations "rda.suse.com/auth-seed" | default "" -}}
+      {{- if ne $existingSeed "" -}}
+        {{- $currentSeed := include "suse-library.dsl.authSeed" (dict "svc" $svc "mapping" $vEntry) -}}
+        {{- if ne $existingSeed $currentSeed -}}
+        {{- fail (printf "services[binding=%s] auth has changed since this chart's PVC was first initialised (seed %s → %s). %s only initialises its credentials once, on first start of an empty PGDATA. Subsequent re-deploys keep the ORIGINAL credentials/database baked into the volume — your DSL edit is silently ignored, and the runtime fails with confusing auth errors.\n\nTo pick up the new auth values, nuke the volume:\n\n    tilt down\n    kubectl delete pvc -l app.kubernetes.io/instance=%s\n    tilt up\n\nIf you didn't mean to change the auth, revert your DSL edit (re-render against git: rda render --check).\n\nSee idefxH/rda-opinion-bundle-example#63." $svc.binding $existingSeed $currentSeed $svc.type $.Release.Name) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -390,6 +455,21 @@ metadata:
     # to their values.yaml without having to dive into helper code.
     rda.suse.com/source: "services[binding={{ $svc.binding }}].type={{ $svc.type }}.provisioning={{ $provisioning }}"
     rda.suse.com/helper: "suse-library.dsl.bindingSecretFrom"
+    {{- /* Auth-seed annotation (#63). Stamps the secret with a hash of
+           the auth fields the chart's PVC bakes on first init. On
+           re-deploy, validateConsistency reads this annotation back via
+           lookup and compares with the freshly-computed seed. Mismatch
+           = the dev edited an auth field after first init = PVC reset
+           required. Empty when the chart is stateless (no auth_seed_paths
+           in dsl-mappings.yaml — grafana, prometheus). Only emitted for
+           provisioning=local: shared/external bindings don't have a PVC
+           to drift against. */ -}}
+    {{- if eq $provisioning "local" -}}
+    {{- $authSeed := include "suse-library.dsl.authSeed" (dict "svc" $svc "mapping" $mapping) -}}
+    {{- if ne $authSeed "" }}
+    rda.suse.com/auth-seed: {{ $authSeed | quote }}
+    {{- end -}}
+    {{- end }}
 type: Opaque
 stringData:
 {{- range $bsEntry := index $mapping "binding_secret" }}

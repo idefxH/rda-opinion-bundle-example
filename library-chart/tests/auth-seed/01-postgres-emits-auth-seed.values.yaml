@@ -1,0 +1,15 @@
+# Smoke test: postgres binding's secret should carry an auth-seed annotation
+# whose hash is deterministic (same input = same hash).
+services:
+  - binding: db
+    type: postgresql
+    auth:
+      admin: { password: "admin-pw" }
+      user:
+        name: app
+        password: "app-pw"
+        database: demo
+    persistence: { enabled: false }
+
+postgresql:
+  enabled: true

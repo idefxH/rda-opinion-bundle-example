@@ -1,0 +1,11 @@
+# Shared services don't deploy a sub-chart, so no PVC drift to track.
+services:
+  - binding: db
+    type: postgresql
+    provisioning: shared
+    auth:
+      user: { name: app, password: "x", database: y }
+
+defaults:
+  shared_services:
+    postgresql: { host: pg.platform, port: 5432, scheme: postgres }
