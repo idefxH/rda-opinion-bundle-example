@@ -132,15 +132,20 @@ prometheus:
   server:
     persistentVolume:
       enabled: false
-  # Auto-Ingress for the Prometheus UI. When prometheus.enabled is
-  # true, the library renders an Ingress at prometheus.<release>.localhost
-  # so the dev opens the expression browser from a browser without
-  # configuring a host explicitly. Override:
-  #   prometheus.ui.expose: false  # opt out
-  #   prometheus.ui.host: "..."    # custom host
-  # Refs bundle issue #8.
+  # Auto-Ingress for the Prometheus UI. The library used to render its
+  # own Ingress (via templates/ingress-ui.yaml) when this was true,
+  # because per-chart Ingress shapes differed enough that the DSL
+  # couldn't bridge them. Now (bundle 0.11.9+) the DSL `services[]
+  # .ingress.hosts: [...]` projects via dsl-mappings to the chart-
+  # native Ingress directly — no library detour, no duplication. The
+  # default flipped to `false` to avoid two Ingress resources
+  # (prometheus's own + library's auto) for the same host. Devs who
+  # want the library auto-Ingress (e.g. to override host without
+  # touching the prometheus block) flip this to true explicitly.
+  # Refs bundle issue #8 (the original auto-Ingress design) and the
+  # post-mortem that flipped the default.
   ui:
-    expose: true
+    expose: false
   alertmanager:
     enabled: false
   prometheus-node-exporter:
@@ -161,13 +166,20 @@ grafana:
   # opinion bundle's value prop.
   metrics:
     enabled: true
-  # Auto-Ingress for the Grafana UI. When grafana.enabled is true, the
-  # library renders an Ingress at grafana.<release>.localhost. Override:
-  #   grafana.ui.expose: false  # opt out
-  #   grafana.ui.host: "..."    # custom host
-  # Refs bundle issue #8.
+  # Auto-Ingress for the Grafana UI. The library used to render its
+  # own Ingress (via templates/ingress-ui.yaml) when this was true,
+  # because per-chart Ingress shapes differed enough that the DSL
+  # couldn't bridge them. Now (bundle 0.11.9+) the DSL `services[]
+  # .ingress.hosts: [...]` projects via dsl-mappings to the chart-
+  # native Ingress directly — no library detour, no duplication. The
+  # default flipped to `false` to avoid two Ingress resources
+  # (grafana's own + library's auto) for the same host. Devs who want
+  # the library auto-Ingress (e.g. to override host without touching
+  # the grafana block) flip this to true explicitly. Refs bundle
+  # issue #8 (the original auto-Ingress design) and the post-mortem
+  # that flipped the default.
   ui:
-    expose: true
+    expose: false
 
 # Disabled-by-default catch on `redis.enabled`. Helm dep `condition:`
 # semantics: when the path is MISSING from values entirely, Helm treats
