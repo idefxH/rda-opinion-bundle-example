@@ -8,7 +8,7 @@ keywords: [rda, {{ .Language }}]
 
 dependencies:
   - name: suse-library
-    version: 0.11.9
+    version: 0.11.10
     # Vendored at charts/suse-library/. The library chart references
     # AppCo charts by their real name (postgresql, prometheus, grafana,
     # ...) — toggle each one via suse-library.<chart>.enabled in
