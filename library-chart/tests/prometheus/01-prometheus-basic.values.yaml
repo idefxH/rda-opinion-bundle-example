@@ -1,0 +1,15 @@
+# Smoke test: prometheus binding renders a binding-secret with host/port/url,
+# emits env vars (PROM_HOST, PROM_PORT, PROM_URL), and does NOT emit an
+# auth-seed annotation (stateless from the auth perspective).
+services:
+  - binding: prom
+    type: prometheus
+    persistence:
+      enabled: true
+      size: 5Gi
+    retention: "15d"
+    ingress:
+      enabled: false
+
+prometheus:
+  enabled: true

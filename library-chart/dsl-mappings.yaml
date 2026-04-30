@@ -136,6 +136,54 @@ charts:
           - {key: port, literal: "6379"}
           - {key: password, from_dsl: auth.password, required: true}
 
+  prometheus:
+    versions:
+      - constraint: ">=29.0.0"
+        # AppCo prometheus 29.x (community chart 29.x lineage, prometheus
+        # binary 3.11.x). Service is named <release>-prometheus-server
+        # (`-server` suffix because the chart deploys server +
+        # alertmanager + node-exporter + pushgateway + kube-state-metrics
+        # as separate workloads). Port 80 → pod port 9090 (HTTP UI +
+        # /metrics + /api/v1/query). UI auto-Ingress (issue #8) uses
+        # port 80.
+        #
+        # No auth: Prometheus is unauthenticated by default — ingress
+        # protection (BasicAuth, OIDC) is the standard way to secure
+        # the UI in shared clusters. No auth_seed_paths since there's
+        # no PVC-baked credential to drift against; the time-series
+        # database is data, not auth state.
+        service:
+          host: "{{ .Release.Name }}-prometheus-server"
+          port: 80
+          scheme: http
+        values_mapping:
+          # Persistence for the TSDB (time-series database).
+          persistence.enabled: prometheus.server.persistentVolume.enabled
+          persistence.size: prometheus.server.persistentVolume.size
+          # Retention (how long to keep metrics — e.g. "15d", "30d").
+          # Prometheus-specific DSL field; the chart's default applies
+          # when unset.
+          retention: prometheus.server.retention
+          # UI Ingress.
+          ingress.enabled: prometheus.server.ingress.enabled
+          ingress.host: prometheus.server.ingress.hosts[0]
+          # Resources are server-scoped (the other prometheus chart
+          # components — alertmanager, exporters, pushgateway — are
+          # disabled by default in the library's values.yaml).
+          resources.requests.cpu: prometheus.server.resources.requests.cpu
+          resources.requests.memory: prometheus.server.resources.requests.memory
+          resources.limits.cpu: prometheus.server.resources.limits.cpu
+          resources.limits.memory: prometheus.server.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: prometheus, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-prometheus-server"}
+          - {key: port, literal: "80"}
+          # url is the canonical "where do I scrape / query" — apps that
+          # use Prometheus as a data source (Grafana, custom dashboards,
+          # OpenTelemetry pipelines) typically read this single field.
+          - {key: url, template: "http://{{ .Release.Name }}-prometheus-server:80"}
+
   grafana:
     versions:
       - constraint: ">=12.0.0"
