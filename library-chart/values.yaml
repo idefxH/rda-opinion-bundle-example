@@ -168,3 +168,15 @@ grafana:
   # Refs bundle issue #8.
   ui:
     expose: true
+
+# Disabled-by-default catch on `redis.enabled`. Helm dep `condition:`
+# semantics: when the path is MISSING from values entirely, Helm treats
+# the condition as 'no effect' and loads the dep regardless. So a missing
+# default here would make every project pull redis even without
+# `services[].type=redis` opting in. Closes a bug surfaced live: a
+# project with only postgresql in services[] still saw payments-redis
+# resources because nobody had explicitly written redis.enabled: false.
+# rda render writes redis.enabled: true into the overlay only when an
+# enabled redis service exists, so the user-facing default is off.
+redis:
+  enabled: false
