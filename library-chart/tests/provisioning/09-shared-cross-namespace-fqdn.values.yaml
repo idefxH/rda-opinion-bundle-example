@@ -1,0 +1,28 @@
+# UC5 (NS Phase D): shared postgres deployed in a third namespace
+# (`platform-services`), consumed by a project deployed elsewhere (e.g.
+# `payments` or `orders`). The corp overlay's defaults.shared_services
+# entry MUST carry the FQDN form for cross-namespace DNS resolution to
+# succeed — bare names only resolve within the consumer pod's own
+# namespace, which would break the cross-ns case.
+#
+# This fixture asserts the binding-secret's `host` key is the literal
+# FQDN string the overlay supplied. The library helper `bindingSecretFrom`
+# reads from `defaults.shared_services.<type>.host` verbatim — it doesn't
+# rewrite, doesn't infer, doesn't append a suffix. That's the contract:
+# whatever shape the operator wrote in the overlay is what the consumer
+# sees in the env var.
+defaults:
+  shared_services:
+    postgresql:
+      host: shared-pg-platform-services.platform-services.svc.cluster.local
+      port: 5432
+      scheme: tcp
+services:
+  - binding: shared-events-db
+    type: postgresql
+    provisioning: shared
+    auth:
+      user:
+        name: app
+        password: ignored
+        database: ignored
