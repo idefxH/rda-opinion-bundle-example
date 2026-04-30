@@ -176,7 +176,14 @@ charts:
           retention: prometheus.server.retention
           # UI Ingress.
           ingress.enabled: prometheus.server.ingress.enabled
+          # Plural `hosts: [...]` is canonical (matches the app-level DSL
+          # at suse-library.ingress.hosts). Singular `host: <str>` stays
+          # supported for back-compat with bundles ≤0.11.7 — projected to
+          # hosts[0] via the bracket-notation projection (closes
+          # rda-cli#75). Both writeable; if a project sets BOTH, the
+          # render's seen-types collision detection will warn loud.
           ingress.host: prometheus.server.ingress.hosts[0]
+          ingress.hosts: prometheus.server.ingress.hosts
           # Resources are server-scoped (the other prometheus chart
           # components — alertmanager, exporters, pushgateway — are
           # disabled by default in the library's values.yaml).
@@ -206,7 +213,12 @@ charts:
           auth.admin.name: grafana.adminUser
           auth.admin.password: grafana.adminPassword
           ingress.enabled: grafana.ingress.enabled
+          # Plural `hosts: [...]` is canonical (matches the app-level DSL
+          # at suse-library.ingress.hosts). Singular `host: <str>` stays
+          # supported for back-compat — projected to hosts[0] via
+          # bracket-notation (closes rda-cli#75). Both writeable.
           ingress.host: grafana.ingress.hosts[0]
+          ingress.hosts: grafana.ingress.hosts
           metrics.enabled: grafana.grafana.ini.metrics.enabled
           persistence.enabled: grafana.persistence.enabled
           persistence.size: grafana.persistence.size

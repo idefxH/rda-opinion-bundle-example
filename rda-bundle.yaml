@@ -17,8 +17,16 @@ library_chart:
   # v1: file:// URI relative to bundle root. The rda HelmClient.PullChart
   # production implementation supports file:// URIs only — see the v1-gap
   # issue tracking oci:// support.
+  #
+  # IMPORTANT: this version MUST match library-chart/Chart.yaml's version
+  # field. `rda upgrade` reads its target from THIS manifest (the bundle
+  # claims version X), not from library-chart/Chart.yaml directly. If the
+  # two drift, `rda upgrade` silently lies: it'll say "already up to date"
+  # at the manifest's stale version while the actual library is newer.
+  # CONTRIBUTING.md mandates bumping both files in the same commit, and a
+  # follow-up test asserting equality is filed against the bundle.
   oci_ref: file://library-chart
-  version: 0.11.4
+  version: 0.11.8
 
 # Catalogue surfaced by the library chart. Each AppCo chart is referenced
 # by its real name (no alias). The local_chart_ref points at the bundled

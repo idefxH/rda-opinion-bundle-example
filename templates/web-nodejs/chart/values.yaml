@@ -21,11 +21,19 @@ suse-library:
 
   # ─── Ingress (cluster Traefik / FIPS variant) ──────────────────────
   # The library auto-renders an Ingress when this block is present.
-  # Default host {{ .Name }}.localhost resolves on macOS / Rancher
-  # Desktop without /etc/hosts edits; change for staging+.
+  #
+  # Default host uses localtest.me — a public wildcard DNS that resolves
+  # *.localtest.me to 127.0.0.1 from any OS, no /etc/hosts edits needed.
+  # Works on macOS, Linux, AND Windows out of the box. The shorter
+  # `<name>.localhost` form is also fine on macOS / Linux (where modern
+  # mDNS resolves *.localhost to 127.0.0.1) but it's NOT universal
+  # — Windows resolution is hit-or-miss without registry tweaks.
+  # Change all hosts for staging+.
   ingress:
     enabled: true
-    hosts: [{{ .Name }}.localhost]
+    hosts:
+      - {{ .Name }}.localtest.me
+      # - {{ .Name }}.localhost  # alternative (macOS / Linux only)
 
   image:
     repository: {{ .Name }}
