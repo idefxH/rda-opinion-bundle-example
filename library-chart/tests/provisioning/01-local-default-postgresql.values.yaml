@@ -6,3 +6,6 @@ services:
         name: app
         password: dev-pw
         database: payments
+
+postgresql:
+  enabled: true

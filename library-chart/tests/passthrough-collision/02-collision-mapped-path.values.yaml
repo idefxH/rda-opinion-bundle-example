@@ -9,3 +9,6 @@ services:
     passthrough:
       auth:
         password: dev-from-passthrough
+
+postgresql:
+  enabled: true

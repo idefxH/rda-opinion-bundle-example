@@ -15,3 +15,9 @@ services:
     passthrough:
       persistence:
         enabled: false
+
+postgresql:
+  enabled: true
+
+redis:
+  enabled: true

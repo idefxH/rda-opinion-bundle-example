@@ -12,3 +12,6 @@ services:
       primary:
         nodeSelector:
           disk: ssd
+
+postgresql:
+  enabled: true

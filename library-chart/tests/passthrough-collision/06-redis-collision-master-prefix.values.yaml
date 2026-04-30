@@ -9,3 +9,6 @@ services:
       master:
         persistence:
           enabled: true
+
+redis:
+  enabled: true

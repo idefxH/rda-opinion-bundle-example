@@ -11,3 +11,6 @@ services:
         resources:
           limits:
             memory: 2Gi
+
+redis:
+  enabled: true

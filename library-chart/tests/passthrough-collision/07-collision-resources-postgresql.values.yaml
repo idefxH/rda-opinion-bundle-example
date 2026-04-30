@@ -15,3 +15,6 @@ services:
         resources:
           requests:
             cpu: 500m
+
+postgresql:
+  enabled: true
