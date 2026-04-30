@@ -53,7 +53,7 @@ suse-library:
   # ships empty by design (no plaintext default in the template).
   #
   # The DSL is the source of truth. `rda render` projects services[]
-  # into chart/values.generated.yaml (the AppCo sub-chart values
+  # into deploy/.rda/values.generated.yaml (the AppCo sub-chart values
   # Helm needs). The Tilt extension auto-runs `rda render` before
   # every `helm template`, so as you edit services[] here, the
   # overlay stays in sync. Don't edit values.generated.yaml by hand

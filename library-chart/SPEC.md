@@ -2,7 +2,7 @@
 
 ## META
 Deployment:   helm-library-chart
-Version:      0.11.11
+Version:      0.11.13
 Spec-Schema:  0.1.0
 Author:       François-Xavier Houard <fx.houard@gmail.com>
 License:      Apache-2.0
@@ -34,7 +34,10 @@ specific values overlays, and runs library-aware doctor checks.
 - `<binding>` — the symbolic name a project's app uses to reach a
   service (env-var prefix, Secret name suffix, SBS mount).
 - `services[]` — the unified DSL, written by the dev (or by `rda
-  add-service`) at `chart/values.yaml` under `suse-library.services`.
+  add-service`) at `deploy/values.yaml` under `suse-library.services`
+  (legacy projects scaffolded before bundle 0.11.13 still use
+  `chart/values.yaml`; both are accepted by `rda` and the Tilt
+  extension via auto-detection).
 
 ## BEHAVIOR: services-iteration
 Constraint: required
@@ -377,3 +380,34 @@ These four lessons share a class: **contracts that span multiple files
 without a check are bugs waiting to happen.** Every BEHAVIOR section
 above pairs with a test guard precisely to make these classes
 unproducable on a fresh PR.
+
+---
+
+## MILESTONE: 0.11.13
+Status: in-progress
+
+- Bundle template directory rename: `templates/web-nodejs/chart/` →
+  `templates/web-nodejs/deploy/`. The directory's purpose is to hold
+  what gets deployed to Kubernetes; calling it `deploy/` makes that
+  obvious to a newcomer cloning the repo. The legacy name `chart/`
+  was conceptually overloaded — it sounded like an arbitrary helm
+  chart we'd publish to a registry, when in fact it's the project's
+  own deployment surface.
+- New `templates/web-nodejs/deploy/README.md` — explains the
+  directory's contract: what each file is, who edits it, why it's
+  called `deploy/`, and the load-bearing rule that app source stays
+  at the project root and never under `deploy/`.
+- Template files updated: `templates/web-nodejs/Tiltfile` passes
+  `chart_path='deploy'` explicitly to `suse_app(...)`. Project
+  README + `deploy/values.yaml` comments switched from `chart/...`
+  to `deploy/...` references.
+- Companion changes (separate PRs):
+  - `idefxH/rda-cli` — `internal/project/detect.go` and
+    `cmd/new.go::vendorLibraryChart` accept `deploy/` (preferred)
+    and fall back to `chart/` (legacy) for back-compat with projects
+    scaffolded before this milestone.
+  - `idefxH/tilt-extension-suse-rda` — auto-detects `deploy/` vs
+    `chart/` so existing projects that pass `chart_path='chart'`
+    keep working.
+- Manifest version sync: `library-chart/Chart.yaml` and
+  `rda-bundle.yaml::library_chart.version` both bumped to 0.11.13.
