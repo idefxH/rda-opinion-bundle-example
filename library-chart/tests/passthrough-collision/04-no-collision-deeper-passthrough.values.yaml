@@ -12,3 +12,6 @@ services:
       metrics:
         serviceMonitor:
           enabled: true
+
+postgresql:
+  enabled: true

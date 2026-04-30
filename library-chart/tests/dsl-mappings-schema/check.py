@@ -25,6 +25,9 @@ Schema (mirrors the file's own header documentation):
               required:      <bool>            # only with from_dsl
               default:       <string>          # only with from_dsl
               skip_env:      <bool>            # optional
+              env_aliases:   <list of strings> # optional; emits additional
+                                               # env vars referencing the
+                                               # same Secret key
 
 Exit codes:
   0  schema valid
@@ -48,7 +51,7 @@ EXPECTED_API_VERSION = "rda.suse.com/dsl-mapping/v1alpha1"
 # guarantees collision detection in validatePassthrough computes the right
 # sub-path (it strips the chart-name prefix).
 RESERVED_BS_KEYS = {"key", "literal", "template", "from_dsl",
-                    "required", "default", "skip_env"}
+                    "required", "default", "skip_env", "env_aliases"}
 
 
 def err(errors, path, msg):
@@ -99,6 +102,35 @@ def check_binding_secret(errors, chart, vidx, bs):
         if "skip_env" in entry and not isinstance(entry["skip_env"], bool):
             err(errors, "%s.key=%s" % (path, key),
                 "skip_env must be bool")
+        if "env_aliases" in entry:
+            aliases = entry["env_aliases"]
+            if not isinstance(aliases, list):
+                err(errors, "%s.key=%s" % (path, key),
+                    "env_aliases must be a list of strings, got %s" %
+                    type(aliases).__name__)
+            else:
+                for ai, a in enumerate(aliases):
+                    if not isinstance(a, str) or not a:
+                        err(errors, "%s.key=%s.env_aliases[%d]" % (path, key, ai),
+                            "must be a non-empty string")
+                # An alias that re-spells the secret key as itself is
+                # a no-op; flag the typo. snakecase comparison covers
+                # camelCase / kebab-case equivalence.
+                import re
+                norm = lambda s: re.sub(r"[\W_]+", "", s.lower())
+                key_norm = norm(key)
+                for ai, a in enumerate(aliases):
+                    if isinstance(a, str) and norm(a) == key_norm:
+                        err(errors, "%s.key=%s.env_aliases[%d]" % (path, key, ai),
+                            "alias %r resolves to the same env-var name as the "
+                            "key %r — drop it (it would emit a duplicate env "
+                            "var entry on the Deployment)." % (a, key))
+        if "skip_env" in entry and entry.get("skip_env") and "env_aliases" in entry:
+            err(errors, "%s.key=%s" % (path, key),
+                "env_aliases on a skip_env entry is meaningless — the "
+                "primary env var is suppressed, so the aliases would be "
+                "the only env vars projected. Either drop skip_env or "
+                "drop env_aliases.")
 
 
 def check_values_mapping(errors, chart, vidx, vm):

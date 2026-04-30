@@ -12,3 +12,6 @@ services:
       limits:
         cpu: 500m
         memory: 1Gi
+
+grafana:
+  enabled: true

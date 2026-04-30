@@ -145,6 +145,14 @@ checks:
   - every entry has a non-empty `binding`
   - every entry has a recognised `type` (must be in dsl-mappings.yaml)
   - bindings are unique within services[]
+  - for provisioning=local entries: <chart>.enabled must be true. The
+    Helm dependency `condition` field on library-chart/Chart.yaml gates
+    sub-chart resolution on that flag, and condition is evaluated at
+    dep-resolution time — BEFORE `_helpers.tpl` runs. So we can't auto-
+    derive the flag from services[]; we can only fail loud here when
+    they're out of sync. `rda add-service` writes both halves; this
+    check catches the case where someone removes <chart>.enabled
+    manually thinking it's redundant with the DSL entry.
 */}}
 {{- define "suse-library.dsl.validateConsistency" -}}
 {{- $mappings := include "suse-library.dsl.loadMappings" . | fromJson -}}
@@ -162,6 +170,18 @@ checks:
   {{- fail (printf "duplicate binding %q in services[]: each entry needs a unique binding name." $svc.binding) -}}
   {{- end -}}
   {{- $_ := set $seen $svc.binding true -}}
+  {{- /* Local provisioning requires the matching <chart>.enabled flag.
+         Helm's dep `condition` evaluates before this helper runs, so we
+         can only validate post-hoc — but the failure is clear enough
+         that the dev fixes it in one edit. */ -}}
+  {{- $provisioning := $svc.provisioning | default "local" -}}
+  {{- if eq $provisioning "local" -}}
+  {{- $chartBlock := index $.Values $svc.type | default dict -}}
+  {{- if not (eq (kindOf $chartBlock) "map") -}}{{- $chartBlock = dict -}}{{- end -}}
+  {{- if not (eq (index $chartBlock "enabled" | default false) true) -}}
+  {{- fail (printf "services[binding=%s].type=%s, provisioning=local — but suse-library.%s.enabled is not true. The Helm dep gates the sub-chart on `condition: %s.enabled`, and condition is evaluated at dep resolution time, so the DSL entry alone can't trigger the dep. Set:\n\n    suse-library:\n      %s:\n        enabled: true\n\n(Or run `rda add-service` which writes both halves automatically.) See rda-docs/concepts/dsl.md#why-the-enabled-flag-is-not-redundant." $svc.binding $svc.type $svc.type $svc.type $svc.type) -}}
+  {{- end -}}
+  {{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -169,6 +189,14 @@ checks:
 suse-library.dsl.envFromBinding — project env vars from a binding-secret.
 For every key declared in the chart's binding_secret list, emit a
 { name: <BINDING>_<KEY>, valueFrom: { secretKeyRef: { ... } } } entry.
+
+When a binding_secret entry declares `env_aliases: [name1, name2]`, the
+helper emits ADDITIONAL env vars `<BINDING>_<NAMEn>` that all reference
+the SAME secret key. Use this to keep SBS-canonical key names in the
+Secret (username, database, ...) while also projecting the env-var
+spellings the broader ecosystem expects (libpq's PGUSER convention →
+DB_USER, JDBC's DB_NAME, etc.). Aliases never appear in the Secret's
+stringData — only as additional env-var bindings.
 
 Args (dict): svc, release.
 */}}
@@ -183,9 +211,17 @@ Args (dict): svc, release.
 {{- /* The env var name uses upper-snake-case: camelCase secret keys (adminUser)
        become ADMIN_USER, kebab-case keys (admin-user) become ADMIN_USER too.
        Sprig's `snakecase` does the camelCase split; replace handles dashes. */ -}}
-{{- $envKey := (index $entry "key" | snakecase | upper | replace "-" "_") }}
+{{- $secretKey := index $entry "key" -}}
+{{- $envKey := ($secretKey | snakecase | upper | replace "-" "_") }}
 - name: {{ printf "%s_%s" $bindingUpper $envKey }}
-  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: {{ index $entry "key" }} } }
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: {{ $secretKey }} } }
+{{- /* Optional aliases — additional env vars referencing the same Secret
+       key. Empty / missing list is fine; we just iterate and emit. */ -}}
+{{- range $alias := index $entry "env_aliases" | default list }}
+{{- $aliasEnvKey := ($alias | snakecase | upper | replace "-" "_") }}
+- name: {{ printf "%s_%s" $bindingUpper $aliasEnvKey }}
+  valueFrom: { secretKeyRef: { name: {{ $secret }}, key: {{ $secretKey }} } }
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end -}}
@@ -384,6 +420,13 @@ stringData:
   {{- end }}
   {{ $key }}: {{ $default | quote }}
   {{- else }}
+  {{- /* required:true also rejects empty strings — pg, mysql, redis, etc.
+         all treat an empty password as "no password" / fall back to env
+         vars / silently fail at runtime. Catching here makes the failure
+         loud at template time with a clear DSL key in the message. */ -}}
+  {{- if and $required (eq $val "") }}
+  {{- fail (printf "services[binding=%s].%s is required for type=%s but is empty (\"\"). Set a non-empty value before tilt up — most clients (pg, mysql, redis) treat an empty password as missing and silently fall back, producing a confusing runtime error rather than a clear template-time one. See rda-docs/concepts/dsl.md." $svc.binding $dslPath $svc.type) }}
+  {{- end }}
   {{ $key }}: {{ $val | quote }}
   {{- end }}
   {{- end }}
