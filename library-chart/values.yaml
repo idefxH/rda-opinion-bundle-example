@@ -192,3 +192,11 @@ grafana:
 # enabled redis service exists, so the user-facing default is off.
 redis:
   enabled: false
+
+dex:
+  enabled: false
+  # The dex chart REQUIRES `config:` to be set or the pod crashloops
+  # at startup ("no issuer set"). The library doesn't ship a default
+  # here — the project's deploy/values.yaml supplies the issuer URL +
+  # storage block via `passthrough` on the services[] entry. See
+  # `rda add-service dex` for the scaffold defaults.

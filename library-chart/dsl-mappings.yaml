@@ -234,3 +234,85 @@ charts:
           - {key: url, template: "http://{{ .Release.Name }}-grafana:80"}
           - {key: adminUser, from_dsl: auth.admin.name, default: admin}
           - {key: adminPassword, from_dsl: auth.admin.password, required: true}
+
+  dex:
+    versions:
+      - constraint: ">=0.24.0 <1.0.0"
+        # Dex 0.24.0 (app 2.44.0). NOT in the AppCo catalogue — pulled
+        # from charts.dexidp.io (declared in library-chart/Chart.yaml
+        # with repository: https://charts.dexidp.io).
+        #
+        # Service: <release>-dex on port 5556 (HTTP issuer endpoint).
+        # gRPC (5557) and HTTPS (5554) are off by default; flip via
+        # passthrough.grpc.enabled / passthrough.https.enabled when
+        # the project needs them.
+        #
+        # Bootstrap: dex requires `config:` to be set, otherwise the pod
+        # crashloops at startup. The DSL exposes only the high-level
+        # knobs (issuer URL, ingress, metrics, resources) — anything
+        # else (connectors, oauth2 clients, staticPasswords, the
+        # storage block) goes through `passthrough.config.*`. The
+        # `rda add-service dex` scaffold writes a sane bootstrap
+        # config (storage.memory + enablePasswordDB) so a fresh
+        # project starts with a working dex even before the dev edits
+        # the connector list.
+        service:
+          host: "{{ .Release.Name }}-dex.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 5556
+        values_mapping:
+          # Issuer URL — the canonical "where this dex thinks it lives"
+          # value baked into the OIDC discovery endpoint. Required to
+          # be set; the scaffold defaults to the in-cluster Service URL.
+          issuer: dex.config.issuer
+          # Ingress: same DSL shape as grafana/prometheus (singular
+          # `ingress.host` + plural `ingress.hosts: [str]`), but the
+          # dex chart's ingress.yaml expects a richer object form
+          # `[{host, paths: [{path, pathType}]}]`. The projector
+          # fills in the missing `paths` field via `chart_defaults`
+          # below — devs writing the simple string list in their
+          # values.yaml get a working Ingress without knowing the
+          # chart-side shape difference.
+          ingress.enabled: dex.ingress.enabled
+          ingress.host: dex.ingress.hosts[0].host
+          # ServiceMonitor (prometheus integration). Off by default.
+          metrics.enabled: dex.serviceMonitor.enabled
+          # Resources — the dex chart shape is a flat resources block.
+          resources.requests.cpu: dex.resources.requests.cpu
+          resources.requests.memory: dex.resources.requests.memory
+          resources.limits.cpu: dex.resources.limits.cpu
+          resources.limits.memory: dex.resources.limits.memory
+        # Chart-required fields the DSL doesn't surface (because they
+        # don't vary across deployments). `rda render` writes these
+        # AFTER applying values_mapping, only when at least one
+        # values_mapping target landed in the overlay (i.e. the chart
+        # is actively configured). Each entry: `<target_path>:
+        # <literal_value>`. Same path syntax as values_mapping
+        # (bracket notation supported). NS Phase G (rda-cli 0.1.49).
+        chart_defaults:
+          # Dex requires each ingress host entry to have a `paths`
+          # array. We default to a single root-path
+          # ImplementationSpecific entry — the standard Ingress shape
+          # for "match everything under /". Devs needing more
+          # specific routing override via passthrough.
+          dex.ingress.hosts[0].paths:
+            - path: "/"
+              pathType: ImplementationSpecific
+        # No auth_seed_paths: dex's storage backend is configurable
+        # (memory / kubernetes / postgres) — only the persistent backends
+        # carry seed-class state. When the dev opts into postgres-backed
+        # dex via passthrough.config.storage.type=postgres, that's a
+        # cross-binding concern (a postgres binding feeding dex), out of
+        # scope for the dex catalog entry's auth-seed declaration.
+        binding_secret:
+          - {key: type, literal: dex, skip_env: true}
+          - {key: provider, literal: dexidp-upstream, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-dex"}
+          - {key: port, literal: "5556"}
+          # url is the OIDC issuer URL — the same value the dev
+          # configured at config.issuer, surfaced to consuming apps as
+          # DEX_URL. App OIDC libraries expect this shape.
+          - {key: url, template: "http://{{ .Release.Name }}-dex:5556"}
+          # Issuer is identical to url today (same endpoint). Kept
+          # separate so future SSL / external-issuer configs can
+          # diverge without breaking the env-var contract.
+          - {key: issuer, template: "http://{{ .Release.Name }}-dex:5556"}

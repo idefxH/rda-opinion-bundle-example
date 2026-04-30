@@ -2,7 +2,7 @@
 
 ## META
 Deployment:   helm-library-chart
-Version:      0.11.14
+Version:      0.11.15
 Spec-Schema:  0.1.0
 Author:       François-Xavier Houard <fx.houard@gmail.com>
 License:      Apache-2.0
@@ -447,3 +447,67 @@ Status: in-progress
     keep working.
 - Manifest version sync: `library-chart/Chart.yaml` and
   `rda-bundle.yaml::library_chart.version` both bumped to 0.11.13.
+
+## MILESTONE: 0.11.15
+Status: in-progress
+
+- Catalogue gains a 5th chart: **dex** (OIDC + OAuth2 IdP). Unlike the
+  4 prior charts, dex is NOT in the AppCo catalogue — pulled from the
+  upstream `https://charts.dexidp.io` repo at chart 0.24.0 (app 2.44.0).
+  This is also the first chart in the catalogue with a non-OCI repo;
+  helm dep update handles both shapes transparently.
+- `library-chart/dsl-mappings.yaml` gains a `dex:` entry:
+  - `service.host`: `<release>-dex.<ns>.svc.cluster.local` (FQDN per
+    NS Phase C convention)
+  - `service.port`: 5556 (HTTP issuer endpoint; gRPC 5557 + HTTPS 5554
+    are off by default and opt-in via passthrough)
+  - `values_mapping`: minimal — just `issuer`, `ingress.{enabled,host}`,
+    `metrics.enabled` (ServiceMonitor), and the resources block.
+    Everything else (storage, connectors, oauth2 clients,
+    staticPasswords) goes through `passthrough.config.*`.
+  - **NEW**: `chart_defaults` field — literal fill-in values the rda
+    renderer writes after `values_mapping`. Used here to fill
+    `dex.ingress.hosts[0].paths` with the standard root-path
+    ImplementationSpecific entry the dex chart requires (the unified
+    DSL writes `ingress.hosts: [str]`, the dex chart wants
+    `hosts: [{host, paths}]` — chart_defaults bridges the shape gap
+    so devs writing simple-string hosts get a working Ingress).
+    Optional on every entry; absent on the AppCo charts whose schemas
+    already match the DSL shape. See rda-cli 0.1.49 milestone for
+    the renderer-side plumbing.
+  - `binding_secret`: type/provider/host/port/url/issuer. The
+    `url` and `issuer` keys carry the OIDC issuer URL; consuming
+    apps read `DEX_URL` (12-factor projection) to bootstrap their
+    OIDC client.
+  - No `auth_seed_paths`: dex's storage is configurable (memory /
+    kubernetes / postgres). Memory (default scaffold) has no
+    persistent state to seed; kubernetes-CRD storage is server-
+    managed; postgres-backed storage is a cross-binding concern that
+    belongs on the postgres binding's auth-seed declaration, not
+    here.
+- `library-chart/values.yaml`: `dex.enabled: false` default added.
+  Comment reminds that the dex chart REQUIRES `config:` to be set
+  or its pod crashloops at startup — the project's
+  `deploy/values.yaml` supplies `passthrough.config.{issuer,storage,
+  enablePasswordDB}` (the `rda add-service dex` scaffold does this).
+- Tilt extension auto-discovery picks up dex's ingress block via the
+  same `<chart>.ingress` → Tilt UI link path that grafana already
+  uses; no Tiltfile changes needed.
+- Companion changes (separate PRs):
+  - `idefxH/rda-cli` — `cmd/add_service.go::dslDefaultsFor` gains a
+    `case "dex":` arm that writes the bootstrap config (issuer URL
+    pointing at the in-cluster Service, storage.memory,
+    enablePasswordDB) into `passthrough.config` so a fresh scaffold
+    boots without manual editing.
+  - `idefxH/rda-e2e-tests` — new scenario asserts the binding-secret
+    carries the issuer URL, dex pod is Ready, the discovery endpoint
+    `/.well-known/openid-configuration` returns 200, and (when
+    ingress.enabled) the Ingress resource carries the hosts so the
+    Tilt UI shows clickable links.
+- Discovered: planned addition. dex was the smallest IdP we could
+  validate the catalog-extension flow against without dragging in
+  Keycloak's heavier footprint (Java + DB).
+- Spec META.Version 0.11.13 → 0.11.15. Skips 0.11.14 — that slot
+  was the in-flight Phase D test fixture which already shipped via
+  the bundle Phase C+D combined merge. The version sequencing here
+  reflects the reality of merged commits, not the open-PR ordering.
