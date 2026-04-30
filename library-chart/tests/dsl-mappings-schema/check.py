@@ -191,6 +191,39 @@ def check_version(errors, chart, vidx, ver):
         check_values_mapping(errors, chart, vidx, ver["values_mapping"])
     if "binding_secret" in ver:
         check_binding_secret(errors, chart, vidx, ver["binding_secret"])
+    if "auth_seed_paths" in ver:
+        check_auth_seed_paths(errors, chart, vidx, ver["auth_seed_paths"], ver.get("values_mapping", {}))
+
+
+def check_auth_seed_paths(errors, chart, vidx, paths, values_mapping):
+    """Validate auth_seed_paths: list of non-empty strings, no duplicates,
+    each must be either a known DSL path (present in values_mapping keys)
+    or a documented exception. The cross-check with values_mapping prevents
+    typos that would silently produce a constant hash (a path the helper
+    can't dig in svc would resolve to "" and the seed would be deterministic
+    but wrong)."""
+    base = "charts.%s.versions[%d].auth_seed_paths" % (chart, vidx)
+    if not isinstance(paths, list):
+        err(errors, base, "must be a list of DSL path strings, got %s" % type(paths).__name__)
+        return
+    seen = set()
+    for i, p in enumerate(paths):
+        path_at = "%s[%d]" % (base, i)
+        if not isinstance(p, str) or not p:
+            err(errors, path_at, "must be a non-empty string")
+            continue
+        if p in seen:
+            err(errors, path_at, "duplicate path %r" % p)
+        seen.add(p)
+        # Require each auth_seed_path to be in values_mapping. Otherwise
+        # the helper would dig a key that's never set on the service entry,
+        # silently producing a hash of empty strings.
+        if p not in values_mapping:
+            err(errors, path_at,
+                "path %r is not in values_mapping; the helper would dig it as missing "
+                "and produce a meaningless seed. Either declare the path in values_mapping "
+                "(if the field is meant to project to the sub-chart) or remove it from "
+                "auth_seed_paths." % p)
 
 
 def check_chart(errors, chart, body):

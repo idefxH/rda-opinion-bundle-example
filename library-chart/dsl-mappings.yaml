@@ -25,6 +25,17 @@
 #     port: <int>
 #   values_mapping:            # DSL path → chart values path
 #     <dsl-path>: <values-path>
+#   auth_seed_paths:           # OPTIONAL list of DSL paths whose values are
+#     - <dsl-path>             # baked into the chart's PVC on first init
+#                              # (typically the user/password/database used
+#                              # by the chart's init container). Drives the
+#                              # rda.suse.com/auth-seed annotation on the
+#                              # binding-secret + the validateConsistency
+#                              # drift check. Stateful charts (postgres,
+#                              # mariadb, mongo, redis-with-persistence)
+#                              # declare this; stateless ones (grafana,
+#                              # prometheus) leave it absent. See
+#                              # idefxH/rda-opinion-bundle-example#63.
 #   binding_secret:            # ordered list, projects to <release>-<binding>-binding
 #     - key: <name>
 #       <one of: literal | template | from_dsl>
@@ -35,6 +46,11 @@
 #                              # not project it as <BINDING>_<KEY> (used for
 #                              # metadata keys like type / provider that the
 #                              # app shouldn't see as env vars)
+#       env_aliases:           # OPTIONAL list of strings; emits additional
+#         - <name>             # env vars referencing the same Secret key,
+#                              # e.g. ['user'] on the username key projects
+#                              # both DB_USERNAME (canonical) and DB_USER
+#                              # (env-var convention).
 #
 # The CATALOG.md doc in rda-devx-catalog should stay aligned with this file.
 # Phase 2.5 will add a CI check that asserts CATALOG.md mentions every chart
@@ -63,6 +79,17 @@ charts:
           resources.requests.memory: postgresql.primary.resources.requests.memory
           resources.limits.cpu: postgresql.primary.resources.limits.cpu
           resources.limits.memory: postgresql.primary.resources.limits.memory
+        # AppCo postgres init only runs once on empty PGDATA. Once these
+        # values are baked into the volume, subsequent re-deploys keep the
+        # ORIGINAL credentials/database — env-var changes are silently
+        # ignored. Listing these paths drives the auth-seed annotation +
+        # the template-time drift check that fails loud with the nuke
+        # recipe when the dev edits one of them after first deploy.
+        auth_seed_paths:
+          - auth.user.name
+          - auth.user.password
+          - auth.user.database
+          - auth.admin.password
         binding_secret:
           - {key: type, literal: postgresql, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
@@ -95,6 +122,13 @@ charts:
           resources.requests.memory: redis.master.resources.requests.memory
           resources.limits.cpu: redis.master.resources.limits.cpu
           resources.limits.memory: redis.master.resources.limits.memory
+        # Redis password lives in the AOF / RDB snapshot once persistence
+        # is on — flipping it after first init requires a PVC reset.
+        # When persistence is off (default for redis), the auth seed
+        # check still fires but is informational: the lookup finds no
+        # PVC, the helper short-circuits with no warning.
+        auth_seed_paths:
+          - auth.password
         binding_secret:
           - {key: type, literal: redis, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}

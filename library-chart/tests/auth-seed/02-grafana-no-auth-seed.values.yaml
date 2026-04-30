@@ -1,0 +1,9 @@
+# Stateless chart — no auth_seed_paths in dsl-mappings.yaml — no annotation.
+services:
+  - binding: dashboards
+    type: grafana
+    auth:
+      admin: { name: admin, password: "admin-pw" }
+
+grafana:
+  enabled: true
