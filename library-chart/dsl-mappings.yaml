@@ -105,11 +105,16 @@ charts:
 
   redis:
     versions:
-      - constraint: ">=21.0.0"
-        # AppCo redis 21.x (Bitnami 17.x lineage). Service has -master suffix
-        # because the chart deploys a primary/replicas split. The DSL
-        # persistence.enabled / metrics.enabled paths lift onto master.* under
-        # the hood — see values_mapping.
+      - constraint: ">=2.0.0 <3.0.0"
+        # AppCo redis 2.x (chart packaging — redis binary 8.x lineage).
+        # Note: the constraint uses the AppCo helm chart version, not
+        # the redis container version. AppCo repackages as 2.x; if you
+        # see "21.x" referenced anywhere it's the upstream Bitnami
+        # convention and doesn't apply here.
+        # Service has -master suffix because the chart deploys a
+        # primary/replicas split. The DSL persistence.enabled /
+        # metrics.enabled paths lift onto master.* under the hood —
+        # see values_mapping.
         service:
           host: "{{ .Release.Name }}-redis-master"
           port: 6379
