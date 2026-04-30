@@ -64,6 +64,7 @@ run_one "$SCRIPT_DIR/05-external-missing-endpoint-fails.values.yaml"  fail "requ
 run_one "$SCRIPT_DIR/06-bad-provisioning-value-fails.values.yaml"   fail "must be 'local', 'shared', or 'external'"
 run_one "$SCRIPT_DIR/07-grafana-shared-uses-overlay-scheme.values.yaml"  pass "https://grafana.platform-services:3000"
 run_one "$SCRIPT_DIR/08-passthrough-on-shared-is-skipped.values.yaml"   pass "host: \"pg.platform-services\""
+run_one "$SCRIPT_DIR/09-shared-cross-namespace-fqdn.values.yaml"        pass "host: \"shared-pg-platform-services.platform-services.svc.cluster.local\""
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
