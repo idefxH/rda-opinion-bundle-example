@@ -76,6 +76,55 @@ The library chart's catalogue (which AppCo charts you can opt into via `services
 
 Read CATALOG.md before adding a new chart to the bundle — every chart needs the 12 dimensions answered.
 
+## Template-time gates (Layer 2 of the layered-defense model)
+
+The library helpers run gates at every `helm template` invocation —
+every `tilt up`, every `rda upgrade`, every `rda promote`. These are
+**Layer 2** of RDA's four-layer defense model. The canonical reference
+is [`rda-docs/concepts/gates.md`](https://github.com/idefxH/rda-docs/blob/main/concepts/gates.md);
+the anchor in the rda CLI spec is the `BEHAVIOR: promote` NOTES in
+[`rda-cli/rda.md`](https://github.com/idefxH/rda-cli/blob/main/rda.md)
+under "Layered-defense model".
+
+Scoped to the rendered DSL — these gates fire before any manifest
+reaches a cluster, and run identically on the dev's laptop and in CI.
+
+### Active checks
+
+- **`suse-library.dsl.validateConsistency`** — fails the render if
+  any `services[]` entry has an empty `binding`, an unknown `type`
+  (not in `library-chart/dsl-mappings.yaml`), or a duplicate
+  `binding`. Catches typos before deployment.
+- **`suse-library.dsl.validatePassthrough`** — fails the render if
+  a service entry sets the same path twice: once via the DSL and
+  once via `passthrough:`. Catches DSL/legacy drift before
+  deployment. The collision keys come from each chart's
+  `values_mapping` in `dsl-mappings.yaml`, so the check stays in
+  sync with the catalogue.
+
+### Planned
+
+- **`dsl_drift`** — extends the passthrough collision check to also
+  flag the case where a project mixes the unified DSL with the
+  legacy chart-specific paths (`postgresql.auth.password` set
+  alongside `services[binding=db].auth.user.password`). Today the
+  collision check covers DSL ↔ passthrough; this extension covers
+  DSL ↔ legacy top-level. Tracked alongside the `rda promote`
+  `dsl_drift` gate stub on the CLI side.
+
+### Why template-time matters
+
+These checks are **complementary** to image-level gates (Layer 1,
+`suse_app(...)` in tilt-extension-suse-rda) and deployment-level
+gates (Layer 3, `rda promote`). The library helpers see what no
+other layer sees: the actual render of the project's DSL after
+overlay merge but before `kubectl apply`. A buildpack does not see
+the DSL; `rda promote`'s `forbidden_charts` does not see the
+rendered binding-secret structure; admission controllers see the
+final manifest but lose the `services[]` provenance. Failing here
+is the cheapest place to fail — `tilt up` exits in seconds with a
+specific DSL key in the error message.
+
 ## Persistence model
 
 The library chart's catalogue draws a line between **stateful** and **observability/cache** services:
