@@ -18,7 +18,7 @@ library_chart:
   # production implementation supports file:// URIs only — see the v1-gap
   # issue tracking oci:// support.
   oci_ref: file://library-chart
-  version: 0.11.8
+  version: 0.11.9
 
 # Catalogue surfaced by the library chart. Each AppCo chart is referenced
 # by its real name (no alias). The local_chart_ref points at the bundled
