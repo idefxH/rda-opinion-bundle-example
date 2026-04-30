@@ -40,8 +40,17 @@ spec:
             - {name: SERVICE_BINDING_ROOT, value: /bindings}
             # 12-factor PORT — user code MUST respect process.env.PORT.
             - {name: PORT, value: "{{ .Values.port }}"}
-            {{- /* DSL path: project env from each services[] entry (Phase 1) */ -}}
-            {{- range $i, $svc := .Values.services }}
+            {{- /* DSL path: project env from each ENABLED services[] entry.
+                   Iterates the same enabledServices helper as binding-secret.yaml
+                   so a disabled service doesn't end up with envFromBinding /
+                   volumeMounts referencing a Secret that was never rendered.
+                   Live e2e Apr 30: a prometheus service scaffolded with
+                   `enabled: false` had the deployment mount /bindings/metrics
+                   while binding-secret.yaml correctly skipped it → pod
+                   MountVolume.SetUp failed with `secret payments-metrics-binding
+                   not found`. Single source of truth fixes the drift. */ -}}
+            {{- $enabled := include "suse-library.dsl.enabledServices" $ | fromJsonArray }}
+            {{- range $i, $svc := $enabled }}
             # ─── DSL binding {{ $svc.binding }} (type {{ $svc.type }}) ───
             {{- include "suse-library.dsl.envFromBinding" (dict "svc" $svc "release" $.Release.Name "root" $) | nindent 12 }}
             {{- end }}
@@ -82,7 +91,7 @@ spec:
                 services have no Secret to mount (the dev wired the
                 connection details elsewhere).
             */}}
-            {{- range $i, $svc := .Values.services }}
+            {{- range $i, $svc := $enabled }}
             {{- $prov := $svc.provisioning | default "local" }}
             {{- if ne $prov "external" }}
             - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
@@ -114,7 +123,7 @@ spec:
             DSL binding volumes — one Secret-backed volume per non-external
             services[] entry. Pairs with the volumeMounts loop above.
         */}}
-        {{- range $i, $svc := .Values.services }}
+        {{- range $i, $svc := $enabled }}
         {{- $prov := $svc.provisioning | default "local" }}
         {{- if ne $prov "external" }}
         - name: {{ printf "binding-%s" $svc.binding }}
