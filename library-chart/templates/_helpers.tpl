@@ -173,19 +173,37 @@ like grafana). Empty seed = no annotation emitted = no drift check.
 {{- end -}}
 
 {{/*
+suse-library.dsl.enabledServices — return the services[] entries that are
+enabled. A service is enabled when its `enabled` field is true; absent or
+nil defaults to true (back-compat with projects scaffolded before bundle
+v0.11.6, which never wrote the field). `rda add-service` since rda-cli
+v0.1.38 writes `enabled: false` explicitly so fresh scaffolds are inert
+until the dev fills in mandatory auth fields and flips it.
+
+Returned as a JSON-encoded list (Helm named templates can only return
+strings); the caller unwraps with fromJsonArray. Single source of truth so
+binding-secret.yaml, validateConsistency, and any future iterator stay in
+agreement on what counts as "live".
+
+Args (root context).
+*/}}
+{{- define "suse-library.dsl.enabledServices" -}}
+{{- $out := list -}}
+{{- range $svc := .Values.services -}}
+  {{- $isEnabled := true -}}
+  {{- if hasKey $svc "enabled" -}}{{- $isEnabled = $svc.enabled -}}{{- end -}}
+  {{- if $isEnabled -}}{{- $out = append $out $svc -}}{{- end -}}
+{{- end -}}
+{{- $out | toJson -}}
+{{- end -}}
+
+{{/*
 suse-library.dsl.validateConsistency — sanity checks on services[]. Phase 1
-checks:
+checks (run only on the enabled subset; disabled entries are inert
+scaffolds, not yet ready for deployment):
   - every entry has a non-empty `binding`
   - every entry has a recognised `type` (must be in dsl-mappings.yaml)
   - bindings are unique within services[]
-  - for provisioning=local entries: <chart>.enabled must be true. The
-    Helm dependency `condition` field on library-chart/Chart.yaml gates
-    sub-chart resolution on that flag, and condition is evaluated at
-    dep-resolution time — BEFORE `_helpers.tpl` runs. So we can't auto-
-    derive the flag from services[]; we can only fail loud here when
-    they're out of sync. `rda add-service` writes both halves; this
-    check catches the case where someone removes <chart>.enabled
-    manually thinking it's redundant with the DSL entry.
   - for stateful types (auth_seed_paths declared): if a binding-secret
     already exists in the cluster (= chart was deployed before), its
     rda.suse.com/auth-seed annotation must match the freshly-computed
@@ -193,12 +211,19 @@ checks:
     of the PVC; chart sub-init won't re-run, the new credentials don't
     take, runtime fails with confusing auth errors. Fail loud at
     template time with the nuke recipe. Closes #63.
+
+Note on chart-level enabled: prior bundles required `<chart>.enabled: true`
+(set in chart/values.yaml alongside services[]) for Helm dep resolution.
+That field is now derived by `rda render` and lives in the auto-generated
+overlay (.rda/values.generated.yaml — never in chart/values.yaml). Closes
+rda-cli#65, rda-cli#67.
 */}}
 {{- define "suse-library.dsl.validateConsistency" -}}
 {{- $mappings := include "suse-library.dsl.loadMappings" . | fromJson -}}
 {{- $known := index $mappings "charts" | default dict -}}
 {{- $seen := dict -}}
-{{- range $i, $svc := .Values.services -}}
+{{- $enabled := include "suse-library.dsl.enabledServices" . | fromJsonArray -}}
+{{- range $i, $svc := $enabled -}}
   {{- if eq (toString $svc.binding) "" -}}
   {{- fail (printf "services[%d] has no binding name. Each entry must set 'binding: <name>'." $i) -}}
   {{- end -}}
@@ -210,17 +235,8 @@ checks:
   {{- fail (printf "duplicate binding %q in services[]: each entry needs a unique binding name." $svc.binding) -}}
   {{- end -}}
   {{- $_ := set $seen $svc.binding true -}}
-  {{- /* Local provisioning requires the matching <chart>.enabled flag.
-         Helm's dep `condition` evaluates before this helper runs, so we
-         can only validate post-hoc — but the failure is clear enough
-         that the dev fixes it in one edit. */ -}}
   {{- $provisioning := $svc.provisioning | default "local" -}}
   {{- if eq $provisioning "local" -}}
-  {{- $chartBlock := index $.Values $svc.type | default dict -}}
-  {{- if not (eq (kindOf $chartBlock) "map") -}}{{- $chartBlock = dict -}}{{- end -}}
-  {{- if not (eq (index $chartBlock "enabled" | default false) true) -}}
-  {{- fail (printf "services[binding=%s].type=%s, provisioning=local — but suse-library.%s.enabled is not true. The Helm dep gates the sub-chart on `condition: %s.enabled`, and condition is evaluated at dep resolution time, so the DSL entry alone can't trigger the dep. Set:\n\n    suse-library:\n      %s:\n        enabled: true\n\n(Or run `rda add-service` which writes both halves automatically.) See rda-docs/concepts/dsl.md#why-the-enabled-flag-is-not-redundant." $svc.binding $svc.type $svc.type $svc.type $svc.type) -}}
-  {{- end -}}
   {{- /* Auth-seed drift check (#63). Fires only when:
            1. the chart declares auth_seed_paths in dsl-mappings.yaml
            2. an existing binding-secret carries an auth-seed annotation
