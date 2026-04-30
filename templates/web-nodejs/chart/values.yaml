@@ -1,13 +1,31 @@
 # Project values for {{ .Name }}.
 #
-# Toggle services on under suse-library:.<chart>:.enabled. Each block
-# is the AppCo chart's own values schema — refer to AppCo docs for
-# what each chart accepts.
+# This template is DSL-first (suse-library v0.11.0+). To attach a
+# backing service (postgres, redis, grafana, ...), use:
+#
+#   rda add-service postgresql payments-db
+#
+# It writes a `services[]` entry below AND auto-flips
+# `<chart>.enabled: true` for Helm dep resolution. Both halves are
+# required: services[] drives the DSL helpers (Secret + env wiring),
+# and <chart>.enabled gates the AppCo sub-chart deployment in
+# library-chart's Chart.yaml.
+#
+# Edit the auth/persistence/metrics blocks under each service entry
+# to taste — defaults are dev-tuned, not prod.
 
 suse-library:
   name: {{ .Name }}
   replicas: 1
   port: 8080
+
+  # ─── Ingress (cluster Traefik / FIPS variant) ──────────────────────
+  # The library auto-renders an Ingress when this block is present.
+  # Default host {{ .Name }}.localhost resolves on macOS / Rancher
+  # Desktop without /etc/hosts edits; change for staging+.
+  ingress:
+    enabled: true
+    hosts: [{{ .Name }}.localhost]
 
   image:
     repository: {{ .Name }}
@@ -17,30 +35,25 @@ suse-library:
   imagePullSecrets:
     - name: application-collection
 
-  # ─── postgresql ────────────────────────────────────────────────────
-  # When enabled, the app receives:
-  #   /bindings/postgresql/<key>             (Service Binding Spec)
-  #   POSTGRESQL_HOST/PORT/USER/PASSWORD/DATABASE  (12-factor)
-  #   DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME  (semantic SQL alias)
-  postgresql:
-    enabled: true
-    auth:
-      username: app
-      password: localdev-do-not-use-in-prod
-      database: {{ .Name }}
-
-  # ─── prometheus ────────────────────────────────────────────────────
-  # Uncomment to add Prometheus to your dev loop. App gets:
-  #   /bindings/prometheus/url
-  #   PROMETHEUS_URL=http://<release>-prometheus-server:9090
-  # prometheus:
-  #   enabled: true
-
-  # ─── grafana ───────────────────────────────────────────────────────
-  # Uncomment for Grafana. App gets:
-  #   /bindings/grafana/{url,adminUser,adminPassword}
-  #   GRAFANA_URL/GRAFANA_ADMIN_USER/GRAFANA_ADMIN_PASSWORD
-  # grafana:
-  #   enabled: true
-  #   adminUser: admin
-  #   adminPassword: localdev-do-not-use-in-prod
+  # ─── Backing services ──────────────────────────────────────────────
+  # Add via `rda add-service <type> <binding>`. Example for the
+  # bundled example app (which discovers a postgresql binding by
+  # type — see src/index.js findBindingByType):
+  #
+  # services:
+  #   - binding: payments-db
+  #     type: postgresql
+  #     auth:
+  #       user:
+  #         name: app
+  #         password: ""        # FILL IN — required, no default
+  #         database: payments
+  #     persistence:
+  #       enabled: true
+  #       size: 1Gi
+  #     metrics:
+  #       enabled: true
+  #     resources:
+  #       requests: { cpu: 100m, memory: 256Mi }
+  #       limits:   { cpu: 500m, memory: 1Gi }
+  services: []
