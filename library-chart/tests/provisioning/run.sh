@@ -56,7 +56,7 @@ run_one() {
     PASS=$((PASS+1))
 }
 
-run_one "$SCRIPT_DIR/01-local-default-postgresql.values.yaml"       pass "host: \"testrelease-postgresql\""
+run_one "$SCRIPT_DIR/01-local-default-postgresql.values.yaml"       pass "host: \"testrelease-postgresql.default.svc.cluster.local\""
 run_one "$SCRIPT_DIR/02-shared-with-overlay-defaults-vault.values.yaml"  pass "host: \"shared-pg.platform-services\""
 run_one "$SCRIPT_DIR/03-shared-without-overlay-fails.values.yaml"   fail "no defaults.shared_services.postgresql.host"
 run_one "$SCRIPT_DIR/04-external-with-endpoint.values.yaml"         pass "host: \"legacy-postgres.corp.local\""

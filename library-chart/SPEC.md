@@ -2,7 +2,7 @@
 
 ## META
 Deployment:   helm-library-chart
-Version:      0.11.13
+Version:      0.11.14
 Spec-Schema:  0.1.0
 Author:       François-Xavier Houard <fx.houard@gmail.com>
 License:      Apache-2.0
@@ -327,6 +327,42 @@ Status: in-progress
   spec → code → tests → version bump in lockstep across all four
   files (library Chart.yaml, rda-bundle.yaml, template Chart.yaml,
   SPEC.md META.Version).
+
+## MILESTONE: 0.11.14
+Status: in-progress
+
+- `dsl-mappings.yaml` `service.host` for all four catalogued charts
+  (postgresql, redis, prometheus, grafana) moves from bare-name
+  templates (`{{ .Release.Name }}-postgresql`) to FQDN templates
+  (`{{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local`).
+  NS Phase C per `idefxH/rda-cli#74`. (rebased over 0.11.13 rename PR)
+- Why FQDN: NS Phase A made the deploy namespace explicit per project
+  and per developer (multi-dev shared cluster pattern,
+  `{{.project}}-{{.user}}`). Phase C unlocks the cross-namespace
+  shared-binding case (UC5) — a `provisioning: shared` postgres
+  deployed in a third namespace, consumed by two project namespaces.
+  Bare-name templates only resolve within the same namespace; FQDN
+  resolves anywhere via cluster-DNS.
+- Bare-name back-compat: bare names still work *within* the same
+  namespace because Kubernetes DNS resolves unqualified names against
+  the pod's own namespace. So legacy projects (rda-cli pre-0.1.43,
+  no namespace block, deploys with bindings + workload in the same
+  namespace) keep working through the binding-secret env var even
+  though the var now contains the FQDN. Apps that connect by hostname
+  treat `host.ns.svc.cluster.local` and `host` interchangeably when
+  both resolve.
+- Companion change in `tilt-extension-suse-rda` (PR stacked on
+  Phase A's `feature/ns-phase-a-tiltfile`): `workload_name_for()` now
+  substitutes `{{ .Release.Namespace }}` in addition to
+  `{{ .Release.Name }}`, then strips the FQDN suffix
+  (`.<ns>.svc.cluster.local`) to recover the bare workload name —
+  k8s_resource registers by Deployment / StatefulSet name, not by
+  Service FQDN. Idempotent on bare-name templates so the strip is
+  safe to apply across both the pre-0.11.14 and post-0.11.14 shapes.
+- Manifest version sync: `library-chart/Chart.yaml` and
+  `rda-bundle.yaml::library_chart.version` both bumped to 0.11.14 in
+  the same commit. The `manifest-version-sync` test guard catches
+  drift if either is missed.
 
 ---
 

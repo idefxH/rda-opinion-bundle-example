@@ -45,9 +45,13 @@ check() {
 }
 
 check "binding-secret name = demo-prom-binding" "name: demo-prom-binding"
-check "binding-secret host = demo-prometheus-server" 'host: "demo-prometheus-server"'
+# Library 0.11.12+: service.host is FQDN (NS Phase C — supports cross-
+# namespace shared bindings). helm template's default namespace is
+# 'default' when --namespace isn't passed, so the rendered FQDN is
+# <release>-<chart>.default.svc.cluster.local.
+check "binding-secret host = demo-prometheus-server FQDN" 'host: "demo-prometheus-server.default.svc.cluster.local"'
 check "binding-secret port = 80" 'port: "80"'
-check "binding-secret url = http://demo-prometheus-server:80" 'url: "http://demo-prometheus-server:80"'
+check "binding-secret url = http://...:80 FQDN" 'url: "http://demo-prometheus-server.default.svc.cluster.local:80"'
 check "binding-secret type = prometheus" 'type: "prometheus"'
 check "env var PROM_HOST" "name: PROM_HOST"
 check "env var PROM_PORT" "name: PROM_PORT"

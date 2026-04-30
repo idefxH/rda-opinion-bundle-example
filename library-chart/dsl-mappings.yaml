@@ -65,7 +65,7 @@ charts:
         # AppCo postgresql 0.4.x (internal Bitnami chart 13.x lineage).
         # Service is named <release>-postgresql (no -primary / -master suffix).
         service:
-          host: "{{ .Release.Name }}-postgresql"
+          host: "{{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local"
           port: 5432
         values_mapping:
           auth.user.name: postgresql.auth.username
@@ -121,7 +121,7 @@ charts:
         # PodTemplate-based schema separates init / app / sidecar
         # resource budgets.
         service:
-          host: "{{ .Release.Name }}-redis"
+          host: "{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local"
           port: 6379
         values_mapping:
           auth.password: redis.auth.password
@@ -163,7 +163,7 @@ charts:
         # no PVC-baked credential to drift against; the time-series
         # database is data, not auth state.
         service:
-          host: "{{ .Release.Name }}-prometheus-server"
+          host: "{{ .Release.Name }}-prometheus-server.{{ .Release.Namespace }}.svc.cluster.local"
           port: 80
           scheme: http
         values_mapping:
@@ -207,7 +207,7 @@ charts:
         # AppCo grafana 12.x. Service maps port 80 (chart default) to pod
         # port 3000. The library's auto-Ingress (issue #8) uses port 80.
         service:
-          host: "{{ .Release.Name }}-grafana"
+          host: "{{ .Release.Name }}-grafana.{{ .Release.Namespace }}.svc.cluster.local"
           port: 80
         values_mapping:
           auth.admin.name: grafana.adminUser
