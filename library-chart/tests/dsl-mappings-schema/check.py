@@ -166,12 +166,42 @@ def check_service(errors, chart, vidx, svc):
     elif not isinstance(svc["host"], str) or not svc["host"]:
         err(errors, "charts.%s.versions[%d].service.host" % (chart, vidx),
             "must be a non-empty string")
-    if "port" not in svc:
+    # Port shape — two flavours, mutually exclusive:
+    #   A. legacy single-port:  service.port: <int>
+    #   B. multi-port:          service.ports: { <name>: { port: <int>, scheme?, primary?: bool }, ... }
+    has_port = "port" in svc
+    has_ports = "ports" in svc
+    if not has_port and not has_ports:
         err(errors, "charts.%s.versions[%d].service" % (chart, vidx),
-            "missing 'port'")
-    elif not isinstance(svc["port"], int):
-        err(errors, "charts.%s.versions[%d].service.port" % (chart, vidx),
-            "must be an integer, got %s" % type(svc["port"]).__name__)
+            "missing 'port' (legacy) or 'ports' (multi-port map)")
+    elif has_port and has_ports:
+        err(errors, "charts.%s.versions[%d].service" % (chart, vidx),
+            "cannot declare both 'port' and 'ports' — pick one shape")
+    elif has_port:
+        if not isinstance(svc["port"], int):
+            err(errors, "charts.%s.versions[%d].service.port" % (chart, vidx),
+                "must be an integer, got %s" % type(svc["port"]).__name__)
+    else:
+        ports = svc["ports"]
+        if not isinstance(ports, dict) or not ports:
+            err(errors, "charts.%s.versions[%d].service.ports" % (chart, vidx),
+                "must be a non-empty map of name → {port, scheme?, primary?}")
+        else:
+            primary_count = 0
+            for name, p in ports.items():
+                base = "charts.%s.versions[%d].service.ports.%s" % (chart, vidx, name)
+                if not isinstance(p, dict):
+                    err(errors, base, "must be a dict")
+                    continue
+                if "port" not in p:
+                    err(errors, base, "missing 'port'")
+                elif not isinstance(p["port"], int):
+                    err(errors, base + ".port", "must be an integer")
+                if p.get("primary") is True:
+                    primary_count += 1
+            if primary_count != 1:
+                err(errors, "charts.%s.versions[%d].service.ports" % (chart, vidx),
+                    "exactly one port must have 'primary: true' (got %d)" % primary_count)
 
 
 def check_version(errors, chart, vidx, ver):
