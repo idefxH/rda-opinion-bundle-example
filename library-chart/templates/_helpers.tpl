@@ -561,6 +561,32 @@ stringData:
   {{- end }}
   {{- end }}
 {{- end }}
+{{- /* Multi-port emission (bundle 0.11.20+, paired with rda-cli 0.1.52
+       service.ports spec). When the chart declares service.ports with
+       named entries, emit <port_name>_host / <port_name>_port /
+       <port_name>_url for EVERY port (primary included, for explicit
+       discoverability — a dev who sees MINIO_S3_HOST in env knows
+       what they're getting, vs MINIO_HOST aliasing to the same).
+
+       Only fires for provisioning=local: shared/external bindings
+       have a single endpoint per binding by definition (the overlay's
+       defaults.shared_services map carries one host/port pair, and
+       endpoint: in external mode is also a single triple). Named
+       ports are an in-cluster Service shape concept; they don't
+       generalise to remote endpoints. */ -}}
+{{- if eq $provisioning "local" -}}
+{{- $svcSpec := index $mapping "service" | default dict -}}
+{{- $ports := index $svcSpec "ports" | default dict -}}
+{{- if $ports -}}
+{{- range $portName, $p := $ports -}}
+{{- $pPort := (index $p "port" | default "") | toString -}}
+{{- $pScheme := index $p "scheme" | default "http" -}}
+  {{ $portName }}_host: {{ $host | quote }}
+  {{ $portName }}_port: {{ $pPort | quote }}
+  {{ $portName }}_url: {{ printf "%s://%s:%s" $pScheme $host $pPort | quote }}
+{{- end }}
+{{- end -}}
+{{- end }}
 {{- end -}}
 
 {{/* ──────────────────────────────────────────────────────────────────────
