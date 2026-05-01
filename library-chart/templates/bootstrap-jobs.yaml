@@ -1,0 +1,90 @@
+{{/*
+bootstrap-jobs.yaml — emit one Helm Job per services[].bootstrap.jobs[]
+entry, materialised in the overlay as suse-library.bootstrap_jobs[]
+by `rda render` (rda-cli #92).
+
+Each entry shape (cross-binding refs already resolved by render):
+
+  - binding: <binding>
+    type:    <chart-type>
+    job:
+      name:         <jobname>             # required
+      image:        <image:tag>           # required
+      env:          { KEY: value, ... }   # optional
+      command:      [ ... ]               # optional
+      args:         [ ... ]               # optional
+      runOnce:      <bool>                # optional, default true
+      timeout:      <duration>            # optional, default 5m
+      backoffLimit: <int>                 # optional, default 3
+      restartPolicy: Never|OnFailure      # optional, default Never
+
+Hooks:
+  - helm.sh/hook: post-install,post-upgrade — runs after binding-secret
+    + deployment + sub-charts are ready (the dev's app pod doesn't
+    block on this; the Job runs alongside).
+  - helm.sh/hook-weight: 5 — gives a stable order if multiple bootstrap
+    jobs across bindings exist.
+  - helm.sh/hook-delete-policy: before-hook-creation — Helm deletes the
+    previous Job before creating a new one on upgrade.
+
+The Job's name is <release>-<binding>-<jobname>. Add a discriminator
+suffix if your project has two jobs with the same `name` across
+bindings.
+*/}}
+{{- range $idx, $entry := .Values.bootstrap_jobs }}
+{{- $binding := $entry.binding }}
+{{- $job := $entry.job }}
+{{- $jobName := $job.name | required (printf "bootstrap_jobs[%d].job.name is required" $idx) }}
+{{- $image := $job.image | required (printf "bootstrap_jobs[%d].job.image is required" $idx) }}
+{{- $name := printf "%s-%s-%s" $.Release.Name $binding $jobName }}
+{{- $backoffLimit := $job.backoffLimit | default 3 }}
+{{- $restartPolicy := $job.restartPolicy | default "Never" }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    rda.suse.com/bootstrap-job: "true"
+    rda.suse.com/bootstrap-binding: {{ $binding | quote }}
+    rda.suse.com/bootstrap-type: {{ $entry.type | quote }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
+    rda.suse.com/source: "services[binding={{ $binding }}].bootstrap.jobs[name={{ $jobName }}]"
+spec:
+  backoffLimit: {{ $backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "suse-library.selectorLabels" $ | nindent 8 }}
+        rda.suse.com/bootstrap-job: "true"
+        rda.suse.com/bootstrap-binding: {{ $binding | quote }}
+    spec:
+      restartPolicy: {{ $restartPolicy }}
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $jobName }}
+          image: {{ $image | quote }}
+          imagePullPolicy: IfNotPresent
+          {{- with $job.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $job.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $job.env }}
+          env:
+            {{- range $k, $v := . }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- end }}
+{{- end }}
