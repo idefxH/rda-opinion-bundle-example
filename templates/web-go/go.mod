@@ -1,6 +1,8 @@
 module example.com/{{ .Name }}
 
-go 1.22
+// pgx v5.7+ requires go >= 1.23; the heroku/go buildpack respects
+// this directive when picking the Go toolchain to install.
+go 1.23
 
 require (
 	github.com/jackc/pgx/v5 v5.7.6
