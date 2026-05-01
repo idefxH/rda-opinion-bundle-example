@@ -7,6 +7,12 @@
 v1alpha1.extension_repo(
     name='suse-rda',
     url='https://github.com/idefxH/tilt-extension-suse-rda',
+    # Pinned by semver tag (tilt-ext #14) — without `ref=`, Tilt
+    # checks out the repo's default branch (main), so a `tilt up`
+    # on Tuesday silently picks up changes pushed Monday afternoon.
+    # Bumping this line is an explicit, reviewable upgrade. Override
+    # locally for testing by editing this file.
+    ref='v0.3.0',
 )
 v1alpha1.extension(
     name='suse-rda',

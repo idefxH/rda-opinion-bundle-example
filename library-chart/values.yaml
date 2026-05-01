@@ -230,3 +230,25 @@ mariadb:
 # ergonomics as redis.
 apache-kafka:
   enabled: false
+
+# Valkey (AppCo). Open-source Redis fork — same DSL surface as redis.
+# Standalone architecture by default (single pod). Dev posture matches
+# redis: persistence-off scaffold default, metrics-on.
+valkey:
+  enabled: false
+
+# MinIO (AppCo). S3-compatible object storage. The chart's own default
+# is `mode: distributed` (16 replicas, 500Gi each) — the dsl-mappings
+# entry's chart_defaults overrides to `mode: standalone`, replicas: 1
+# so a fresh project works on Rancher Desktop without surprise.
+# Operators flip back to distributed via passthrough for production.
+minio:
+  enabled: false
+
+# Vault (AppCo, HashiCorp Community Edition). Dev mode by default
+# (in-memory storage, root token from devRootToken, sealed=false at
+# boot). Operators flip to a real backend (raft / postgresql) via
+# passthrough.server for production deploys. The injector sidecar is
+# off by default — see dsl-mappings chart_defaults for the rationale.
+vault:
+  enabled: false
