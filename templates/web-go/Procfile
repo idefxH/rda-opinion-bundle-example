@@ -1,19 +1,19 @@
 # CNB Procfile — declares the launch processes buildpacks register.
 #
-# - web: production launch. heroku/go auto-registers this pointing
-#   at the absolute path of the compiled binary
-#   (/layers/heroku_go/go_target/bin/<module>).
+# heroku/go puts the compiled binary at:
+#   /layers/heroku_go/go_target/bin/<last-segment-of-module-path>
+# That dir is on $PATH at runtime, so we can invoke the binary by its
+# bare name (which is the project name from `module example.com/X`).
+#
+# - web: production launch.
 # - dev: same as web for now. The Tilt extension's live_update
 #   path-sync copies source files into /workspace on every save;
 #   the running container keeps the existing binary until the next
-#   pack rebuild. For a true sub-2s live recompile, add a Go
-#   live-reload tool (e.g. air) via your own dev workflow:
-#       go install github.com/air-verse/air@latest
-#   and override `dev:` here to `air -c .air.toml`. We don't ship
-#   that by default because the `tool` directive in go.mod (Go 1.24+)
-#   that surfaces `air` for `go tool air` invocation breaks the
-#   heroku/go buildpack's `web` process auto-registration with:
-#       "tried to set web to default but it doesn't exist"
-#   See web-go/go.mod's NOTE block for the trade-off.
-web: bin/{{ .Name }}
-dev: bin/{{ .Name }}
+#   pack rebuild. For a true sub-2s live recompile, install air
+#   locally (`go install github.com/air-verse/air@latest`) and
+#   override `dev:` here to `air -c .air.toml`. (We can't ship air
+#   in go.mod's `tool` directive — it breaks heroku/go's `web`
+#   process auto-registration: 'tried to set web to default but it
+#   doesn't exist'.)
+web: {{ .Name }}
+dev: {{ .Name }}
