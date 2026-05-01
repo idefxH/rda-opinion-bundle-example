@@ -1,15 +1,10 @@
 {{/*
 Helpers for the SUSE library chart.
 
-Phase 2.5 (data-driven catalog): the per-chart shape of the unified DSL
-is read from `library-chart/dsl-mappings.yaml`, not hardcoded if/else
-arms. Adding a new chart = one YAML entry; the helpers below loop over
-it generically.
+The per-chart shape of the unified DSL is read from
+`library-chart/dsl-mappings.yaml`, not hardcoded if/else arms. Adding a
+new chart = one YAML entry; the helpers below loop over it generically.
 
-The legacy.* helpers further down still target the pre-DSL gated path
-(<chart>.enabled). They cover postgresql, prometheus, grafana — the same
-catalogue the DSL covers, but rendered without services[]. Phase 1.5
-will deprecate the legacy path entirely.
 */}}
 
 {{- define "suse-library.name" -}}
@@ -198,9 +193,9 @@ Args (root context).
 {{- end -}}
 
 {{/*
-suse-library.dsl.validateConsistency — sanity checks on services[]. Phase 1
-checks (run only on the enabled subset; disabled entries are inert
-scaffolds, not yet ready for deployment):
+suse-library.dsl.validateConsistency — sanity checks on services[]. Run
+only on the enabled subset; disabled entries are inert scaffolds, not
+yet ready for deployment:
   - every entry has a non-empty `binding`
   - every entry has a recognised `type` (must be in dsl-mappings.yaml)
   - bindings are unique within services[]
@@ -212,11 +207,9 @@ scaffolds, not yet ready for deployment):
     take, runtime fails with confusing auth errors. Fail loud at
     template time with the nuke recipe. Closes #63.
 
-Note on chart-level enabled: prior bundles required `<chart>.enabled: true`
-(set in chart/values.yaml alongside services[]) for Helm dep resolution.
-That field is now derived by `rda render` and lives in the auto-generated
-overlay (.rda/values.generated.yaml — never in chart/values.yaml). Closes
-rda-cli#65, rda-cli#67.
+Chart-level enabled is derived by `rda render` and lives in the
+auto-generated overlay (deploy/.rda/values.generated.yaml — never
+hand-written). Closes rda-cli#65, rda-cli#67.
 */}}
 {{- define "suse-library.dsl.validateConsistency" -}}
 {{- $mappings := include "suse-library.dsl.loadMappings" . | fromJson -}}
@@ -429,9 +422,9 @@ local-deploy convention.
   {{- $hostTpl := index $svcSpec "host" | default "" -}}
   {{- if eq $hostTpl "" -}}{{- fail (printf "dsl-mappings.yaml: charts.%s.versions[*].service.host is missing" $svc.type) -}}{{- end -}}
   {{- $host = tpl $hostTpl $root -}}
-  {{- /* Two port shapes (rda-cli 0.1.53 / bundle 0.11.19+):
+  {{- /* Two port shapes:
 
-         A. Legacy single-port (postgresql, redis, valkey, mariadb, ...):
+         A. Single-port (postgresql, redis, valkey, mariadb, ...):
               service: { host: <tpl>, port: <int>, scheme: <str> }
 
          B. Multi-port (minio, dex, prometheus-with-subcharts):
@@ -443,10 +436,9 @@ local-deploy convention.
 
          The two shapes are mutually exclusive. When `ports` is present,
          we pick the entry with `primary: true` for the host/port/url
-         keys (matching cli's BindingFields.Host/Port/URL). The
-         secondary ports are NOT emitted as binding-secret keys yet —
-         that's a follow-up. Cross-binding refs already access them via
-         ${binding:NAME.<port_name>_url} (rda-cli #99). */ -}}
+         keys (matching cli's BindingFields.Host/Port/URL). Secondary
+         ports are reachable via ${binding:NAME.<port_name>_url}
+         (rda-cli #99) — not projected as binding-secret keys today. */ -}}
   {{- $ports := index $svcSpec "ports" | default dict -}}
   {{- if $ports -}}
     {{- $primaryFound := false -}}
@@ -461,7 +453,7 @@ local-deploy convention.
     {{- fail (printf "dsl-mappings.yaml: charts.%s.versions[*].service.ports has no entry with `primary: true` — exactly one port must be primary" $svc.type) -}}
     {{- end -}}
   {{- else -}}
-    {{- /* legacy single-port */ -}}
+    {{- /* single-port shape */ -}}
     {{- $port = (index $svcSpec "port" | default "") | toString -}}
     {{- $scheme = index $svcSpec "scheme" | default "http" -}}
   {{- end -}}
@@ -587,126 +579,4 @@ stringData:
 {{- end }}
 {{- end -}}
 {{- end }}
-{{- end -}}
-
-{{/* ──────────────────────────────────────────────────────────────────────
-    Legacy-path helpers (issue #5) — pre-DSL <chart>.enabled gated path.
-    ────────────────────────────────────────────────────────────────────── */}}
-
-{{- define "suse-library.legacy.envForSqlDb" -}}
-{{- $chart := .chart -}}
-{{- $rel := .release -}}
-{{- $upper := upper $chart -}}
-- {name: {{ $upper }}_HOST,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: host}}}
-- {name: {{ $upper }}_PORT,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: port}}}
-- {name: {{ $upper }}_USER,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: username}}}
-- {name: {{ $upper }}_PASSWORD, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: password}}}
-- {name: {{ $upper }}_DATABASE, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: database}}}
-- {name: DB_HOST,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: host}}}
-- {name: DB_PORT,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: port}}}
-- {name: DB_USER,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: username}}}
-- {name: DB_PASSWORD, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: password}}}
-- {name: DB_NAME,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: database}}}
-{{- end -}}
-
-{{- define "suse-library.legacy.envForUrlOnly" -}}
-{{- $chart := .chart -}}
-{{- $rel := .release -}}
-{{- $upper := upper $chart -}}
-- {name: {{ $upper }}_URL, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: url}}}
-{{- end -}}
-
-{{- define "suse-library.legacy.envForUiWithAdmin" -}}
-{{- $chart := .chart -}}
-{{- $rel := .release -}}
-{{- $upper := upper $chart -}}
-- {name: {{ $upper }}_URL,            valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: url}}}
-- {name: {{ $upper }}_ADMIN_USER,     valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: adminUser}}}
-- {name: {{ $upper }}_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: {{ $rel }}-{{ $chart }}-binding, key: adminPassword}}}
-{{- end -}}
-
-{{- define "suse-library.legacy.bindingMount" -}}
-- {name: binding-{{ .chart }}, mountPath: /bindings/{{ .chart }}, readOnly: true}
-{{- end -}}
-
-{{- define "suse-library.legacy.bindingVolume" -}}
-- name: binding-{{ .chart }}
-  secret: {secretName: {{ .release }}-{{ .chart }}-binding}
-{{- end -}}
-
-{{- define "suse-library.legacy.sqlBindingSecret" -}}
-{{- $chart := .chart -}}
-{{- $port := .port -}}
-{{- $hostSvc := .hostSvc -}}
-{{- $root := .root -}}
-{{- $vals := index $root.Values $chart -}}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ include "suse-library.name" $root }}-{{ $chart }}-binding
-  labels:
-    {{- include "suse-library.labels" $root | nindent 4 }}
-    service.binding/binding-name: {{ $chart }}
-    service.binding/binding-type: {{ $chart }}
-type: Opaque
-stringData:
-  type: {{ $chart }}
-  provider: rda-appco
-  host: {{ $hostSvc | quote }}
-  port: {{ $port | quote }}
-  username: {{ required (printf "%s.auth.username is required when %s.enabled=true" $chart $chart) $vals.auth.username | quote }}
-  password: {{ required (printf "%s.auth.password is required when %s.enabled=true" $chart $chart) $vals.auth.password | quote }}
-  database: {{ required (printf "%s.auth.database is required when %s.enabled=true" $chart $chart) $vals.auth.database | quote }}
-{{- end -}}
-
-{{- define "suse-library.legacy.urlBindingSecret" -}}
-{{- $chart := .chart -}}
-{{- $port := .port -}}
-{{- $hostSvc := .hostSvc -}}
-{{- $root := .root -}}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ include "suse-library.name" $root }}-{{ $chart }}-binding
-  labels:
-    {{- include "suse-library.labels" $root | nindent 4 }}
-    service.binding/binding-name: {{ $chart }}
-    service.binding/binding-type: {{ $chart }}
-type: Opaque
-stringData:
-  type: {{ $chart }}
-  provider: rda-appco
-  host: {{ $hostSvc | quote }}
-  port: {{ $port | quote }}
-  url: "http://{{ $hostSvc }}"
-{{- end -}}
-
-{{- define "suse-library.legacy.uiBindingSecret" -}}
-{{- $chart := .chart -}}
-{{- $port := .port -}}
-{{- $hostSvc := .hostSvc -}}
-{{- $adminUser := .adminUser -}}
-{{- $adminField := .adminField -}}
-{{- $root := .root -}}
-{{- $vals := index $root.Values $chart -}}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ include "suse-library.name" $root }}-{{ $chart }}-binding
-  labels:
-    {{- include "suse-library.labels" $root | nindent 4 }}
-    service.binding/binding-name: {{ $chart }}
-    service.binding/binding-type: {{ $chart }}
-type: Opaque
-stringData:
-  type: {{ $chart }}
-  provider: rda-appco
-  host: {{ $hostSvc | quote }}
-  port: {{ $port | quote }}
-  url: "http://{{ $hostSvc }}"
-  adminUser: {{ index $vals "adminUser" | default $adminUser | quote }}
-  adminPassword: {{ required (printf "%s.%s is required when %s.enabled=true" $chart $adminField $chart) (index $vals $adminField) | quote }}
 {{- end -}}

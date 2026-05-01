@@ -1,6 +1,6 @@
 # Lookup is by .type — the overlay must have defaults.shared_services[<type>].
-# Phase 1 catalog supports postgresql/redis/grafana. We use postgresql here
-# as a stand-in for "any chart the team has centralised in platform-services".
+# We use postgresql here as a stand-in for any chart the team has centralised
+# in platform-services.
 defaults:
   shared_services:
     postgresql:

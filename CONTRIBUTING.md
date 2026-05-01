@@ -61,7 +61,7 @@ These tests run on every PR — make sure your change doesn't trip them:
 | `manifest-version-sync` | `Chart.yaml.version == rda-bundle.yaml.library_chart.version` | PRs #71/#73/#75 (manifest stuck at 0.11.4 across 4 bumps) |
 | `services-iteration-grep` | Every chart template iterates services[] via `enabledServices` helper | PR #71 (deployment.yaml iterated raw `.Values.services`, broke disabled-service pods) |
 | `dep-defaults-presence` | Every Helm dep in `Chart.yaml` has `<name>.enabled: false` default in `values.yaml` | PR #71 (redis dep added without default — loaded unconditionally) |
-| `catalog-consistency` | `dsl-mappings.yaml` ↔ `rda-devx-catalog/CATALOG.md` consistency | (pre-existing) |
+| `catalog-consistency` | `dsl-mappings.yaml` ↔ `rda-docs/reference/catalog.md` consistency (every chart in the YAML is listed in the doc's `## Catalogued charts` table) | (pre-existing) |
 | `auth-seed` | binding-secret renders the auth-seed annotation when stateful | (pre-existing) |
 | `auto-ingress-ui` | UI Ingress only when `ui.expose: true` | (pre-existing) |
 | `passthrough-collision` | DSL field × passthrough field detect collisions | (pre-existing) |

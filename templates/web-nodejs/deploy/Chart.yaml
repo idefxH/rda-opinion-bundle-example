@@ -8,9 +8,12 @@ keywords: [rda, {{ .Language }}]
 
 dependencies:
   - name: suse-library
-    version: 0.11.11
-    # Vendored at charts/suse-library/. The library chart references
-    # AppCo charts by their real name (postgresql, prometheus, grafana,
-    # ...) — toggle each one via suse-library.<chart>.enabled in
-    # values.yaml. The Tilt extension's chart-version alignment +
-    # recursive helm dep update make the multi-level resolution work.
+    version: 0.11.22
+    # Vendored at charts/suse-library/. Catalogued sub-charts
+    # (postgresql, redis, prometheus, ...) are opted into via the
+    # unified DSL `services[]` block in deploy/values.yaml — `rda
+    # render` projects each entry into the chart-specific values
+    # under deploy/.rda/values.generated.yaml. The Tilt extension
+    # runs that render before each `helm dep update` and aligns
+    # AppCo's OCI tag → internal version so multi-level resolution
+    # works.

@@ -52,9 +52,9 @@
 #                              # both DB_USERNAME (canonical) and DB_USER
 #                              # (env-var convention).
 #
-# The CATALOG.md doc in rda-devx-catalog should stay aligned with this file.
-# Phase 2.5 will add a CI check that asserts CATALOG.md mentions every chart
-# present here.
+# concepts/catalog.md in rda-docs should stay aligned with this file. The
+# `tests/dsl-mappings-targets-valid/` test guard catches structural drift;
+# catalog/doc drift is caught at PR review.
 
 apiVersion: rda.suse.com/dsl-mapping/v1alpha1
 

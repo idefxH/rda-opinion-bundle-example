@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the cross-repo CATALOG.md ↔ dsl-mappings.yaml consistency check.
+# Run the cross-repo catalog.md ↔ dsl-mappings.yaml consistency check.
 # Mirrors the other tests/ subdirectory pattern so a single
 # `bash tests/*/run.sh` loop covers every check.
 #
@@ -7,8 +7,8 @@
 # Requires: python3 + PyYAML.
 #
 # Environment:
-#   CATALOG_MD_PATH — explicit path to rda-devx-catalog/CATALOG.md.
-#                     Defaults to ../rda-devx-catalog/CATALOG.md
+#   CATALOG_MD_PATH — explicit path to rda-docs/reference/catalog.md.
+#                     Defaults to ../rda-docs/reference/catalog.md
 #                     relative to this bundle's repo root (the
 #                     conventional sibling-clone layout).
 
