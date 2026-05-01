@@ -1,9 +1,7 @@
 module example.com/{{ .Name }}
 
-// pgx v5.7+ requires go >= 1.23. We declare 1.24 to enable the
-// `tool` directive (Go 1.24+) for managing dev-time tools like
-// air without polluting the runtime require block. heroku/go
-// fetches the requested Go version from go.dev/dl at build time.
+// pgx v5.7+ requires go >= 1.23. We pin 1.24 for forward compatibility
+// (heroku/go fetches the requested toolchain from go.dev/dl at build).
 go 1.24
 
 require (
@@ -11,14 +9,18 @@ require (
 	github.com/prometheus/client_golang v1.21.1
 )
 
-// Dev-time tool: air for live-reload during `tilt up`. `go tool air`
-// resolves to the binary fetched into the module cache at
-// `go mod tidy` time. The Procfile's dev process runs it.
-tool github.com/air-verse/air
-
 // Indirect deps. Pinned by go mod tidy on the rendered template — ship
 // them here so the heroku/go buildpack's `go list -tags heroku` doesn't
 // say "updates to go.mod needed; to update it: go mod tidy".
+//
+// NOTE: an earlier revision used a `tool github.com/air-verse/air`
+// directive (Go 1.24+) for live-reload. That broke heroku/go's `web`
+// process auto-registration ("tried to set web to default but it
+// doesn't exist") — air's transitives confused main-package discovery.
+// Live-reload is now handled by the Tilt extension's live_update
+// path-sync (source files copied into the container without a pack
+// rebuild); the source is unchanged in the running container until
+// the next pack build.
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -30,9 +32,9 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
-	google.golang.org/protobuf v1.36.1 // indirect
+	golang.org/x/crypto v0.41.0 // indirect
+	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
+	google.golang.org/protobuf v1.36.8 // indirect
 )

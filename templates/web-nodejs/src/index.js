@@ -283,12 +283,36 @@ const html = () => `<!DOCTYPE html>
 
 const startTime = Date.now();
 
+// Connect to Postgres with bounded retries — postgres often isn't
+// Ready when the app pod starts (helm install kicks both in parallel,
+// the postgres init scripts take 5-15s). A failed connect that exits
+// the process gets us into a CrashLoop with k8s recreating us before
+// postgres comes up, AND with `node --watch` (the dev process from
+// rda's web-nodejs Procfile) the script just *waits* on connect
+// failure instead of exiting — so the readiness probe never gets a
+// healthy response and the pod gets killed anyway. Retrying gives
+// postgres time to finish init while we keep the process alive.
+async function connectWithRetry(maxAttempts, delayMs) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await client.connect();
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      console.log(
+        `⏳ postgres not ready yet (attempt ${attempt}/${maxAttempts}: ${err.code || err.message}); retrying in ${delayMs}ms…`
+      );
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+}
+
 async function start() {
   if (!process.env[`${dbPrefix}_HOST`]) {
     console.error(`💀 No ${dbPrefix}_HOST in env — bind a postgresql service via deploy/values.yaml services[]`);
     process.exit(1);
   }
-  await client.connect();
+  await connectWithRetry(60, 2000);   // up to 60 attempts × 2s = 2min budget
   console.log('✅ Connected to PostgreSQL at ' + env('HOST') + ':' + env('PORT', '5432'));
 
   await client.query(`
