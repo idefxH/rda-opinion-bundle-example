@@ -62,7 +62,7 @@ charts:
   postgresql:
     versions:
       - constraint: ">=0.4.0 <1.0.0"
-        # AppCo postgresql 0.4.x (internal Bitnami chart 13.x lineage).
+        # AppCo postgresql 0.4.x.
         # Service is named <release>-postgresql (no -primary / -master suffix).
         service:
           host: "{{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local"
@@ -108,19 +108,15 @@ charts:
           # multiple charts (mariadb, redis), auto-classified as such by
           # the scaffold formatter via IsCommonField cardinality.
           auth.admin.password:
-            visibility: visible
             default: ""
             comment: "admin (postgres user) password — required"
           auth.user.name:
-            visibility: visible
             default: "app"
             comment: "application user — your service connects as this"
           auth.user.password:
-            visibility: visible
             default: ""
             comment: "application user password — required"
           auth.user.database:
-            visibility: visible
             default: ""
             comment: "application database — required"
           # Persistence-off scaffold default (issue #60). Dev flips to true
@@ -128,25 +124,18 @@ charts:
           # flip is a one-line change. Auth-seed annotation (bundle #63)
           # guards drift when persistence is on.
           persistence.enabled:
-            visibility: visible
             default: false
           persistence.size:
-            visibility: visible
             default: "1Gi"
           metrics.enabled:
-            visibility: visible
             default: true
           resources.requests.cpu:
-            visibility: visible
             default: "100m"
           resources.requests.memory:
-            visibility: visible
             default: "256Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "500m"
           resources.limits.memory:
-            visibility: visible
             default: "1Gi"
 
   redis:
@@ -154,13 +143,9 @@ charts:
       - constraint: ">=2.0.0 <3.0.0"
         # AppCo redis 2.x (chart packaging — redis binary 8.x lineage).
         # Note: the constraint uses the AppCo helm chart version, not
-        # the redis container version. AppCo repackages as 2.x; if you
-        # see "21.x" referenced anywhere it's the upstream Bitnami
-        # convention and doesn't apply here.
         #
         # AppCo redis defaults to architecture=standalone (single
-        # replica), so the Service is just <release>-redis (no -master
-        # suffix — that's a Bitnami HA-mode artifact). Persistence and
+        # replica), so the Service is just <release>-redis (no -master suffix). Persistence and
         # metrics keys are top-level under redis.* (no master.* prefix).
         # Container resources are nested under
         # podTemplates.containers.redis.resources because AppCo's
@@ -194,28 +179,21 @@ charts:
 
         scaffold:
           auth.password:
-            visibility: visible
             default: ""
             comment: "redis password — required"
           # Persistence-off default — flip to true for durable AOF/RDB
           # snapshots (auth-seed annotation guards drift when on).
           persistence.enabled:
-            visibility: visible
             default: false
           metrics.enabled:
-            visibility: visible
             default: true
           resources.requests.cpu:
-            visibility: visible
             default: "50m"
           resources.requests.memory:
-            visibility: visible
             default: "128Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "200m"
           resources.limits.memory:
-            visibility: visible
             default: "256Mi"
 
   prometheus:
@@ -277,36 +255,27 @@ charts:
           # No `auth` block — Prometheus is unauthenticated by default;
           # auth belongs at the ingress layer (BasicAuth, OIDC).
           persistence.enabled:
-            visibility: visible
             default: false
           persistence.size:
-            visibility: visible
             default: "8Gi"
           retention:
-            visibility: visible
             default: "15d"
             comment: "TSDB retention — e.g. 15d, 30d, 1y"
           ingress.enabled:
-            visibility: visible
             default: false
           # Working <binding>.<release>.localtest.me default — no /etc/hosts
           # edits needed; localtest.me wildcards resolve to 127.0.0.1.
           ingress.hosts:
-            visibility: visible
             default:
               - "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"
           resources.requests.cpu:
-            visibility: visible
             default: "100m"
           resources.requests.memory:
-            visibility: visible
             default: "256Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "500m"
           resources.limits.memory:
-            visibility: visible
             default: "1Gi"
 
   grafana:
@@ -345,34 +314,25 @@ charts:
 
         scaffold:
           auth.admin.name:
-            visibility: visible
             default: "admin"
           auth.admin.password:
-            visibility: visible
             default: ""
             comment: "grafana admin password — required"
           ingress.enabled:
-            visibility: visible
             default: false
           ingress.hosts:
-            visibility: visible
             default:
               - "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"
           metrics.enabled:
-            visibility: visible
             default: false
           resources.requests.cpu:
-            visibility: visible
             default: "50m"
           resources.requests.memory:
-            visibility: visible
             default: "128Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "200m"
           resources.limits.memory:
-            visibility: visible
             default: "256Mi"
 
   dex:
@@ -457,6 +417,43 @@ charts:
           # diverge without breaking the env-var contract.
           - {key: issuer, template: "http://{{ .Release.Name }}-dex:5556"}
 
+        scaffold:
+          # DSL fields (mapped via values_mapping)
+          issuer:
+            default: "http://{{.ProjectName}}-dex.{{.ProjectName}}.svc.cluster.local:5556"
+            comment: "OIDC issuer URL — apps use this as their identity provider"
+          ingress.enabled:
+            default: false
+          ingress.host:
+            default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
+            comment: "or use <binding>.<release>.localhost on macOS/Linux"
+          metrics.enabled:
+            default: false
+          resources.requests.cpu:
+            default: "50m"
+          resources.requests.memory:
+            default: "128Mi"
+          resources.limits.cpu:
+            default: "200m"
+          resources.limits.memory:
+            default: "256Mi"
+          # Chart-side bootstrap (passthrough.* — copied verbatim by render).
+          # dex refuses to boot without `config:` set; these defaults give a
+          # working dev posture (in-memory storage, password DB on, OAuth
+          # approval bypassed).
+          passthrough.config.storage.type:
+            default: "memory"
+            comment: "memory|kubernetes|postgres — flip for prod (kubernetes uses CRDs; postgres needs a separate binding)"
+          passthrough.config.enablePasswordDB:
+            default: true
+          passthrough.config.oauth2.skipApprovalScreen:
+            default: true
+            comment: "skip OAuth approval screen — flip off for prod"
+          passthrough.config.staticClients:
+            default: []
+          passthrough.config.staticPasswords:
+            default: []
+
   mariadb:
     versions:
       - constraint: ">=0.1.0 <1.0.0"
@@ -503,41 +500,30 @@ charts:
 
         scaffold:
           auth.admin.password:
-            visibility: visible
             default: ""
             comment: "admin (root) password — required"
           auth.user.name:
-            visibility: visible
             default: "app"
             comment: "application user — your service connects as this"
           auth.user.password:
-            visibility: visible
             default: ""
             comment: "application user password — required"
           auth.user.database:
-            visibility: visible
             default: ""
             comment: "application database — required"
           persistence.enabled:
-            visibility: visible
             default: false
           persistence.size:
-            visibility: visible
             default: "1Gi"
           metrics.enabled:
-            visibility: visible
             default: true
           resources.requests.cpu:
-            visibility: visible
             default: "100m"
           resources.requests.memory:
-            visibility: visible
             default: "256Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "500m"
           resources.limits.memory:
-            visibility: visible
             default: "1Gi"
 
   apache-kafka:
@@ -576,25 +562,18 @@ charts:
           # + topic ACLs which don't fit the user/password shape. SASL +
           # multi-broker live in passthrough.
           persistence.enabled:
-            visibility: visible
             default: false
           persistence.size:
-            visibility: visible
             default: "1Gi"
           metrics.enabled:
-            visibility: visible
             default: false
           resources.requests.cpu:
-            visibility: visible
             default: "100m"
           resources.requests.memory:
-            visibility: visible
             default: "512Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "1"
           resources.limits.memory:
-            visibility: visible
             default: "1Gi"
 
   valkey:
@@ -629,26 +608,19 @@ charts:
           - {key: password, from_dsl: auth.password, required: true}
         scaffold:
           auth.password:
-            visibility: visible
             default: ""
             comment: "valkey password — required"
           persistence.enabled:
-            visibility: visible
             default: false
           metrics.enabled:
-            visibility: visible
             default: true
           resources.requests.cpu:
-            visibility: visible
             default: "50m"
           resources.requests.memory:
-            visibility: visible
             default: "128Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "200m"
           resources.limits.memory:
-            visibility: visible
             default: "256Mi"
 
   minio:
@@ -704,41 +676,30 @@ charts:
           - {key: secretKey, from_dsl: auth.user.password, required: true, env_aliases: [password]}
         scaffold:
           auth.user.name:
-            visibility: visible
             default: "minioadmin"
             comment: "S3 access key (root user)"
           auth.user.password:
-            visibility: visible
             default: ""
             comment: "S3 secret key (root password) — required, min 8 chars"
           persistence.enabled:
-            visibility: visible
             default: false
           persistence.size:
-            visibility: visible
             default: "5Gi"
           metrics.enabled:
-            visibility: visible
             default: false
           ingress.enabled:
-            visibility: visible
             default: false
           ingress.hosts:
-            visibility: visible
             default:
               - "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"
           resources.requests.cpu:
-            visibility: visible
             default: "100m"
           resources.requests.memory:
-            visibility: visible
             default: "256Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "500m"
           resources.limits.memory:
-            visibility: visible
             default: "1Gi"
 
   vault:
@@ -792,29 +753,21 @@ charts:
           - {key: token, from_dsl: auth.admin.password, default: "root"}
         scaffold:
           auth.admin.password:
-            visibility: visible
             default: "root"
             comment: "dev-mode root token (Vault unsealed at boot with this token)"
           ingress.enabled:
-            visibility: visible
             default: false
           ingress.hosts:
-            visibility: visible
             default:
               - "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"
           metrics.enabled:
-            visibility: visible
             default: false
           resources.requests.cpu:
-            visibility: visible
             default: "100m"
           resources.requests.memory:
-            visibility: visible
             default: "256Mi"
           resources.limits.cpu:
-            visibility: visible
             default: "500m"
           resources.limits.memory:
-            visibility: visible
             default: "1Gi"
