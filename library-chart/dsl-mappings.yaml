@@ -338,9 +338,12 @@ charts:
   dex:
     versions:
       - constraint: ">=0.24.0 <1.0.0"
-        # Dex 0.24.0 (app 2.44.0). NOT in the AppCo catalogue — pulled
-        # from charts.dexidp.io (declared in library-chart/Chart.yaml
-        # with repository: https://charts.dexidp.io).
+        # Dex 0.24.0 (app 2.44.0) via SUSE Application Collection.
+        # Chart name on disk is `dex-idp` (AppCo's slug) but library
+        # Chart.yaml declares it with `alias: dex` so resource names,
+        # values keys, and helper Chart.Name all use "dex". User-
+        # facing API is unchanged from the upstream chart we pulled
+        # from charts.dexidp.io pre-0.11.25.
         #
         # Service: <release>-dex on port 5556 (HTTP issuer endpoint).
         # gRPC (5557) and HTTPS (5554) are off by default; flip via

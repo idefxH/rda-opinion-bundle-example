@@ -16,7 +16,7 @@ description: |
 
   See rda-docs/concepts/dsl.md for the full DSL contract.
 type: application
-version: 0.11.24
+version: 0.11.25
 appVersion: "1.0"
 keywords: [suse, rda, library, service-binding, application-collection]
 home: https://github.com/idefxH/rda-opinion-bundle-example
@@ -49,15 +49,30 @@ dependencies:
     version: "2.6.1-3.1"
     repository: oci://dp.apps.rancher.io/charts
     condition: redis.enabled
-  # dex/dex (OIDC + OAuth2) — upstream chart, not AppCo. The AppCo
-  # catalogue (as of 2026-04) does NOT include an OIDC IdP, so we pull
-  # from charts.dexidp.io directly. Same shape as the other deps:
-  # condition-gated by <chart>.enabled. The internal version aligns
-  # with the upstream tag for dexidp's chart, so the Tilt extension's
-  # _align_subchart_versions workaround is a no-op for this dep.
-  - name: dex
+  # dex (OIDC + OAuth2) via SUSE Application Collection.
+  #
+  #   - The upstream dex Helm chart at charts.dexidp.io is published
+  #     by the dex maintainers; AppCo packages the same chart as
+  #     `dex-idp` (chart name + scanned image). Switching to AppCo
+  #     gives us a single registry for everything (postgres, redis,
+  #     dex, ...) — no separate HTTP repo to bootstrap, image scanned
+  #     by SUSE, supported commercially.
+  #
+  #   - `alias: dex` keeps the on-disk dependency dir at
+  #     deploy/charts/dex/, and the chart's _helpers.tpl uses
+  #     `dex.fullname` (NOT `dex-idp.fullname` — checked in 0.24.0).
+  #     With the alias, .Chart.Name = "dex" inside the chart's
+  #     templates, so resource names stay <release>-dex (matching
+  #     dsl-mappings.yaml's service.host = {{ .Release.Name }}-dex).
+  #     User-facing values.yaml API is unchanged: still .dex.* under
+  #     suse-library: namespace.
+  #
+  # Internal version aligns with the upstream tag (AppCo follows
+  # upstream) so Tilt's _align_subchart_versions is a no-op.
+  - name: dex-idp
+    alias: dex
     version: "0.24.0"
-    repository: https://charts.dexidp.io
+    repository: oci://dp.apps.rancher.io/charts
     condition: dex.enabled
   - name: mariadb
     version: "0.1.7-10.1"
