@@ -2,15 +2,18 @@
 #
 # - web: production launch. heroku/go auto-registers this pointing
 #   at the absolute path of the compiled binary
-#   (/layers/heroku_go/go_target/bin/<module>). The Procfile entry
-#   below is informational/local-development; pack still picks up
-#   heroku/go's auto-registration when --default-process web is set.
-# - dev: development launch via `air`. air is a Go live-reload tool
-#   (github.com/air-verse/air) installed by the buildpack as a tool
-#   dep — see go.mod's tool directive (Go 1.24+) or the buildpack's
-#   pre-install hook in heroku/go for older toolchains. With
-#   tilt-extension-suse-rda's live_update_paths=['./'] for go,
-#   source changes are sync'd to /workspace and air recompiles
-#   in-place (sub-2s vs. ~14s for a full pack rebuild).
+#   (/layers/heroku_go/go_target/bin/<module>).
+# - dev: same as web for now. The Tilt extension's live_update
+#   path-sync copies source files into /workspace on every save;
+#   the running container keeps the existing binary until the next
+#   pack rebuild. For a true sub-2s live recompile, add a Go
+#   live-reload tool (e.g. air) via your own dev workflow:
+#       go install github.com/air-verse/air@latest
+#   and override `dev:` here to `air -c .air.toml`. We don't ship
+#   that by default because the `tool` directive in go.mod (Go 1.24+)
+#   that surfaces `air` for `go tool air` invocation breaks the
+#   heroku/go buildpack's `web` process auto-registration with:
+#       "tried to set web to default but it doesn't exist"
+#   See web-go/go.mod's NOTE block for the trade-off.
 web: bin/{{ .Name }}
-dev: air -c .air.toml
+dev: bin/{{ .Name }}
