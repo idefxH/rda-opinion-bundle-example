@@ -365,7 +365,7 @@ charts:
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         # AppCo apache-kafka 1.x (KRaft mode, no zookeeper). Broker
-        # service is <release>-apache-kafka-broker on 9092 (PLAINTEXT).
+        # service is <release>-apache-kafka-controller on 9092 (PLAINTEXT).
         # SASL / TLS are configurable via passthrough — the DSL surface
         # for kafka stays minimal: connect string + topic-level auth
         # don't fit the simple user/password shape.
@@ -375,7 +375,7 @@ charts:
         # operator manages. Persistence (KRaft metadata + topic logs)
         # IS data, but it's not auth state.
         service:
-          host: "{{ .Release.Name }}-apache-kafka-broker.{{ .Release.Namespace }}.svc.cluster.local"
+          host: "{{ .Release.Name }}-apache-kafka-controller.{{ .Release.Namespace }}.svc.cluster.local"
           port: 9092
         values_mapping:
           persistence.enabled: apache-kafka.broker.persistence.enabled
@@ -384,10 +384,10 @@ charts:
         binding_secret:
           - {key: type, literal: apache-kafka, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
-          - {key: host, template: "{{ .Release.Name }}-apache-kafka-broker"}
+          - {key: host, template: "{{ .Release.Name }}-apache-kafka-controller"}
           - {key: port, literal: "9092"}
           # bootstrap_servers is the kafka-client convention (same
           # shape as KAFKA_BOOTSTRAP_SERVERS in containerised confluent
           # / strimzi clients). Single broker, port 9092 — overrides
           # via passthrough for multi-broker / SASL setups.
-          - {key: bootstrap_servers, template: "{{ .Release.Name }}-apache-kafka-broker:9092"}
+          - {key: bootstrap_servers, template: "{{ .Release.Name }}-apache-kafka-controller:9092"}

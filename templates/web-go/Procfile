@@ -1,9 +1,0 @@
-# CNB Procfile — declares the launch processes that buildpacks register.
-#
-# - web: production launch (compiled binary at /app/app via Dockerfile).
-# - dev: development launch via `go run` against the source tree. Tilt's
-#   live-update sync writes new files into the dev container; `go run`
-#   recompiles on each invocation. Future iteration: pair with air or
-#   reflex for faster watcher-driven rebuilds.
-web: /app/app
-dev: go run ./...
