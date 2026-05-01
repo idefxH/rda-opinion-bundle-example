@@ -257,7 +257,7 @@ Status: released
 
 - BEHAVIOR/dsl-mappings: redis entry rewritten for AppCo's
   `architecture: standalone` default — Service is `<release>-redis`
-  (no `-master` Bitnami HA artifact). values_mapping for persistence
+  (no `-master` HA-mode suffix). values_mapping for persistence
   + resources rewired to AppCo's PodTemplate-based schema.
 
 ## MILESTONE: 0.11.6
