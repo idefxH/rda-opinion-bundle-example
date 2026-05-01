@@ -429,8 +429,42 @@ local-deploy convention.
   {{- $hostTpl := index $svcSpec "host" | default "" -}}
   {{- if eq $hostTpl "" -}}{{- fail (printf "dsl-mappings.yaml: charts.%s.versions[*].service.host is missing" $svc.type) -}}{{- end -}}
   {{- $host = tpl $hostTpl $root -}}
-  {{- $port = (index $svcSpec "port" | default "") | toString -}}
-  {{- $scheme = index $svcSpec "scheme" | default "http" -}}
+  {{- /* Two port shapes (rda-cli 0.1.53 / bundle 0.11.19+):
+
+         A. Legacy single-port (postgresql, redis, valkey, mariadb, ...):
+              service: { host: <tpl>, port: <int>, scheme: <str> }
+
+         B. Multi-port (minio, dex, prometheus-with-subcharts):
+              service:
+                host: <tpl>
+                ports:
+                  s3:      { port: 9000, scheme: http, primary: true }
+                  console: { port: 9001, scheme: http }
+
+         The two shapes are mutually exclusive. When `ports` is present,
+         we pick the entry with `primary: true` for the host/port/url
+         keys (matching cli's BindingFields.Host/Port/URL). The
+         secondary ports are NOT emitted as binding-secret keys yet —
+         that's a follow-up. Cross-binding refs already access them via
+         ${binding:NAME.<port_name>_url} (rda-cli #99). */ -}}
+  {{- $ports := index $svcSpec "ports" | default dict -}}
+  {{- if $ports -}}
+    {{- $primaryFound := false -}}
+    {{- range $name, $p := $ports -}}
+      {{- if and (not $primaryFound) (index $p "primary" | default false) -}}
+        {{- $port = (index $p "port" | default "") | toString -}}
+        {{- $scheme = index $p "scheme" | default "http" -}}
+        {{- $primaryFound = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if not $primaryFound -}}
+    {{- fail (printf "dsl-mappings.yaml: charts.%s.versions[*].service.ports has no entry with `primary: true` — exactly one port must be primary" $svc.type) -}}
+    {{- end -}}
+  {{- else -}}
+    {{- /* legacy single-port */ -}}
+    {{- $port = (index $svcSpec "port" | default "") | toString -}}
+    {{- $scheme = index $svcSpec "scheme" | default "http" -}}
+  {{- end -}}
 {{- else if eq $provisioning "shared" -}}
   {{- $defaults := index $root.Values "defaults" | default dict -}}
   {{- $sharedRoot := index $defaults "shared_services" | default dict -}}
