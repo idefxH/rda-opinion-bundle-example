@@ -358,7 +358,15 @@ charts:
         # the connector list.
         service:
           host: "{{ .Release.Name }}-dex.{{ .Release.Namespace }}.svc.cluster.local"
-          port: 5556
+          ports:
+            # http is the OIDC issuer endpoint — discovery, /token,
+            # /authorize, /keys all live here. Apps' OIDC libraries
+            # read DEX_HOST / DEX_PORT / DEX_URL.
+            http: { port: 5556, scheme: http, primary: true }
+            # gRPC API — for dex-managing clients (CLI, admin tools).
+            # Off by default in the chart; flip via passthrough.grpc.
+            # Cross-binding refs see DEX_GRPC_PORT / DEX_GRPC_URL.
+            grpc: { port: 5557, scheme: tcp }
         values_mapping:
           # Issuer URL — the canonical "where this dex thinks it lives"
           # value baked into the OIDC discovery endpoint. Required to
@@ -637,7 +645,15 @@ charts:
         # for durable buckets).
         service:
           host: "{{ .Release.Name }}-minio.{{ .Release.Namespace }}.svc.cluster.local"
-          port: 9000
+          ports:
+            # S3 API — apps that use MinIO as object storage talk to
+            # this port. Primary, so MINIO_HOST / MINIO_PORT / MINIO_URL
+            # alias to the S3 endpoint by default (matching the
+            # AWS SDK / boto3 idiom of `endpoint_url=...`).
+            s3: { port: 9000, scheme: http, primary: true }
+            # Console — the web UI for browsing buckets, IAM, policies.
+            # Cross-binding refs see MINIO_CONSOLE_PORT / MINIO_CONSOLE_URL.
+            console: { port: 9001, scheme: http }
         values_mapping:
           auth.user.name: minio.rootUser
           auth.user.password: minio.rootPassword
