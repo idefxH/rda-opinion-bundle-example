@@ -93,10 +93,34 @@ func main() {
 	}
 	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		log.Fatalf("💀 db.Ping: %v", err)
+	// Retry the initial Ping — postgres often isn't Ready when the app
+	// pod starts (helm install kicks both in parallel; postgres init
+	// takes 5-15s). A Fatal exit here loops us in CrashLoop with k8s
+	// recreating us before postgres comes up. Retrying gives postgres
+	// time to finish init while we keep the process alive.
+	{
+		const maxAttempts = 60
+		const delay = 2 * time.Second
+		var lastErr error
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			err := db.PingContext(ctx)
+			cancel()
+			if err == nil {
+				lastErr = nil
+				break
+			}
+			lastErr = err
+			if attempt == maxAttempts {
+				break
+			}
+			log.Printf("⏳ postgres not ready yet (attempt %d/%d: %v); retrying in %s…",
+				attempt, maxAttempts, err, delay)
+			time.Sleep(delay)
+		}
+		if lastErr != nil {
+			log.Fatalf("💀 db.Ping after %d attempts: %v", maxAttempts, lastErr)
+		}
 	}
 	log.Printf("✅ Connected to PostgreSQL at %s:%s", host, envWithPrefix("PORT", "5432"))
 
