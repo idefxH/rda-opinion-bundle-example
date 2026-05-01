@@ -1,0 +1,25 @@
+# rda template metadata. Read by `rda templates show <id>`.
+# This file is excluded from the scaffolded project — it lives in the
+# bundle, not in the generated repo.
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: web-go
+  display_name: Web Service (Go)
+  language: go
+  description: |
+    Net/http-based web service ready to bind a Postgres / MariaDB / Redis
+    / Apache Kafka backing service via the Kubernetes Service Binding
+    Specification — discovery by TYPE, not by name. Includes a Tiltfile
+    for inner-loop development on Rancher Desktop and a Dockerfile
+    using the SUSE Application Collection Go images (dev variant for
+    build, slim variant for runtime).
+
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier from the template metadata.
+      autoCompute: from-template-language

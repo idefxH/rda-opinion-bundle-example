@@ -1,0 +1,23 @@
+# Go build artefacts
+/app
+*.test
+*.out
+.tilt/
+.tiltbuild/
+.DS_Store
+
+# Vendored Helm sub-charts — populated by `rda new` (and refreshed by
+# `rda upgrade`) from the bundle's library-chart/. No need to track.
+deploy/charts/
+deploy/Chart.lock
+
+# rda-managed overlay (rda-cli v0.1.38+). Holds the services[] DSL
+# projection that Helm reads alongside deploy/values.yaml. Regenerated
+# on every `rda render` — including by the Tilt extension before each
+# `helm template` and by `rda promote` as a pre-flight step. Production
+# paths (Fleet, CI helm install) get the overlay produced by their own
+# `rda promote`, never the checked-in copy.
+deploy/.rda/
+
+# Buildpack outputs
+*.cnb

@@ -1,0 +1,11 @@
+# CNB Procfile — declares the launch processes that buildpacks register.
+#
+# - web: production launch.
+# - dev: development launch via nodemon -L. Polling-based watcher works
+#   reliably through Tilt's tar | kubectl exec syncs on overlayfs.
+#
+# nodemon is in `dependencies` (not devDeps) so it ships in every build.
+# heroku/nodejs's z_node_module_bins layer adds node_modules/.bin to
+# PATH at runtime, so plain 'nodemon' resolves without a relative path.
+web: node src/index.js
+dev: nodemon -L src/index.js
