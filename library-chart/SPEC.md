@@ -452,7 +452,7 @@ Status: in-progress
 
 - Catalogue gains a 5th chart: **dex** (OIDC + OAuth2 IdP). Unlike the
   4 prior charts, dex is NOT in the AppCo catalogue — pulled from the
-  upstream `https://charts.dexidp.io` repo at chart 0.24.0 (app 2.44.0).
+  AppCo `oci://dp.apps.rancher.io/charts/dex-idp` at chart 0.24.0 (app 2.44.0), aliased as `dex`.
   This is also the first chart in the catalogue with a non-OCI repo;
   helm dep update handles both shapes transparently.
 - `library-chart/dsl-mappings.yaml` gains a `dex:` entry:
