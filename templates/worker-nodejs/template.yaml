@@ -1,0 +1,26 @@
+# rda template metadata. Read by `rda templates show <id>`.
+# This file is excluded from the scaffolded project — it lives in the
+# bundle, not in the generated repo.
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: worker-nodejs
+  display_name: Worker / Consumer (Node.js)
+  language: nodejs
+  description: |
+    Long-running background worker — no HTTP server, no Ingress. Reads
+    its config from /bindings/* (any catalogued binding type), logs a
+    heartbeat, and stays running. The natural template for queue
+    consumers (Kafka, Redis pub/sub), cron-style schedulers, and
+    sidecars that don't accept inbound traffic. The library chart's
+    Deployment still applies; the only difference from web-* is no
+    Service / Ingress and no HTTP port.
+
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier from the template metadata.
+      autoCompute: from-template-language

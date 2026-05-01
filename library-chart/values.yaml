@@ -200,3 +200,33 @@ dex:
   # here — the project's deploy/values.yaml supplies the issuer URL +
   # storage block via `passthrough` on the services[] entry. See
   # `rda add-service dex` for the scaffold defaults.
+
+# MariaDB (AppCo). Sister chart to postgresql — same default-on
+# stateful posture: persistence on by default (1Gi, laptop-friendly),
+# metrics-exporter sidecar on. Same auth-seed contract: changing
+# auth.password / auth.database after first init has no effect on the
+# baked PVC; nuke the PVC to reset.
+mariadb:
+  enabled: false
+  auth:
+    rootPassword: ""
+    database: ""
+    username: ""
+    password: ""
+  persistence:
+    resources:
+      requests:
+        storage: 1Gi
+  nodeCount: 1
+  metrics:
+    enabled: true
+
+# Apache Kafka (AppCo). 4.x KRaft mode — no zookeeper. Single broker
+# default for dev; scale via passthrough.controller.replicas. Auth and
+# persistence default off in the AppCo chart; we keep that posture (the
+# operator typically lifts the auth in their overlay's
+# default_values.yaml). Brokers expose 9092 (PLAINTEXT). Topic
+# auto-creation is on by default in the AppCo chart's config — same dev
+# ergonomics as redis.
+apache-kafka:
+  enabled: false

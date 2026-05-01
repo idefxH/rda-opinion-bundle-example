@@ -12,13 +12,35 @@ templates:
       Prometheus and Grafana from the SUSE Application Collection.
       Includes a Tiltfile for inner-loop development on Rancher Desktop.
     path_in_bundle: templates/web-nodejs
+  - id: web-go
+    display_name: Web Service (Go)
+    language: go
+    description: |
+      Net/http-based web service ready to bind any catalogued backing
+      service (PostgreSQL / MariaDB / Redis / Apache Kafka) via the
+      Kubernetes Service Binding Specification. Multi-stage Dockerfile
+      using SUSE Application Collection Go images: dev variant for
+      compilation, slim variant for runtime. Static CGO_DISABLED binary,
+      runs as UID 1000.
+    path_in_bundle: templates/web-go
+  - id: worker-nodejs
+    display_name: Worker / Consumer (Node.js)
+    language: nodejs
+    description: |
+      Long-running background worker — no HTTP server, no Service, no
+      Ingress. Heartbeat loop logs each binding under /bindings/ at
+      startup. The natural template for queue consumers (Kafka, Redis
+      pub/sub), cron-style schedulers, and sidecars that don't accept
+      inbound traffic. Pair with `rda add-service apache-kafka events`
+      or `rda add-service redis events-bus` for an actual consumer.
+    path_in_bundle: templates/worker-nodejs
 
 library_chart:
   # v1: file:// URI relative to bundle root. The rda HelmClient.PullChart
   # production implementation supports file:// URIs only — see the v1-gap
   # issue tracking oci:// support.
   oci_ref: file://library-chart
-  version: 0.11.15
+  version: 0.11.16
 
 # Catalogue surfaced by the library chart. Each AppCo chart is referenced
 # by its real name (no alias). The local_chart_ref points at the bundled
@@ -31,4 +53,8 @@ service_catalog:
   - type_name: grafana
     local_chart_ref: file://library-chart
   - type_name: dex
+    local_chart_ref: file://library-chart
+  - type_name: mariadb
+    local_chart_ref: file://library-chart
+  - type_name: apache-kafka
     local_chart_ref: file://library-chart
