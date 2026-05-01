@@ -1,0 +1,16 @@
+# CNB Procfile — declares the launch processes buildpacks register.
+#
+# - web: production launch. heroku/go auto-registers this pointing
+#   at the absolute path of the compiled binary
+#   (/layers/heroku_go/go_target/bin/<module>). The Procfile entry
+#   below is informational/local-development; pack still picks up
+#   heroku/go's auto-registration when --default-process web is set.
+# - dev: development launch via `air`. air is a Go live-reload tool
+#   (github.com/air-verse/air) installed by the buildpack as a tool
+#   dep — see go.mod's tool directive (Go 1.24+) or the buildpack's
+#   pre-install hook in heroku/go for older toolchains. With
+#   tilt-extension-suse-rda's live_update_paths=['./'] for go,
+#   source changes are sync'd to /workspace and air recompiles
+#   in-place (sub-2s vs. ~14s for a full pack rebuild).
+web: bin/{{ .Name }}
+dev: air -c .air.toml
