@@ -570,9 +570,9 @@ stringData:
 {{- $svcSpec := index $mapping "service" | default dict -}}
 {{- $ports := index $svcSpec "ports" | default dict -}}
 {{- if $ports -}}
-{{- range $portName, $p := $ports -}}
-{{- $pPort := (index $p "port" | default "") | toString -}}
-{{- $pScheme := index $p "scheme" | default "http" -}}
+{{- range $portName, $p := $ports }}
+{{- $pPort := (index $p "port" | default "") | toString }}
+{{- $pScheme := index $p "scheme" | default "http" }}
   {{ $portName }}_host: {{ $host | quote }}
   {{ $portName }}_port: {{ $pPort | quote }}
   {{ $portName }}_url: {{ printf "%s://%s:%s" $pScheme $host $pPort | quote }}
