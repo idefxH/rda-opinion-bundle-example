@@ -1,0 +1,61 @@
+# Project values for {{ .Name }} (worker / consumer).
+#
+# Worker template: NO HTTP server, NO Service, NO Ingress. The library
+# chart still renders a Deployment + the binding-secret + 12-factor env
+# wiring, but `ingress.enabled: false` skips the Ingress and the
+# Deployment's container probe shape is liveness-only (workers expose
+# no /ready endpoint).
+#
+# To attach a backing service (kafka, redis, ...), use:
+#
+#   rda add-service apache-kafka events
+#
+# It writes a `services[]` entry below AND `rda render` projects the
+# DSL into the AppCo sub-chart values.
+
+suse-library:
+  name: {{ .Name }}
+  replicas: 1
+  # Workers don't accept inbound traffic — port stays here only because
+  # the library chart's deployment container spec defaults expect a
+  # number. Skip Service / Ingress via the toggles below.
+  port: 8080
+
+  # Workers don't serve traffic.
+  ingress:
+    enabled: false
+
+  # Workers don't expose a Service (no inbound). The library chart honours
+  # `service.enabled: false` (added in 0.11.16+) by skipping the Service
+  # resource. If you're on an older library, leave the Service rendered
+  # (no harm — it just has no Endpoints when there's no Service port the
+  # pod listens on). See bundle #worker-shape.
+  service:
+    enabled: false
+
+  image:
+    repository: {{ .Name }}
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  imagePullSecrets:
+    - name: application-collection
+
+  # Worker probes: liveness only, no readiness. The library chart's
+  # deployment.yaml probes block reads from suse-library.probes; setting
+  # readiness to null/empty skips the readinessProbe field on the
+  # container. (Override at the project level, not in the library — the
+  # library default keeps both for web shapes.)
+  probes:
+    liveness:  {path: /health, initialDelaySeconds: 10, periodSeconds: 10}
+    readiness: null
+
+  # ─── Backing services ──────────────────────────────────────────────
+  # Kafka worker:
+  #   rda add-service apache-kafka events
+  # Redis pub/sub worker:
+  #   rda add-service redis events-bus
+  # The example src/index.js iterates /bindings/* and logs each
+  # binding's host/port — replace with kafkajs.consumer.run() (or your
+  # consumer of choice) to consume actual messages. SBS discovery is
+  # by TYPE, not name.

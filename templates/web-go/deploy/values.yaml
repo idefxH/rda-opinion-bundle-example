@@ -1,0 +1,65 @@
+# Project values for {{ .Name }}.
+#
+# This template is DSL-first (suse-library v0.11.0+). To attach a
+# backing service (postgres, redis, grafana, ...), use:
+#
+#   rda add-service postgresql payments-db
+#
+# It writes a `services[]` entry below AND auto-flips
+# `<chart>.enabled: true` for Helm dep resolution. Both halves are
+# required: services[] drives the DSL helpers (Secret + env wiring),
+# and <chart>.enabled gates the AppCo sub-chart deployment in
+# library-chart's Chart.yaml.
+#
+# Edit the auth/persistence/metrics blocks under each service entry
+# to taste — defaults are dev-tuned, not prod.
+
+suse-library:
+  name: {{ .Name }}
+  replicas: 1
+  port: 8080
+
+  # ─── Ingress (cluster Traefik / FIPS variant) ──────────────────────
+  # The library auto-renders an Ingress when this block is present.
+  #
+  # Default host uses localtest.me — a public wildcard DNS that resolves
+  # *.localtest.me to 127.0.0.1 from any OS, no /etc/hosts edits needed.
+  # Works on macOS, Linux, AND Windows out of the box. The shorter
+  # `<name>.localhost` form is also fine on macOS / Linux (where modern
+  # mDNS resolves *.localhost to 127.0.0.1) but it's NOT universal
+  # — Windows resolution is hit-or-miss without registry tweaks.
+  # Change all hosts for staging+.
+  ingress:
+    enabled: true
+    hosts:
+      - {{ .Name }}.localtest.me
+      # - {{ .Name }}.localhost  # alternative (macOS / Linux only)
+
+  image:
+    repository: {{ .Name }}
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  imagePullSecrets:
+    - name: application-collection
+
+  # ─── Backing services ──────────────────────────────────────────────
+  # Add via `rda add-service <type> <binding>`, e.g.:
+  #
+  #   rda add-service postgresql db
+  #
+  # The CLI appends a services[] entry here (block style). Before
+  # `tilt up`, edit the appended entry's auth.user.password — it
+  # ships empty by design (no plaintext default in the template).
+  #
+  # The DSL is the source of truth. `rda render` projects services[]
+  # into deploy/.rda/values.generated.yaml (the AppCo sub-chart values
+  # Helm needs). The Tilt extension auto-runs `rda render` before
+  # every `helm template`, so as you edit services[] here, the
+  # overlay stays in sync. Don't edit values.generated.yaml by hand
+  # — your changes will be overwritten on the next render.
+  #
+  # The bundled example app (src/index.js) discovers its DB binding
+  # by type (`findBindingByType('postgresql')`), so the binding name
+  # you pick is up to you — `db`, `orders-db`, anything unique
+  # within services[].

@@ -1,3 +1,23 @@
+{{- /*
+    Service rendering toggle. Defaults to true (web shapes always
+    expose a Service); workers / batch templates flip
+    `service.enabled: false` to skip the resource entirely. The
+    Deployment / binding-secret / Ingress decisions are independent —
+    Ingress also defaults off, but service-off is the rarer case
+    (workers without inbound traffic). Bundle 0.11.16+.
+
+    `dig` walks an optional path; the third arg is the fallback when
+    any segment is missing. Equivalent to
+    `(default true .Values.service.enabled)` but tolerates the whole
+    `service:` block being absent (most projects don't write one).
+
+    `.Values | toJson | fromJson` round-trip coerces the chartutil.Values
+    wrapper down to `map[string]interface{}`, which `dig` requires.
+    Without the round-trip, dig errors with "interface conversion:
+    interface {} is common.Values, not map[string]interface {}".
+    Tested helm 3.17+; cheap (single chart's values, ~µs).
+*/}}
+{{- if (dig "service" "enabled" true (.Values | toJson | fromJson)) }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -13,3 +33,4 @@ spec:
       protocol: TCP
   selector:
     {{- include "suse-library.selectorLabels" . | nindent 4 }}
+{{- end }}

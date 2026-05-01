@@ -1,0 +1,22 @@
+node_modules/
+npm-debug.log
+.tilt/
+.tiltbuild/
+.DS_Store
+
+# Vendored Helm sub-charts — populated by `rda new` (and refreshed by
+# `rda upgrade`) from the bundle's library-chart/. No need to track.
+chart/charts/
+chart/Chart.lock
+
+# rda-managed overlay (rda-cli v0.1.38+, closes rda-cli#68). Holds the
+# services[] DSL projection that Helm reads alongside chart/values.yaml.
+# Machine-generated, regenerated on every `rda render` — including by
+# the Tilt extension before each `helm template` and by `rda promote`
+# as a pre-flight step. Production paths (Fleet, CI helm install) get
+# the overlay produced by their own `rda promote` invocation, never the
+# checked-in copy. Gitignoring keeps the diff noise out of the repo.
+chart/.rda/
+
+# Buildpack outputs (pack build leaves these in CWD on some setups)
+*.cnb

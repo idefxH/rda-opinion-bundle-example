@@ -2,7 +2,7 @@
 
 ## META
 Deployment:   helm-library-chart
-Version:      0.11.15
+Version:      0.11.16
 Spec-Schema:  0.1.0
 Author:       François-Xavier Houard <fx.houard@gmail.com>
 License:      Apache-2.0
@@ -511,3 +511,43 @@ Status: in-progress
   was the in-flight Phase D test fixture which already shipped via
   the bundle Phase C+D combined merge. The version sequencing here
   reflects the reality of merged commits, not the open-PR ordering.
+
+## MILESTONE: 0.11.16
+Status: in-progress
+
+- Two more AppCo charts in the catalogue: **mariadb** (sister to
+  postgresql, same auth + persistence + auth-seed posture) and
+  **apache-kafka** (KRaft mode 4.x — no zookeeper). Catalog count
+  goes from 5 → 7. mariadb's chart shape mirrors postgresql closely
+  in dsl-mappings (same auth.user.{name,password,database} +
+  auth.admin.password projections); kafka's DSL surface is
+  intentionally minimal (persistence + metrics only) — SASL /
+  multi-broker config goes through passthrough because the
+  user/password DSL shape doesn't fit kafka's bootstrap-servers +
+  topic-ACLs idiom.
+- New library-chart knob: **`service.enabled`** (default true).
+  Worker / batch templates that don't accept inbound traffic flip it
+  to false to skip the Service resource. Pairs with the
+  conditional-probes change in deployment.yaml — readinessProbe is
+  now skipped when `probes.readiness` is null/absent (was
+  unconditional before). Web shapes keep both enabled by default,
+  so no behaviour change for postgresql / redis / grafana /
+  prometheus / dex projects.
+- Two new templates registered in rda-bundle.yaml: **web-go**
+  (Go 1.26 net/http server, multi-stage build using AppCo go +
+  go-dev images) and **worker-nodejs** (long-running consumer, no
+  HTTP). Languages with both AppCo build (`-dev-` flavoured) and
+  runtime (slim) images: nodejs (existing), go (new). Java /
+  OpenJDK is also in AppCo with the same shape — deferred to a
+  follow-on (issue tracked in rda-opinion-bundle-example#templates-jvm).
+- Companion changes (separate PRs):
+  - `idefxH/rda-cli` — `cmd/add_service.go::dslDefaultsFor` gains
+    `case "mariadb":` and `case "apache-kafka":` arms.
+  - `idefxH/rda-e2e-tests` — new scenarios 08-add-mariadb-query,
+    09-add-kafka-produce-consume, 10-template-web-go,
+    11-template-worker-nodejs.
+- Discovered: planned addition. dex (0.11.15) was the catalog-extension
+  shake-out; mariadb + kafka are the proof that the data-driven catalog
+  scales, web-go + worker-nodejs are the proof that the template
+  shape generalises beyond web-nodejs.
+- Spec META.Version 0.11.15 → 0.11.16.

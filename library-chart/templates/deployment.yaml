@@ -109,14 +109,25 @@ spec:
             {{- include "suse-library.legacy.bindingMount" (dict "chart" "grafana") | nindent 12 }}
             {{- end }}
             {{- end }}
+          {{- /*
+            Probes are conditionally rendered. Setting probes.liveness or
+            probes.readiness to null in values.yaml skips the corresponding
+            probe field on the container — needed for worker / batch shapes
+            that don't expose HTTP /health or /ready endpoints. Web shapes
+            keep both populated by default. Bundle 0.11.16+.
+          */}}
+          {{- with .Values.probes.liveness }}
           livenessProbe:
-            httpGet: {path: {{ .Values.probes.liveness.path }}, port: http}
-            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            httpGet: {path: {{ .path }}, port: http}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+          {{- end }}
+          {{- with .Values.probes.readiness }}
           readinessProbe:
-            httpGet: {path: {{ .Values.probes.readiness.path }}, port: http}
-            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
-            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            httpGet: {path: {{ .path }}, port: http}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+          {{- end }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
       volumes:
         {{- /*
