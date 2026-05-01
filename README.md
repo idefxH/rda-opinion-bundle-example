@@ -68,13 +68,23 @@ cd my-app && tilt up
 
 ## Catalogue
 
-The library chart's catalogue (which AppCo charts you can opt into via `services[]` or `<chart>.enabled`) is documented at [`idefxH/rda-devx-catalog`](https://github.com/idefxH/rda-devx-catalog):
+The bundle's catalogue (which AppCo charts you can opt into via
+`services[]`) lives at:
 
-- [`SCHEMA.md`](https://github.com/idefxH/rda-devx-catalog/blob/main/SCHEMA.md) — the unified DSL shape (`services[].type`, `auth.*`, `persistence.*`, ...).
-- [`CATALOG.md`](https://github.com/idefxH/rda-devx-catalog/blob/main/CATALOG.md) — per-chart reference covering all 12 DevX dimensions (connectivity, auth, persistence, UI, metrics, logs, OIDC, RBAC, tracing, CRDs, bootstrap, resource budget) plus the DSL ↔ chart-values mapping for each catalogued chart.
-- [`cookbooks/`](https://github.com/idefxH/rda-devx-catalog/tree/main/cookbooks) — concrete project archetype recipes.
+- `library-chart/dsl-mappings.yaml` — machine-readable per-chart
+  mapping (DSL fields → chart values, `binding_secret` projections,
+  `service.host`/`port`/`ports` shape).
+- [`reference/catalog.md`](https://github.com/idefxH/rda-docs/blob/main/reference/catalog.md)
+  in rda-docs — human-readable reference covering each chart's
+  connectivity, auth, persistence, UI, metrics, logs, OIDC, RBAC,
+  tracing, CRDs, bootstrap, and resource budget.
+- [`concepts/dsl.md`](https://github.com/idefxH/rda-docs/blob/main/concepts/dsl.md)
+  — the unified DSL shape (`services[].type`, `auth.*`,
+  `persistence.*`, `bootstrap.*`, `overrides.*`, ...).
+- [`concepts/scaffolds.md`](https://github.com/idefxH/rda-docs/blob/main/concepts/scaffolds.md)
+  — what `rda add-service <type> <binding>` writes for each chart.
 
-Read CATALOG.md before adding a new chart to the bundle — every chart needs the 12 dimensions answered.
+Read `catalog.md` before adding a new chart to the bundle.
 
 ## Template-time gates (Layer 2 of the layered-defense model)
 
@@ -97,20 +107,16 @@ reaches a cluster, and run identically on the dev's laptop and in CI.
   `binding`. Catches typos before deployment.
 - **`suse-library.dsl.validatePassthrough`** — fails the render if
   a service entry sets the same path twice: once via the DSL and
-  once via `passthrough:`. Catches DSL/legacy drift before
-  deployment. The collision keys come from each chart's
-  `values_mapping` in `dsl-mappings.yaml`, so the check stays in
-  sync with the catalogue.
-
-### Planned
-
-- **`dsl_drift`** — extends the passthrough collision check to also
-  flag the case where a project mixes the unified DSL with the
-  legacy chart-specific paths (`postgresql.auth.password` set
-  alongside `services[binding=db].auth.user.password`). Today the
-  collision check covers DSL ↔ passthrough; this extension covers
-  DSL ↔ legacy top-level. Tracked alongside the `rda promote`
-  `dsl_drift` gate stub on the CLI side.
+  once via `passthrough:`. The collision keys come from each
+  chart's `values_mapping` in `dsl-mappings.yaml`, so the check
+  stays in sync with the catalogue.
+- **auth-seed drift** — for stateful charts (those with
+  `auth_seed_paths` declared in dsl-mappings.yaml), the binding
+  Secret carries an `rda.suse.com/auth-seed` annotation. If the dev
+  edits an auth field after first init of the PVC, the freshly
+  computed seed mismatches the cluster's; render fails loud with
+  the nuke recipe so the dev knows the chart's sub-init won't
+  re-run for the new credentials.
 
 ### Why template-time matters
 

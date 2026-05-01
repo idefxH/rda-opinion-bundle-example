@@ -2,7 +2,7 @@
 
 ## META
 Deployment:   helm-library-chart
-Version:      0.11.16
+Version:      0.11.22
 Spec-Schema:  0.1.0
 Author:       François-Xavier Houard <fx.houard@gmail.com>
 License:      Apache-2.0
@@ -34,10 +34,10 @@ specific values overlays, and runs library-aware doctor checks.
 - `<binding>` — the symbolic name a project's app uses to reach a
   service (env-var prefix, Secret name suffix, SBS mount).
 - `services[]` — the unified DSL, written by the dev (or by `rda
-  add-service`) at `deploy/values.yaml` under `suse-library.services`
-  (legacy projects scaffolded before bundle 0.11.13 still use
-  `chart/values.yaml`; both are accepted by `rda` and the Tilt
-  extension via auto-detection).
+  add-service`) at `deploy/values.yaml` under `suse-library.services`.
+  Projects scaffolded before bundle 0.11.13 used `chart/values.yaml`;
+  both layouts are accepted by `rda` and the Tilt extension via
+  auto-detection so older projects keep working without migration.
 
 ## BEHAVIOR: services-iteration
 Constraint: required
@@ -49,7 +49,7 @@ templates: a disabled service stays inert at every layer (no
 binding-secret, no env var, no volume, no mount, no chart-level
 `<chart>.enabled` flip).
 
-Enforced templates (Phase 1):
+Enforced templates:
 - `templates/binding-secret.yaml` — renders one Secret per enabled entry
 - `templates/deployment.yaml` — env (envFromBinding), volume mounts,
   volume Secret references — all on the enabled subset
@@ -122,14 +122,14 @@ to `chart.ingress.hosts[0]`. Without bracket support the literal key
 `hosts[0]` was written instead of a list — Helm rendered no Ingress.
 Closed in rda-cli#75.
 
-Test guard (Phase 2): `tests/dsl-mappings-targets-valid/` parses every
-target path with the same rules `rda render` uses, fails on malformed
-or unsupported syntax. Currently parked until rda-cli's projection.go
+Test guard: `tests/dsl-mappings-targets-valid/` parses every target
+path with the same rules `rda render` uses, fails on malformed or
+unsupported syntax. Currently parked until rda-cli's projection.go
 is published as a re-usable parser; today the bundle relies on
 rda-cli's tests covering the same surface.
 
 ## BEHAVIOR: binding-secret-schema
-Constraint: required (Phase 2 — captures existing implicit contract)
+Constraint: required
 
 Every binding-secret rendered by `templates/binding-secret.yaml` MUST
 follow the schema:
@@ -161,12 +161,11 @@ this Secret's keys, projecting `<BINDING>_<KEY>` env vars (uppercase,
 snake_case from the SBS-canonical key) PLUS any `env_aliases` declared
 in dsl-mappings (e.g. `username` aliased to `user` for libpq).
 
-Test guard (Phase 2): `tests/binding-secret-schema/` runs `helm
-template` on a fixture project and asserts every binding-secret
-matches the schema.
+Test guard: `tests/binding-secret-schema/` runs `helm template` on a
+fixture project and asserts every binding-secret matches the schema.
 
 ## BEHAVIOR: ingress-conventions
-Constraint: required (Phase 2 — captures existing implicit contract)
+Constraint: required
 
 Two ingress paths exist in the library:
 
@@ -179,12 +178,11 @@ Two ingress paths exist in the library:
    render` to the chart-native `<chart>.ingress.hosts` (or
    `<chart>.server.ingress.hosts` for prometheus, per dsl-mappings).
    The chart-native Ingress is the authoritative one. Bundle 0.11.9
-   flipped the legacy `<chart>.ui.expose: true` default to `false` so
-   the library-emitted auto-Ingress at
-   `templates/ingress-ui.yaml` no longer duplicates the chart-native
-   one. Devs who need the library auto-Ingress (override host without
-   touching the chart's own ingress block) flip `ui.expose` back to
-   true explicitly.
+   flipped `<chart>.ui.expose: true` to `false` so the library-emitted
+   auto-Ingress at `templates/ingress-ui.yaml` no longer duplicates
+   the chart-native one. Devs who need the library auto-Ingress
+   (override host without touching the chart's own ingress block)
+   flip `ui.expose` back to true explicitly.
 
 Singular `services[].ingress.host: <str>` is back-compat-supported via
 the bracket-notation projection (`grafana.ingress.hosts[0]`); plural
@@ -195,8 +193,8 @@ Constraint: required
 
 `templates/_helpers.tpl::suse-library.dsl.validateConsistency` runs at
 every helm template invocation (called from `binding-secret.yaml`).
-Phase 1 checks (on the **enabled** subset only — disabled entries are
-inert scaffolds, not failure conditions):
+Checks (on the **enabled** subset only — disabled entries are inert
+scaffolds, not failure conditions):
 
 - every entry has a non-empty `binding`
 - every entry has a recognised `type` (must be in dsl-mappings.yaml)
@@ -209,9 +207,9 @@ inert scaffolds, not failure conditions):
   take, runtime fails with confusing auth errors. Fails loud at
   template time with the nuke recipe. Closed bundle issue #63.
 
-The legacy `<chart>.enabled` consistency check (pre-0.11.6) was
-removed — chart-level enable is now derived by `rda render` and lives
-only in the auto-generated overlay.
+Chart-level enable is derived by `rda render` and lives only in the
+auto-generated overlay (`deploy/.rda/values.generated.yaml`); never
+hand-written into `deploy/values.yaml`.
 
 ---
 
@@ -219,11 +217,12 @@ only in the auto-generated overlay.
 Status: released
 
 - Initial `suse-library` library chart with the unified DSL
-  (`apiVersion: rda.suse.com/v1alpha1`, `services[]`).
+  (`services[]`).
 - `templates/_helpers.tpl` ships data-driven helpers reading
   `dsl-mappings.yaml` instead of hardcoded if/else arms — adding a
   chart = one YAML entry.
-- Legacy `<chart>.enabled` gated path remains for back-compat.
+- Pre-DSL `<chart>.enabled` gated fallback shipped alongside for
+  back-compat. Removed in 0.11.22 (see milestone below).
 
 ## MILESTONE: 0.11.1
 Status: released
@@ -345,12 +344,12 @@ Status: in-progress
   resolves anywhere via cluster-DNS.
 - Bare-name back-compat: bare names still work *within* the same
   namespace because Kubernetes DNS resolves unqualified names against
-  the pod's own namespace. So legacy projects (rda-cli pre-0.1.43,
-  no namespace block, deploys with bindings + workload in the same
-  namespace) keep working through the binding-secret env var even
-  though the var now contains the FQDN. Apps that connect by hostname
-  treat `host.ns.svc.cluster.local` and `host` interchangeably when
-  both resolve.
+  the pod's own namespace. So projects scaffolded by rda-cli pre-0.1.43
+  (no namespace block; bindings + workload land in the same namespace)
+  keep working through the binding-secret env var even though the var
+  now contains the FQDN. Apps that connect by hostname treat
+  `host.ns.svc.cluster.local` and `host` interchangeably when both
+  resolve.
 - Companion change in `tilt-extension-suse-rda` (PR stacked on
   Phase A's `feature/ns-phase-a-tiltfile`): `workload_name_for()` now
   substitutes `{{ .Release.Namespace }}` in addition to
@@ -425,7 +424,7 @@ Status: in-progress
 - Bundle template directory rename: `templates/web-nodejs/chart/` →
   `templates/web-nodejs/deploy/`. The directory's purpose is to hold
   what gets deployed to Kubernetes; calling it `deploy/` makes that
-  obvious to a newcomer cloning the repo. The legacy name `chart/`
+  obvious to a newcomer cloning the repo. The prior name `chart/`
   was conceptually overloaded — it sounded like an arbitrary helm
   chart we'd publish to a registry, when in fact it's the project's
   own deployment surface.
@@ -440,8 +439,8 @@ Status: in-progress
 - Companion changes (separate PRs):
   - `idefxH/rda-cli` — `internal/project/detect.go` and
     `cmd/new.go::vendorLibraryChart` accept `deploy/` (preferred)
-    and fall back to `chart/` (legacy) for back-compat with projects
-    scaffolded before this milestone.
+    and fall back to `chart/` for projects scaffolded before this
+    milestone.
   - `idefxH/tilt-extension-suse-rda` — auto-detects `deploy/` vs
     `chart/` so existing projects that pass `chart_path='chart'`
     keep working.
@@ -551,3 +550,45 @@ Status: in-progress
   scales, web-go + worker-nodejs are the proof that the template
   shape generalises beyond web-nodejs.
 - Spec META.Version 0.11.15 → 0.11.16.
+
+## MILESTONE: 0.11.22
+Status: in-progress
+
+- Pre-DSL `<chart>.enabled` fallback ripped out. From 0.11.0 through
+  0.11.21 the library shipped a back-compat path: when `services[]`
+  was absent, the templates fell through to `legacy.envForSqlDb /
+  envForUrlOnly / envForUiWithAdmin / bindingMount / bindingVolume /
+  sqlBindingSecret / urlBindingSecret / uiBindingSecret` helpers in
+  `_helpers.tpl`, projecting whatever the dev set under
+  `<chart>.auth.*` into env vars and Secrets directly. The DSL has
+  been the only supported authoring path since 0.11.6 (rda-cli#67's
+  inert-scaffold contract); the v0.11.0–0.11.21 dev population has
+  fully migrated. Carrying both paths doubled the surface area in
+  every template review and produced two answers to "where do
+  credentials come from?" — confusing newcomers reading the chart.
+- Removals:
+  - `templates/_helpers.tpl` — dropped 8 `suse-library.legacy.*`
+    defines (≈120 lines).
+  - `templates/deployment.yaml` — dropped 3 `{{- if not .Values.services }}`
+    branches that called the legacy helpers for env, mounts, volumes.
+  - `templates/binding-secret.yaml` — dropped the if/else fallback;
+    only the DSL-driven loop remains.
+  - `library-chart/values.yaml` — pruned ≈120 lines of comments
+    referencing the legacy path, the v0.7 history, and the
+    superseded SCHEMA.md / PROPOSAL.md docs that never materialised.
+  - `library-chart/Chart.yaml` — description rewrite: drops the
+    "AppCo verbatim, no alias" + "12-factor uppercase prefix" lines
+    that had migrated into `concepts/dsl.md` long ago.
+  - `templates/{web-go,web-nodejs,worker-nodejs}/Tiltfile` — dropped
+    the "Legacy path: every catalogued chart with `<chart>.enabled:
+    true` gets a port-forward" comment block; replaced with the
+    current "auto-discovered from services[] entries" wording.
+- Comment hygiene pass on the rest of the chart, removing stale
+  "Phase 1" / "Phase 2" / "Phase 2.5" markers and the 0.11.0-era
+  references to fields that no longer exist.
+- No Helm output changes for any project that already adopted the
+  DSL (which is everyone — `rda doctor` has flagged any non-DSL
+  project since 0.1.40).
+- Spec META.Version 0.11.16 → 0.11.22 (skips 0.11.17–0.11.21, all
+  of which shipped DSL-evolution features tracked under their own
+  PR commits but never got individual SPEC.md milestones).

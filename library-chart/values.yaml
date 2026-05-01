@@ -1,31 +1,22 @@
-# Defaults for any chart depending on suse-library v0.7.
+# Defaults for any chart depending on suse-library.
 
-# --- Helm globals propagated to every sub-chart ---
-# 'global.*' is special: Helm automatically merges it into every
-# sub-chart's values regardless of nesting. Keeping imagePullSecrets
-# here means every AppCo dep picks it up without per-block repetition.
+# Helm globals — propagated to every sub-chart automatically.
+# Keeping imagePullSecrets here means every AppCo dep picks it up.
 global:
   imagePullSecrets:
     - application-collection
 
-# ─── Unified DSL (apiVersion: rda.suse.com/v1alpha1) ───
-# When services[] is non-empty, the library renders binding-secrets and
-# env vars from this list (the DSL view). When empty, the library falls
-# back to the legacy <chart>.enabled gated path. See PROPOSAL.md in
-# rda-devx-catalog for the design rationale.
-#
-# Each service entry MUST have:
-#   binding: string (app-side env name root: <BINDING>_HOST etc.)
-#   type:    string (AppCo chart name; v1alpha1 supports postgresql, redis, grafana)
-# Plus type-specific auth/persistence/metrics/ingress/bootstrap fields per
-# rda-devx-catalog/SCHEMA.md. The legacy <chart>.* blocks below remain in
-# values.yaml for sub-chart resolution; the rda CLI pre-processor (Phase 1.5)
-# will keep them in sync with services[].
-apiVersion: rda.suse.com/v1alpha1
+# ─── Unified DSL ───
+# services[] is the single source of truth for catalogued sub-charts.
+# Each entry: { binding, type, enabled, auth?, persistence?, metrics?,
+# ingress?, resources?, bootstrap?, passthrough?, overrides? }.
+# `rda add-service <type> <binding>` writes scaffold entries; the
+# scaffold table in dsl-mappings.yaml drives the default shape per
+# chart. See concepts/dsl.md and concepts/scaffolds.md in rda-docs.
 services: []
 
 
-# --- application config ---
+# ─── Application config ───
 name: ""
 replicas: 1
 port: 8080
@@ -35,7 +26,6 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-# Pod-level pull secrets for the application's OWN container.
 imagePullSecrets:
   - name: application-collection
 
@@ -47,32 +37,18 @@ probes:
   liveness:  {path: /health, initialDelaySeconds: 10, periodSeconds: 10}
   readiness: {path: /ready,  initialDelaySeconds: 5,  periodSeconds: 5}
 
-# ─── Prometheus scrape annotations (opinionated default) ───
-# When metrics.enabled is true, the app pod is annotated with
-#   prometheus.io/scrape: "true"
-#   prometheus.io/path:   <metrics.path>      (default /metrics)
-#   prometheus.io/port:   <metrics.port>      (default .Values.port)
-# so the Prometheus chart's `kubernetes-pods` discovery picks it up
-# automatically without any extra ServiceMonitor / PodMonitor config.
-# Disable when your app does not expose a /metrics endpoint.
+# Prometheus scrape annotations on the app pod when metrics.enabled is true.
+# The chart's `kubernetes-pods` discovery picks them up — no ServiceMonitor
+# needed.
 metrics:
   enabled: true
   path: /metrics
   # port: 8080  # defaults to .Values.port
 
-# Free-form pod annotations merged into the Deployment's pod template.
-# Use for app-specific concerns (Linkerd inject, Istio sidecar config,
-# ingress-nginx auth annotations propagated to pods, etc.). Prometheus
-# scrape annotations live in the metrics block above; setting the same
-# keys here will override them.
+# Free-form pod annotations (Linkerd inject, Istio sidecar, etc.).
 podAnnotations: {}
 
-# ─── Ingress (optional) ───
-# When enabled, the library chart emits a single Ingress fronting the
-# application Service. Path rules are simple by default — one path per
-# host, all routed to the app's `http` port. Override `path`/`pathType`
-# for a different routing convention; use `annotations` to plug into
-# Traefik/nginx-specific behaviour (auth, rewrites, rate limits).
+# Application Ingress (one Ingress fronting the app's Service).
 ingress:
   enabled: false
   ingressClassName: ""        # e.g. "traefik" on Rancher Desktop, "nginx" elsewhere
@@ -83,17 +59,17 @@ ingress:
   tls: []                     # e.g. - {hosts: [demo.example.com], secretName: demo-tls}
 
 # ─────────────────────────────────────────────────────────────────────
-# CATALOGUE: AppCo charts the project can opt into
+# Sub-chart enabled flags
 # ─────────────────────────────────────────────────────────────────────
-# Each block below is keyed on the AppCo chart name (no alias). Setting
-# <chart>.enabled: true pulls the chart at template time. The library
-# chart issues:
-#   - a Service Binding Spec Secret at <release>-<chart>-binding,
-#     mounted at /bindings/<chart>/<key>
-#   - 12-factor env vars projected from that Secret into the app
-#     container, using <CHART>_HOST/_PORT/... naming
-# The host always points at <release>-<chart>, which is what the
-# AppCo sub-chart deploys (no alias renaming, the convention is direct).
+# Each <chart>.enabled defaults to false. `rda render` flips them to
+# true in the generated overlay (deploy/.rda/values.generated.yaml)
+# for every services[] entry with enabled: true and provisioning: local.
+# The dev never writes these flags directly; they're internal plumbing
+# between the unified DSL and Helm's `condition: <chart>.enabled` deps.
+#
+# Chart-specific values blocks (auth, persistence, etc.) below are
+# Helm sub-chart defaults the dev's `services[]` entry overrides via
+# values_mapping projection at render time.
 
 postgresql:
   enabled: false
@@ -101,49 +77,22 @@ postgresql:
     database: ""
     username: ""
     password: ""
-  # Stateful service: persist by default so seeded data survives `tilt down`.
-  # Reproduction risk is high otherwise — devs lose trust in the dev loop
-  # when they rebuild and their data is gone. Refs bundle issue #7.
-  # Override locally with `postgresql.persistence.enabled: false` for the
-  # rare clean-slate-every-time workflow. Nuke accumulated PVCs across
-  # re-installs with:
-  #   kubectl delete pvc -l app.kubernetes.io/instance=<release>
-  # Default size is 1Gi (down from the AppCo chart's 8Gi) — laptop-friendly.
   persistence:
     enabled: true
     size: 1Gi
   nodeCount: 1
-  # Out-of-the-box monitoring is the opinion bundle's value prop. Setting
-  # metrics.enabled: true at the library layer means downstream projects
-  # get the postgres_exporter sidecar by default; the chart's own default
-  # is false. Override locally with `postgresql.metrics.enabled: false`
-  # if your project explicitly does not want it. Refs bundle issue #6.
   metrics:
     enabled: true
 
 prometheus:
   enabled: false
-  # Server is the only component we want by default in dev. The other
-  # components from the Prometheus community chart (node-exporter,
-  # alertmanager, pushgateway, kube-state-metrics) all bind hostPorts
-  # or duplicate cluster-wide functions; on a single-node dev cluster
-  # they collide with the system or with previous installs. Users can
-  # opt them back in per-project via values overrides.
+  # Server only — node-exporter / alertmanager / pushgateway /
+  # kube-state-metrics collide with the system on a single-node dev
+  # cluster, so they're off by default. Re-enable per-project via
+  # passthrough if needed.
   server:
     persistentVolume:
       enabled: false
-  # Auto-Ingress for the Prometheus UI. The library used to render its
-  # own Ingress (via templates/ingress-ui.yaml) when this was true,
-  # because per-chart Ingress shapes differed enough that the DSL
-  # couldn't bridge them. Now (bundle 0.11.9+) the DSL `services[]
-  # .ingress.hosts: [...]` projects via dsl-mappings to the chart-
-  # native Ingress directly — no library detour, no duplication. The
-  # default flipped to `false` to avoid two Ingress resources
-  # (prometheus's own + library's auto) for the same host. Devs who
-  # want the library auto-Ingress (e.g. to override host without
-  # touching the prometheus block) flip this to true explicitly.
-  # Refs bundle issue #8 (the original auto-Ingress design) and the
-  # post-mortem that flipped the default.
   ui:
     expose: false
   alertmanager:
@@ -161,51 +110,21 @@ grafana:
   adminPassword: ""
   persistence:
     enabled: false
-  # Self-monitoring on by default (Grafana exposes /metrics for its own
-  # process). Refs bundle issue #6 — out-of-the-box monitoring is the
-  # opinion bundle's value prop.
   metrics:
     enabled: true
-  # Auto-Ingress for the Grafana UI. The library used to render its
-  # own Ingress (via templates/ingress-ui.yaml) when this was true,
-  # because per-chart Ingress shapes differed enough that the DSL
-  # couldn't bridge them. Now (bundle 0.11.9+) the DSL `services[]
-  # .ingress.hosts: [...]` projects via dsl-mappings to the chart-
-  # native Ingress directly — no library detour, no duplication. The
-  # default flipped to `false` to avoid two Ingress resources
-  # (grafana's own + library's auto) for the same host. Devs who want
-  # the library auto-Ingress (e.g. to override host without touching
-  # the grafana block) flip this to true explicitly. Refs bundle
-  # issue #8 (the original auto-Ingress design) and the post-mortem
-  # that flipped the default.
   ui:
     expose: false
 
-# Disabled-by-default catch on `redis.enabled`. Helm dep `condition:`
-# semantics: when the path is MISSING from values entirely, Helm treats
-# the condition as 'no effect' and loads the dep regardless. So a missing
-# default here would make every project pull redis even without
-# `services[].type=redis` opting in. Closes a bug surfaced live: a
-# project with only postgresql in services[] still saw payments-redis
-# resources because nobody had explicitly written redis.enabled: false.
-# rda render writes redis.enabled: true into the overlay only when an
-# enabled redis service exists, so the user-facing default is off.
 redis:
   enabled: false
 
 dex:
   enabled: false
-  # The dex chart REQUIRES `config:` to be set or the pod crashloops
-  # at startup ("no issuer set"). The library doesn't ship a default
-  # here — the project's deploy/values.yaml supplies the issuer URL +
-  # storage block via `passthrough` on the services[] entry. See
-  # `rda add-service dex` for the scaffold defaults.
+  # dex requires `config:` set or the pod crashloops at startup. The
+  # `rda add-service dex` scaffold writes a sane bootstrap config
+  # (storage.memory + enablePasswordDB + oauth2 settings) via the
+  # services[].passthrough block — no default needed here.
 
-# MariaDB (AppCo). Sister chart to postgresql — same default-on
-# stateful posture: persistence on by default (1Gi, laptop-friendly),
-# metrics-exporter sidecar on. Same auth-seed contract: changing
-# auth.password / auth.database after first init has no effect on the
-# baked PVC; nuke the PVC to reset.
 mariadb:
   enabled: false
   auth:
@@ -221,34 +140,21 @@ mariadb:
   metrics:
     enabled: true
 
-# Apache Kafka (AppCo). 4.x KRaft mode — no zookeeper. Single broker
-# default for dev; scale via passthrough.controller.replicas. Auth and
-# persistence default off in the AppCo chart; we keep that posture (the
-# operator typically lifts the auth in their overlay's
-# default_values.yaml). Brokers expose 9092 (PLAINTEXT). Topic
-# auto-creation is on by default in the AppCo chart's config — same dev
-# ergonomics as redis.
 apache-kafka:
   enabled: false
 
-# Valkey (AppCo). Open-source Redis fork — same DSL surface as redis.
-# Standalone architecture by default (single pod). Dev posture matches
-# redis: persistence-off scaffold default, metrics-on.
 valkey:
   enabled: false
 
-# MinIO (AppCo). S3-compatible object storage. The chart's own default
-# is `mode: distributed` (16 replicas, 500Gi each) — the dsl-mappings
-# entry's chart_defaults overrides to `mode: standalone`, replicas: 1
-# so a fresh project works on Rancher Desktop without surprise.
-# Operators flip back to distributed via passthrough for production.
+# MinIO: chart's own default `mode: distributed` (16 replicas × 500Gi)
+# is overridden to `standalone` via dsl-mappings chart_defaults so a
+# fresh project works on Rancher Desktop. Operators flip back to
+# distributed via passthrough for production.
 minio:
   enabled: false
 
-# Vault (AppCo, HashiCorp Community Edition). Dev mode by default
-# (in-memory storage, root token from devRootToken, sealed=false at
-# boot). Operators flip to a real backend (raft / postgresql) via
-# passthrough.server for production deploys. The injector sidecar is
-# off by default — see dsl-mappings chart_defaults for the rationale.
+# Vault: dev mode by default (in-memory, sealed=false, root token
+# from devRootToken). Operators flip to raft/postgres via
+# passthrough.server for production. Injector sidecar off by default.
 vault:
   enabled: false

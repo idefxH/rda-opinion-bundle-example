@@ -16,7 +16,7 @@ This folder is the project's **Helm chart**. `tilt up` and `rda promote` both re
 
 This directory used to be called `chart/`. Renamed because *"chart"* gives no hint about what to do with it — it sounds like an arbitrary helm chart we'd publish to a registry. **Calling it `deploy/` makes the purpose obvious to a newcomer cloning the repo: this is what gets deployed.**
 
-Legacy projects (scaffolded before the rename) still work — `rda` and the Tilt extension auto-detect both `deploy/` (preferred) and `chart/` (fallback). No migration required for existing projects; new scaffolds use `deploy/` going forward.
+Older projects scaffolded before bundle 0.11.13 still use `chart/`; `rda` and the Tilt extension auto-detect both names so no migration is required. New scaffolds use `deploy/`.
 
 ## Don't put app source here
 

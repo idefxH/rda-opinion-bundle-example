@@ -2,38 +2,36 @@ apiVersion: v2
 name: suse-library
 description: |
   SUSE Rancher Developer Access library chart. Encapsulates the
-  application Deployment + Service + Service Binding Spec wiring AND
-  references the SUSE Application Collection charts that projects can
-  opt into via `<chart-name>.enabled: true` in their values.
+  application Deployment + Service + Service Binding Spec wiring and
+  references the SUSE Application Collection charts that projects opt
+  into via `services[]` entries in their deploy/values.yaml.
 
-  Convention: every dep is the AppCo chart name verbatim. No alias.
-  This scales to AppCo's full catalogue (postgresql, mariadb,
-  cloudnative-pg, milvus, redis, prometheus, grafana, ...) and avoids
-  collisions when a project pulls in two SQL DBs side by side.
+  Each `services[]` entry produces:
+    - a binding-secret named <release>-<binding>-binding
+    - mounted at /bindings/<binding>/<key> in the app pod
+    - 12-factor env vars projected as <BINDING>_HOST/PORT/URL/...
 
-  Resources deploy as <release>-<chart-name>. The binding-secret name
-  is <release>-<chart-name>-binding. The /bindings/<chart-name>/ mount
-  point follows the same name. 12-factor env vars use the chart name
-  uppercased as a prefix (POSTGRESQL_HOST, PROMETHEUS_URL, etc.) plus
-  semantic aliases for portable libraries (DB_HOST when a SQL chart
-  is enabled).
+  Multi-port charts (minio, dex) also project per-port keys
+  <BINDING>_<PORT_NAME>_HOST/PORT/URL.
+
+  See rda-docs/concepts/dsl.md for the full DSL contract.
 type: application
-version: 0.11.21
+version: 0.11.22
 appVersion: "1.0"
 keywords: [suse, rda, library, service-binding, application-collection]
 home: https://github.com/idefxH/rda-opinion-bundle-example
 maintainers: [{name: idefxH, email: fx.houard@gmail.com}]
 
-# Approved AppCo charts. As we add more (mariadb, redis, milvus, ...),
-# they're appended here verbatim with their AppCo chart name.
+# Catalogued sub-charts. Adding a chart = one entry here + one
+# `<name>.enabled: false` default in values.yaml + one chart entry
+# in dsl-mappings.yaml (with values_mapping + binding_secret +
+# scaffold table). No rda-cli release needed.
 #
 # Note: AppCo OCI tags (e.g. "0.4.4-29.1") differ from each chart's
 # internal Chart.yaml version (e.g. "0.4.4"). Helm dep-matching uses
-# the INTERNAL version, so the dep silently fails to resolve at
-# template time. The Tilt extension's _align_subchart_versions.py
-# post-processor rewrites every pulled tgz to align internal version
-# with declared version. Drop that workaround when AppCo aligns
-# version<->tag for every chart in their catalogue.
+# the INTERNAL version, so the Tilt extension's
+# _align_subchart_versions.py post-processor rewrites every pulled
+# tgz to align internal version with declared version.
 dependencies:
   - name: postgresql
     version: "0.4.4-29.1"

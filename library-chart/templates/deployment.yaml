@@ -54,38 +54,10 @@ spec:
             # ─── DSL binding {{ $svc.binding }} (type {{ $svc.type }}) ───
             {{- include "suse-library.dsl.envFromBinding" (dict "svc" $svc "release" $.Release.Name "root" $) | nindent 12 }}
             {{- end }}
-            {{- /*
-                Legacy bindings (one block per chart). Each `if` arm calls a
-                category helper from _helpers.tpl (issue #5). The whole
-                legacy block is gated on `not services` so it doesn't double
-                up with the DSL path's env vars when both layers fire (the
-                DSL path's binding-secret has different keys + name shape
-                than the legacy one, so duplicate env names referencing
-                different Secrets would crash on render). Mirrors the
-                either/or branch in binding-secret.yaml.
-            */}}
-            {{- if not .Values.services }}
-            {{- if .Values.postgresql.enabled }}
-            # ─── postgresql binding (12-factor projection, sql-db category) ───
-            # Apps that prefer SBS read /bindings/postgresql/<key> instead.
-            # Both <CHART>_* (verbose, unambiguous) and DB_* (semantic
-            # alias for portable SQL libs like Sequelize, Prisma, pg)
-            # are projected from the same Secret.
-            {{- include "suse-library.legacy.envForSqlDb" (dict "chart" "postgresql" "release" (include "suse-library.name" .)) | nindent 12 }}
-            {{- end }}
-            {{- if .Values.prometheus.enabled }}
-            # ─── prometheus binding (12-factor projection, url-only category) ───
-            {{- include "suse-library.legacy.envForUrlOnly" (dict "chart" "prometheus" "release" (include "suse-library.name" .)) | nindent 12 }}
-            {{- end }}
-            {{- if .Values.grafana.enabled }}
-            # ─── grafana binding (12-factor projection, ui-with-admin category) ───
-            {{- include "suse-library.legacy.envForUiWithAdmin" (dict "chart" "grafana" "release" (include "suse-library.name" .)) | nindent 12 }}
-            {{- end }}
-            {{- end }}
           volumeMounts:
             {{- /*
-                DSL binding mounts (Phase 1). Each services[] entry that
-                isn't `provisioning: external` mounts its binding-secret at
+                DSL binding mounts. Each services[] entry that isn't
+                `provisioning: external` mounts its binding-secret at
                 /bindings/<binding>/, so apps following the Service Binding
                 Spec convention find their credentials there. external
                 services have no Secret to mount (the dev wired the
@@ -95,18 +67,6 @@ spec:
             {{- $prov := $svc.provisioning | default "local" }}
             {{- if ne $prov "external" }}
             - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
-            {{- end }}
-            {{- end }}
-            {{- /* Legacy mounts gated on not services (same rule as env block above). */}}
-            {{- if not .Values.services }}
-            {{- if .Values.postgresql.enabled }}
-            {{- include "suse-library.legacy.bindingMount" (dict "chart" "postgresql") | nindent 12 }}
-            {{- end }}
-            {{- if .Values.prometheus.enabled }}
-            {{- include "suse-library.legacy.bindingMount" (dict "chart" "prometheus") | nindent 12 }}
-            {{- end }}
-            {{- if .Values.grafana.enabled }}
-            {{- include "suse-library.legacy.bindingMount" (dict "chart" "grafana") | nindent 12 }}
             {{- end }}
             {{- end }}
           {{- /*
@@ -139,17 +99,5 @@ spec:
         {{- if ne $prov "external" }}
         - name: {{ printf "binding-%s" $svc.binding }}
           secret: {secretName: {{ printf "%s-%s-binding" (include "suse-library.name" $) $svc.binding }}}
-        {{- end }}
-        {{- end }}
-        {{- /* Legacy volumes gated on not services (same rule as env / mounts above). */}}
-        {{- if not .Values.services }}
-        {{- if .Values.postgresql.enabled }}
-        {{- include "suse-library.legacy.bindingVolume" (dict "chart" "postgresql" "release" (include "suse-library.name" .)) | nindent 8 }}
-        {{- end }}
-        {{- if .Values.prometheus.enabled }}
-        {{- include "suse-library.legacy.bindingVolume" (dict "chart" "prometheus" "release" (include "suse-library.name" .)) | nindent 8 }}
-        {{- end }}
-        {{- if .Values.grafana.enabled }}
-        {{- include "suse-library.legacy.bindingVolume" (dict "chart" "grafana" "release" (include "suse-library.name" .)) | nindent 8 }}
         {{- end }}
         {{- end }}
