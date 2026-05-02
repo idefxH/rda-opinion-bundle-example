@@ -40,19 +40,25 @@ spec:
             - {name: SERVICE_BINDING_ROOT, value: /bindings}
             # 12-factor PORT — user code MUST respect process.env.PORT.
             - {name: PORT, value: "{{ .Values.port }}"}
-            {{- /* DSL path: project env from each ENABLED services[] entry.
-                   Iterates the same enabledServices helper as binding-secret.yaml
-                   so a disabled service doesn't end up with envFromBinding /
-                   volumeMounts referencing a Secret that was never rendered.
-                   Live e2e Apr 30: a prometheus service scaffolded with
-                   `enabled: false` had the deployment mount /bindings/metrics
-                   while binding-secret.yaml correctly skipped it → pod
-                   MountVolume.SetUp failed with `secret payments-metrics-binding
-                   not found`. Single source of truth fixes the drift. */ -}}
+            {{- /* DSL Phase 1 (Design Orientation 0001 Appendix A): emit env
+                   vars from `.Values.env_resolved` — the structured list
+                   `rda render` (rda-cli 0.1.52+) produces from the dev's
+                   `suse-library.env:` block. Each entry carries `name`,
+                   `kind` (secret|value), and either `secretRef`+`secretKey`
+                   or `value`. The set is exactly what the dev declared —
+                   no surprise auto-projection. Empty/absent list is a
+                   valid no-op (workloads that don't read any binding). */ -}}
             {{- $enabled := include "suse-library.dsl.enabledServices" $ | fromJsonArray }}
-            {{- range $i, $svc := $enabled }}
-            # ─── DSL binding {{ $svc.binding }} (type {{ $svc.type }}) ───
-            {{- include "suse-library.dsl.envFromBinding" (dict "svc" $svc "release" $.Release.Name "root" $) | nindent 12 }}
+            {{- range $entry := .Values.env_resolved | default list }}
+            - name: {{ index $entry "name" }}
+              {{- if eq (index $entry "kind") "secret" }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ index $entry "secretRef" }}
+                  key: {{ index $entry "secretKey" }}
+              {{- else }}
+              value: {{ index $entry "value" | quote }}
+              {{- end }}
             {{- end }}
           volumeMounts:
             {{- /*

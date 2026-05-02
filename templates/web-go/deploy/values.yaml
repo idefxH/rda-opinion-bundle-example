@@ -43,6 +43,40 @@ suse-library:
   imagePullSecrets:
     - name: application-collection
 
+  # ─── Workload env block ────────────────────────────────────────────
+  # Explicit env vars projected into your application container,
+  # following Design Orientation 0001 Appendix A (rda-cli 0.1.52+ /
+  # suse-library 0.11.28+).
+  #
+  # Each entry can be:
+  #   - A bare ${binding:NAME.field} → the value comes via
+  #     valueFrom.secretKeyRef from the binding-secret. The actual
+  #     value never appears in `kubectl get deployment -o yaml`. Use
+  #     for secrets and fields backed by binding_secret keys
+  #     (host, port, username, password, database, ...).
+  #   - A composed string with embedded ${binding:...} → resolved
+  #     at render time to a literal `value:` (the resolved string
+  #     IS visible in the deployment spec — fine for dev, OK if no
+  #     secret leaks; the lint flags plaintext passwords leaking
+  #     into overrides.<non-dev>).
+  #   - A pure literal → emitted as `value: "<literal>"`.
+  #
+  # `rda add-service` will scaffold the conventional set for each
+  # binding type as you go (e.g. DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/
+  # DB_NAME for postgresql). Edit / rename / remove freely.
+  #
+  # See https://github.com/idefxH/rda-docs/blob/main/design-orientations/0001-appendix-a-score-comparison.md
+  env: {}
+  # Example, once you've added a postgres binding:
+  # env:
+  #   DB_HOST:        ${binding:db.host}
+  #   DB_PORT:        ${binding:db.port}
+  #   DB_USER:        ${binding:db.username}
+  #   DB_PASSWORD:    ${binding:db.password}
+  #   DB_NAME:        ${binding:db.database}
+  #   DATABASE_URL:   "postgres://${binding:db.username}:${binding:db.password}@${binding:db.host}:${binding:db.port}/${binding:db.database}"
+
+
   # ─── Backing services ──────────────────────────────────────────────
   # Add via `rda add-service <type> <binding>`, e.g.:
   #

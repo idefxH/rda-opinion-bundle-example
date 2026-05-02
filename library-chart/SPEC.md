@@ -2,7 +2,7 @@
 
 ## META
 Deployment:   helm-library-chart
-Version:      0.11.22
+Version: 0.11.28
 Spec-Schema:  0.1.0
 Author:       François-Xavier Houard <fx.houard@gmail.com>
 License:      Apache-2.0
@@ -51,8 +51,9 @@ binding-secret, no env var, no volume, no mount, no chart-level
 
 Enforced templates:
 - `templates/binding-secret.yaml` — renders one Secret per enabled entry
-- `templates/deployment.yaml` — env (envFromBinding), volume mounts,
-  volume Secret references — all on the enabled subset
+- `templates/deployment.yaml` — env (iterates `env_resolved`,
+  `<release>-<binding>-binding` Secret refs come from there), volume
+  mounts and volume Secret references on the enabled subset
 - `templates/service.yaml` (no services iteration today; may grow)
 - `templates/ingress.yaml` (no services iteration today; may grow)
 
@@ -156,10 +157,20 @@ follow the schema:
   stringData keys (conditionally present, per dsl-mappings.yaml binding_secret):
     username, password, database, url, adminUser, adminPassword, …
 
-The 12-factor env-var projection in `_helpers.tpl envFromBinding` reads
-this Secret's keys, projecting `<BINDING>_<KEY>` env vars (uppercase,
-snake_case from the SBS-canonical key) PLUS any `env_aliases` declared
-in dsl-mappings (e.g. `username` aliased to `user` for libpq).
+As of suse-library 0.11.28 (rda-cli 0.1.52+), the env vars projected
+into the workload's container come from `suse-library.env_resolved`,
+the structured list `rda render` produces by walking the dev's
+`suse-library.env` block. The legacy auto-projection (every
+binding_secret key emitted as `<BINDING>_<KEY>` for every enabled
+binding, optionally aliased per dsl-mappings `env_aliases`) is gone.
+
+The dev's contract is now explicit: write `${binding:NAME.field}`
+references in `suse-library.env` (or rely on the scaffolds
+`rda add-service` produces); render writes the resolved list to
+`env_resolved`; deployment.yaml iterates the list. Aliases are now
+ordinary env-block entries the dev controls — the dsl-mappings
+`env_aliases` field has been retired (rendered tolerant: if present,
+ignored). See Design Orientation 0001 Appendix A.
 
 Test guard: `tests/binding-secret-schema/` runs `helm template` on a
 fixture project and asserts every binding-secret matches the schema.
@@ -592,3 +603,61 @@ Status: in-progress
 - Spec META.Version 0.11.16 → 0.11.22 (skips 0.11.17–0.11.21, all
   of which shipped DSL-evolution features tracked under their own
   PR commits but never got individual SPEC.md milestones).
+
+## MILESTONE: 0.11.28
+- BEHAVIOR/services-iteration: `templates/deployment.yaml` no longer
+  emits env vars via the implicit `envFromBinding` helper (which
+  walked each binding's `binding_secret` schema and emitted
+  `<BINDING>_<KEY>` for every entry). Instead, it iterates
+  `.Values.env_resolved` — the structured list produced by
+  `rda render` (rda-cli 0.1.52+) from the dev's
+  `suse-library.env:` block.
+
+- For every entry `{name, kind, secretRef|secretKey | value}`:
+  - `kind: secret` → emit `valueFrom.secretKeyRef` referencing the
+    binding-secret. Value never lands in the deployment spec.
+  - `kind: value` → emit `value: "<resolved>"` literal. Used for
+    composed strings (`DATABASE_URL`) and bare refs to derived
+    fields (`auth.issuer`, `*_url`).
+
+- The dev now explicitly chooses which env vars exist in the pod.
+  No more accidental over-projection of every binding-secret key
+  into every workload. No more dsl-mappings `env_aliases` magic —
+  if the dev wants `DB_USER` aliased onto `${binding:db.username}`,
+  they write `DB_USER: ${binding:db.username}` directly in the
+  `env:` block. Same outcome, visible at the point of declaration.
+
+- BREAKING for projects pre-0.11.28: existing projects with
+  activated `services[]` entries but no `suse-library.env:` block
+  will see their pods boot with NO binding env vars — the legacy
+  auto-projection is gone. Migration: add an `env:` block listing
+  the `${binding:NAME.field}` references the workload reads. Future
+  `rda add-service` writes the canonical set automatically (rda-cli
+  Phase 1 sub-task #4, in flight).
+
+- Scaffolds (`templates/web-go/chart/values.yaml`,
+  `templates/web-nodejs/chart/values.yaml`): add an empty `env: {}`
+  block with a comment block pointing at the design doc + showing
+  an example. Fresh `rda new` projects get the documented pattern
+  even without `rda add-service` writing entries yet.
+
+- TESTS:
+  - `tests/env-aliases/`: rewritten. The legacy fixture asserted
+    `DB_USERNAME` + `DB_USER` both auto-emerge from the postgres
+    binding_secret + env_aliases. The new fixture provides
+    `env_resolved` directly (simulating what `rda render` would
+    produce), asserts the deployment renders the right
+    `valueFrom.secretKeyRef:` for both — the iteration helper's
+    contract, not the projection contract.
+  - `services-iteration-grep`: still applies — the deployment
+    iterates `env_resolved` over enabled bindings only (the secret
+    refs use the same naming convention).
+
+- Companion: rda-cli #108 (env_resolved producer, merged) +
+  rda-cli #109 (BEHAVIOR/render step 5.5 spec, merged). Closes
+  Phase 1 of Design Orientation 0001 Appendix A end-to-end:
+  fresh `rda new` + `rda add-service` (post Phase 1 #4) + `tilt
+  up` produces a pod with exactly the env vars the dev declared.
+
+- Spec META.Version 0.11.22 → 0.11.28 (skips 0.11.23–0.11.27 used
+  for in-flight features without dedicated SPEC milestones).
