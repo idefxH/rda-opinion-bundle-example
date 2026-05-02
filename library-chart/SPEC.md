@@ -722,3 +722,76 @@ Status: in-progress
   names like `auth-7f295296`.
 
 - Spec library-chart version 0.11.29 → 0.11.30.
+
+## MILESTONE: 0.11.31
+
+- FEATURE: dex chart declares its first capabilities (Phase 2.4 of
+  Design Orientation 0001) — `auth.users` and `auth.clients`. Both
+  use the `file-static` backend (Phase 2.2): user-supplied items
+  under `services[].bootstrap.<cap>:` materialise into the chart's
+  values overlay at the same chart-author-side keys the chart
+  already uses (`dex.config.staticPasswords`, `dex.config.staticClients`).
+
+- `auth.users` schema:
+
+      schema:
+        name:     { type: string, required: true }
+        password: { type: string, required: true, secret: true }
+      projection:
+        target:    dex.config.staticPasswords
+        transform: bcrypt-password-to-hash
+        field_map: { name: email }
+
+  The bcrypt transform (Phase 2.2) replaces `password:` with `hash:`
+  using cost-10 `$2a$` so dex consumes the rendered list verbatim.
+  The `field_map` renames `name` → `email` because that's what
+  `staticPasswords` entries use chart-side; users get to write the
+  more natural `name:` key.
+
+- `auth.clients` schema:
+
+      schema:
+        id:           { type: string, required: true }
+        secret:       { type: string, required: true, secret: true }
+        redirectURIs: { type: list,   required: true }
+        name:         { type: string }                # optional consent label
+      projection:
+        target: dex.config.staticClients
+
+  No `field_map` (dex's natural shape matches), no transform (secrets
+  stored verbatim in dev mode; ExternalSecrets/Vault is the production
+  path documented in `concepts/auth.md`).
+
+- Two API surfaces for the same data (transition window): users can
+  still write `services[].passthrough.config.staticClients:` /
+  `staticPasswords:` verbatim. Capabilities project AFTER passthrough
+  at render time, so `bootstrap.auth.{users,clients}` wins when both
+  are set. The passthrough escape-hatch stays as the universal
+  ad-hoc-fields path for keys that don't yet have a typed capability
+  declared (custom connectors, kubernetes-storage tuning, etc).
+
+- Why dex first: it was the pilot in DO 0001 §3.4 because the chart
+  has TWO capabilities (auth.users + auth.clients), each with a
+  different transform/field-map need (bcrypt + identity), exercising
+  the full Phase 2.2 backend surface in one chart.
+
+- TESTS: validated end-to-end on M2 Studio with bundle 0.11.31 +
+  rda-cli 0.1.65 (the projection-target-suseOut fix). A test project
+  with `bootstrap.auth.users: [...]` + `bootstrap.auth.clients: [...]`
+  renders to a `values.generated.yaml` whose `dex.config.staticPasswords`
+  contains bcrypted entries and whose `dex.config.staticClients`
+  contains verbatim id/secret/redirectURIs. Existing schema validator
+  (`tests/dsl-mappings-schema/`) accepts the new `capabilities:` block
+  (it doesn't enforce known top-level keys at the version-entry level
+  — a forward-compatibility design).
+
+- DEFERRED: `postgresql.db.schemas` (initially listed in the DO 0001
+  pilot triple) does NOT land in this milestone. AppCo postgresql 0.4.x
+  doesn't expose user-init-SQL through values (its `scripts:` ConfigMap
+  globs only internal lifecycle scripts; there is no `primary.initdb.scripts`
+  knob). The clean V1 path for postgres bootstrap SQL is `api-job` (a
+  post-install Job running `psql`) — that's Phase 2 V2 / api-job
+  backend, not file-initdb. Tracked as a separate issue against the
+  bundle.
+
+- Spec library-chart version 0.11.30 → 0.11.31.
