@@ -694,3 +694,31 @@ Status: in-progress
   `internal/render/bindingref_computed_test.go`.
 
 - Spec META.Version 0.11.28 → 0.11.29.
+
+## MILESTONE: 0.11.30
+
+- BUGFIX: web-go + web-nodejs templates' `authPrefix` now converts dashes
+  to underscores before reading the binding-prefixed env vars
+  (`<AUTH_PREFIX>_PUBLIC_URL`, etc.). Closes idefxH/rda-opinion-bundle-example#116.
+
+- Why it matters: when `AUTH_BINDING=auth-prod` (any binding name with a
+  dash), `strings.ToUpper("auth-prod")` produced `AUTH-PROD` and the app
+  read `os.Getenv("AUTH-PROD_PUBLIC_URL")` — but the binding-secret
+  helper projects env vars with dashes converted to underscores
+  (`AUTH_PROD_*`). Result: a dashed binding silently disabled OIDC,
+  with `/admin` → 503 even though dex + binding-secret were correctly
+  wired.
+
+- Fix is a one-line normalisation in both templates:
+
+      // web-go
+      authPrefix = strings.ReplaceAll(strings.ToUpper(envOrDefault("AUTH_BINDING", "AUTH")), "-", "_")
+
+      // web-nodejs
+      const authPrefix = (process.env.AUTH_BINDING || 'AUTH').toUpperCase().replace(/-/g, '_');
+
+- Surfaced live during e2e scenario 21
+  (idefxH/rda-e2e-tests#15) on both templates with random binding
+  names like `auth-7f295296`.
+
+- Spec library-chart version 0.11.29 → 0.11.30.

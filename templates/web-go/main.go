@@ -57,7 +57,13 @@ const accentColor = "#736def"
 
 var (
 	dbPrefix     = strings.ToUpper(envOrDefault("DB_BINDING", "DB"))
-	authPrefix   = strings.ToUpper(envOrDefault("AUTH_BINDING", "AUTH"))
+	// AUTH_BINDING may contain dashes (e.g. "auth-prod"). The bundle's
+	// binding-secret helper projects env vars with dashes converted to
+	// underscores (AUTH_PROD_*), so we apply the same normalisation
+	// when computing the lookup prefix. Without this, a dashed binding
+	// name silently disables OIDC (the env vars exist but under names
+	// the app never reads).
+	authPrefix   = strings.ReplaceAll(strings.ToUpper(envOrDefault("AUTH_BINDING", "AUTH")), "-", "_")
 	// authPublicURL is the browser-facing OIDC issuer URL — auto-derived
 	// from services[].ingress.host by rda render + the binding-secret's
 	// public_url key (bundle 0.11.27+). Empty when no auth binding is
