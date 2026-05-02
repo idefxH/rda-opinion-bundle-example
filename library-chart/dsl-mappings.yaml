@@ -415,6 +415,32 @@ charts:
               {{- else -}}
               http://{{ .Release.Name }}-dex:5556
               {{- end -}}
+        # Cross-binding refs (rda-cli 0.1.55+, MILESTONE 0.11.29).
+        # Surfaces dex's computed URLs as `${binding:NAME.<field>}`
+        # references workloads can use in their `suse-library.env:`
+        # block. Same template as derived_values above (the chart's
+        # internal config.issuer); exposing the same value as a
+        # binding field lets `AUTH_ISSUER: ${binding:auth.issuer}`
+        # resolve to the URL the chart's discovery endpoint actually
+        # returns. `public_url` is the same value (dex's issuer ==
+        # public URL by design); both are exposed for app-side
+        # symmetry with the AUTH_PUBLIC_URL convention used by the
+        # web-go / web-nodejs templates' OIDC code.
+        binding_fields:
+          issuer:
+            template: |
+              {{- if .Service.ingress.enabled -}}
+              http://{{ index .Service.ingress "host" }}
+              {{- else -}}
+              http://{{ .Release.Name }}-dex:5556
+              {{- end -}}
+          public_url:
+            template: |
+              {{- if .Service.ingress.enabled -}}
+              http://{{ index .Service.ingress "host" }}
+              {{- else -}}
+              http://{{ .Release.Name }}-dex:5556
+              {{- end -}}
         # Chart-required fields the DSL doesn't surface (because they
         # don't vary across deployments). `rda render` writes these
         # AFTER applying values_mapping, only when at least one

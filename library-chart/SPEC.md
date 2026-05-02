@@ -2,7 +2,7 @@
 
 ## META
 Deployment:   helm-library-chart
-Version: 0.11.28
+Version: 0.11.29
 Spec-Schema:  0.1.0
 Author:       François-Xavier Houard <fx.houard@gmail.com>
 License:      Apache-2.0
@@ -661,3 +661,36 @@ Status: in-progress
 
 - Spec META.Version 0.11.22 → 0.11.28 (skips 0.11.23–0.11.27 used
   for in-flight features without dedicated SPEC milestones).
+
+## MILESTONE: 0.11.29
+- dex dsl-mappings entry gains `binding_fields:` block exposing
+  `issuer` and `public_url` as `${binding:NAME.<field>}` references
+  resolvable at render time. Same template as the existing
+  `derived_values: dex.config.issuer` (the chart's internal
+  configuration). Activates rda-cli #112 (MILESTONE 0.1.55) at
+  runtime: workloads can now write
+  `AUTH_ISSUER: ${binding:auth.issuer}` in their
+  `suse-library.env:` block and the value resolves to the same
+  URL dex's discovery endpoint serves.
+
+- `public_url` is intentionally the same value as `issuer` (dex's
+  contract is "issuer URL == public URL"). Exposed separately for
+  app-side symmetry with the `AUTH_PUBLIC_URL` convention used by
+  the web-go / web-nodejs OIDC templates — those apps read
+  AUTH_PUBLIC_URL for browser-facing redirect URIs and
+  AUTH_ISSUER for token-signature verification, even though both
+  resolve to the same string in dex's case.
+
+- No code changes; pure dsl-mappings.yaml extension. The
+  rda-cli renderer (already merged in #112) walks
+  `binding_fields:` and stores the rendered values in
+  BindingFields.Computed, accessible via Get(<field>).
+
+- TESTS: covered by the existing
+  `tests/dsl-mappings-schema/` validator (yaml well-formed) and
+  `tests/dsl-mappings-target-validity/` (target paths point at
+  real chart values). No new test guard required — the binding_fields
+  surface is exercised by the rda-cli unit tests in
+  `internal/render/bindingref_computed_test.go`.
+
+- Spec META.Version 0.11.28 → 0.11.29.
