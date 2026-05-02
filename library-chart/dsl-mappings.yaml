@@ -438,27 +438,56 @@ charts:
         # cross-binding concern (a postgres binding feeding dex), out of
         # scope for the dex catalog entry's auth-seed declaration.
         binding_secret:
+          # Identity / type info — present on all bindings; skip_env
+          # keeps these out of the projected env-var list (we only
+          # want the connectivity bits as <BINDING>_* env vars).
           - {key: type, literal: dex, skip_env: true}
           - {key: provider, literal: dexidp-upstream, skip_env: true}
+
+          # ─── Connectivity (in-cluster) ─────────────────────────
+          # Stable in-cluster Service URL. Always set, regardless of
+          # whether ingress is enabled. Apps' Kubernetes-side OIDC
+          # libraries (token verifiers, JWKS fetch) hit this. App pod
+          # env: <BINDING>_HOST, <BINDING>_PORT, <BINDING>_URL.
           - {key: host, template: "{{ .Release.Name }}-dex"}
           - {key: port, literal: "5556"}
-          # url is the OIDC issuer URL — the same value the dev
-          # configured at config.issuer, surfaced to consuming apps as
-          # DEX_URL. App OIDC libraries expect this shape.
           - {key: url, template: "http://{{ .Release.Name }}-dex:5556"}
-          # Issuer must match dex.config.issuer — that's auto-derived
-          # via derived_values above. Here we mirror the same logic
-          # so AUTH_ISSUER (the env var the app pod reads) matches the
-          # browser-facing URL the user actually hits.
-          # Today `template:` only has access to .Release.Name, not
-          # the service entry — so we hardcode the in-cluster fallback.
-          # Devs whose ingress is enabled should rely on AUTH_PUBLIC_URL
-          # (TODO #90) for the browser-facing URL; AUTH_ISSUER stays
-          # in-cluster for token verification (which is fine — both
-          # token "iss" and verifier hit the same in-cluster endpoint
-          # when the app's OIDC client uses AUTH_PUBLIC_URL for the
-          # discovery, then validates against AUTH_ISSUER's JWKS).
-          - {key: issuer, template: "http://{{ .Release.Name }}-dex:5556"}
+
+          # ─── OIDC issuer (auto-derives from ingress.host) ──────
+          # This MUST equal whatever URL the *browser* hits. When
+          # ingress is enabled, that's the ingress URL; when not,
+          # it's the in-cluster Service URL (which the browser then
+          # only reaches through tilt port-forward or in-cluster
+          # workloads that aren't human-driven).
+          #
+          # `derived_values:` above writes .Values.dex.config.issuer
+          # on render. We just read it back here. App pod env:
+          # <BINDING>_ISSUER. Token verifiers compare token's
+          # `iss` claim against this — auto-derivation eliminates the
+          # mismatch class of bugs.
+          - key: issuer
+            template: |
+              {{- if and .Values.dex .Values.dex.config .Values.dex.config.issuer -}}
+              {{ .Values.dex.config.issuer }}
+              {{- else -}}
+              http://{{ .Release.Name }}-dex:5556
+              {{- end -}}
+
+          # ─── Public URL (browser-facing) ───────────────────────
+          # Same value as `issuer` today (auto-derived from ingress).
+          # Kept as a separate key so apps can branch their UX:
+          #   - <BINDING>_PUBLIC_URL — where to redirect the browser
+          #   - <BINDING>_ISSUER     — what the verifier expects in iss
+          # If a future config splits them (e.g. dex behind a TLS-
+          # terminating proxy with a /dex path mount, or external SSO
+          # passthrough), the binding contract stays stable.
+          - key: public_url
+            template: |
+              {{- if and .Values.dex .Values.dex.config .Values.dex.config.issuer -}}
+              {{ .Values.dex.config.issuer }}
+              {{- else -}}
+              http://{{ .Release.Name }}-dex:5556
+              {{- end -}}
 
         scaffold:
           # DSL fields (mapped via values_mapping)
