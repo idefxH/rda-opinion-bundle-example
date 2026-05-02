@@ -307,25 +307,31 @@ async function connectWithRetry(maxAttempts, delayMs) {
   }
 }
 
+// Postgres is OPTIONAL. If <DB_PREFIX>_HOST is unset (no postgres binding),
+// the Message Wall API is disabled and the home page shows a friendly
+// 'no DB bound' placeholder. /metrics, /health, /ready still work.
+const dbEnabled = !!process.env[`${dbPrefix}_HOST`];
+
 async function start() {
-  if (!process.env[`${dbPrefix}_HOST`]) {
-    console.error(`💀 No ${dbPrefix}_HOST in env — bind a postgresql service via deploy/values.yaml services[]`);
-    process.exit(1);
+  if (!dbEnabled) {
+    console.log(`ℹ️  No ${dbPrefix}_HOST in env — postgres binding not configured; serving placeholder.`);
+    console.log(`   To enable Message Wall: rda add-service postgresql ${dbPrefix.toLowerCase()}, flip enabled:true, fill auth slots.`);
+  } else {
+    await connectWithRetry(60, 2000);   // up to 60 attempts × 2s = 2min budget
+    console.log('✅ Connected to PostgreSQL at ' + env('HOST') + ':' + env('PORT', '5432'));
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id         SERIAL PRIMARY KEY,
+        body       TEXT NOT NULL CHECK (char_length(body) <= 280),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('✅ Table ready');
+
+    const { rows: [{ count }] } = await client.query('SELECT COUNT(*) FROM messages');
+    messagesCurrent.set(parseInt(count));
   }
-  await connectWithRetry(60, 2000);   // up to 60 attempts × 2s = 2min budget
-  console.log('✅ Connected to PostgreSQL at ' + env('HOST') + ':' + env('PORT', '5432'));
-
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id         SERIAL PRIMARY KEY,
-      body       TEXT NOT NULL CHECK (char_length(body) <= 280),
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  console.log('✅ Table ready');
-
-  const { rows: [{ count }] } = await client.query('SELECT COUNT(*) FROM messages');
-  messagesCurrent.set(parseInt(count));
 
   const server = http.createServer(async (req, res) => {
     const end = httpDuration.startTimer();
@@ -342,6 +348,18 @@ async function start() {
         res.writeHead(200, { 'Content-Type': promClient.register.contentType });
         res.end(metrics);
         return; // don't pollute the histogram with /metrics noise
+      }
+      if (req.url === '/api/messages') {
+        if (!dbEnabled) {
+          status = 503;
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'messages api unavailable: no postgres binding configured',
+            hint: 'rda add-service postgresql ' + dbPrefix.toLowerCase() + ', flip enabled:true, fill auth slots',
+          }));
+          end({ method: req.method, path: '/api/messages', status: 503 });
+          return;
+        }
       }
       if (req.method === 'GET' && req.url === '/api/messages') {
         const { rows } = await client.query(
@@ -391,6 +409,12 @@ async function start() {
         return;
       }
       if (req.url === '/ready') {
+        if (!dbEnabled) {
+          // No DB to probe; report ready as long as the process is up.
+          res.writeHead(200); res.end('ready');
+          end({ method: req.method, path: '/ready', status: 200 });
+          return;
+        }
         try {
           await client.query('SELECT 1');
           res.writeHead(200); res.end('ready');
