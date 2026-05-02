@@ -1,9 +1,19 @@
 # CNB Procfile — declares the launch processes buildpacks register.
 #
-# heroku/go puts the compiled binary at:
+# heroku/go compiles the binary to:
 #   /layers/heroku_go/go_target/bin/<last-segment-of-module-path>
-# That dir is on $PATH at runtime, so we can invoke the binary by its
-# bare name (which is the project name from `module example.com/X`).
+#
+# IMPORTANT: that directory is NOT on $PATH at runtime in the cnb
+# launcher image (runtime PATH is roughly
+# /cnb/process:/cnb/lifecycle:/usr/{local/,}sbin:/usr/{local/,}bin:/sbin:/bin).
+# We therefore invoke the binary by its ABSOLUTE PATH below — using
+# the bare name `{{ .Name }}` is dangerous because:
+#   1. /usr/bin shadows it → if the project name clashes with a POSIX
+#      builtin (test, time, echo, which, true, false, ...), the
+#      launcher silently runs the POSIX binary and exits 1 with NO
+#      logs (no "command not found", no panic — just silent crashloop).
+#   2. Even non-clashing names rely on bash $PATH lookup which is
+#      brittle when buildpack versions change the runtime PATH.
 #
 # - web: production launch.
 # - dev: same as web for now. The Tilt extension's live_update
@@ -15,5 +25,5 @@
 #   in go.mod's `tool` directive — it breaks heroku/go's `web`
 #   process auto-registration: 'tried to set web to default but it
 #   doesn't exist'.)
-web: {{ .Name }}
-dev: {{ .Name }}
+web: /layers/heroku_go/go_target/bin/{{ .Name }}
+dev: /layers/heroku_go/go_target/bin/{{ .Name }}
