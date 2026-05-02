@@ -1,4 +1,4 @@
 services: []
 prometheus:
   enabled: true
-  ui: {host: "metrics.dev.local"}
+  ui: {host: "metrics.dev.local", expose: true}
