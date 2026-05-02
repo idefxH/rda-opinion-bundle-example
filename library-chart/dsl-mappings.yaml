@@ -515,6 +515,42 @@ charts:
               http://{{ .Release.Name }}-dex:5556
               {{- end -}}
 
+          # ─── OIDC client trio (browser-side credentials) ───────
+          # Read from the FIRST entry of dex.config.staticClients
+          # post-render. The bundle scaffold pre-fills one client
+          # (id=<project>-client, secret=dev-secret, redirectURIs=
+          # http://<project>.localtest.me/auth/callback) so a fresh
+          # `rda new + rda add-service dex auth + tilt up` boots a
+          # working OIDC chain without manual edits. App pod env:
+          # <BINDING>_CLIENT_ID / _CLIENT_SECRET / _REDIRECT_URI.
+          # When the dev wants multiple clients (e.g. SPA + admin
+          # CLI), they edit `bootstrap.auth.clients[]` and the
+          # binding-secret keys still point at staticClients[0] —
+          # the canonical client.
+          - key: client_id
+            template: |
+              {{- if and .Values.dex .Values.dex.config .Values.dex.config.staticClients -}}
+              {{- with index .Values.dex.config.staticClients 0 -}}
+              {{ .id }}
+              {{- end -}}
+              {{- end -}}
+          - key: client_secret
+            template: |
+              {{- if and .Values.dex .Values.dex.config .Values.dex.config.staticClients -}}
+              {{- with index .Values.dex.config.staticClients 0 -}}
+              {{ .secret }}
+              {{- end -}}
+              {{- end -}}
+          - key: redirect_uri
+            template: |
+              {{- if and .Values.dex .Values.dex.config .Values.dex.config.staticClients -}}
+              {{- with index .Values.dex.config.staticClients 0 -}}
+              {{- if .redirectURIs -}}
+              {{ index .redirectURIs 0 }}
+              {{- end -}}
+              {{- end -}}
+              {{- end -}}
+
         scaffold:
           # DSL fields (mapped via values_mapping)
           # NOTE: `issuer` is no longer scaffolded — it's auto-derived from
@@ -552,6 +588,39 @@ charts:
             default: []
           passthrough.config.staticPasswords:
             default: []
+          # ─── OIDC password-grant connector ─────────────────────
+          # dex's /token endpoint refuses grant_type=password with
+          # `unsupported_grant_type` unless `oauth2.passwordConnector`
+          # names a connector that supports it (`local` for the
+          # built-in passwordDB). Required for any test/script that
+          # password-grants programmatically. Browser-cookie OIDC
+          # flows work without this; we set it because the cost is
+          # zero and password-grant-via-curl is the simplest e2e
+          # check.
+          passthrough.config.oauth2.passwordConnector:
+            default: local
+            comment: "connector for password-grant; flip to '' if you only want browser flow"
+          # ─── Bootstrap-data defaults (Phase 2.4 of DO 0001) ────
+          # Pre-fills one dev user + one OIDC client so a fresh
+          # `rda new <p> && cd <p> && rda add-service dex auth &&
+          # tilt up` produces a working OIDC chain WITHOUT any
+          # manual values.yaml edit. Devs edit / replace these
+          # before promoting to staging+ (production: connectors,
+          # ExternalSecrets, real users — see concepts/auth.md).
+          bootstrap:
+            comment: "dev bootstrap data — replace before staging+"
+            default:
+              auth.users:
+                - name: dev@example.com
+                  password: dev
+              auth.clients:
+                - id: "{{.ProjectName}}-client"
+                  secret: dev-secret
+                  name: "{{.ProjectName}}"
+                  redirectURIs:
+                    - "http://{{.ProjectName}}.localtest.me/auth/callback"
+                    # second URL for `kubectl port-forward 18081:80` flow
+                    - "http://localhost:18081/auth/callback"
 
         # ─── Capabilities (Phase 2 of DO 0001-A) ───────────────────
         # Bootstrap-data the dex chart accepts: a typed list of users
