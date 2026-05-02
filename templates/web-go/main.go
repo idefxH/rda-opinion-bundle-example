@@ -74,70 +74,78 @@ func main() {
 
 	port := envOrDefault("PORT", "8080")
 
+	// Postgres is OPTIONAL. If <DB_PREFIX>_HOST is unset (no postgres binding),
+	// the Message Wall API is disabled and the home page shows a friendly
+	// 'no DB bound' placeholder instead. /metrics, /health, /ready still
+	// work without postgres so the pod stays Ready.
 	host := envWithPrefix("HOST", "")
-	if host == "" {
-		log.Fatalf("💀 No %s_HOST in env — bind a postgresql service via deploy/values.yaml services[]", dbPrefix)
-	}
+	dbEnabled := host != ""
+	var db *sql.DB
+	if !dbEnabled {
+		log.Printf("ℹ️  No %s_HOST in env — postgres binding not configured; serving placeholder home page.", dbPrefix)
+		log.Printf("   To enable Message Wall: rda add-service postgresql %s, flip enabled:true, fill auth slots.", strings.ToLower(dbPrefix))
+	} else {
+		dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			host,
+			envWithPrefix("PORT", "5432"),
+			envWithPrefix("USERNAME", ""),
+			envWithPrefix("PASSWORD", ""),
+			envWithPrefix("DATABASE", ""),
+		)
 
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host,
-		envWithPrefix("PORT", "5432"),
-		envWithPrefix("USERNAME", ""),
-		envWithPrefix("PASSWORD", ""),
-		envWithPrefix("DATABASE", ""),
-	)
-
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		log.Fatalf("💀 sql.Open: %v", err)
-	}
-	defer db.Close()
-
-	// Retry the initial Ping — postgres often isn't Ready when the app
-	// pod starts (helm install kicks both in parallel; postgres init
-	// takes 5-15s). A Fatal exit here loops us in CrashLoop with k8s
-	// recreating us before postgres comes up. Retrying gives postgres
-	// time to finish init while we keep the process alive.
-	{
-		const maxAttempts = 60
-		const delay = 2 * time.Second
-		var lastErr error
-		for attempt := 1; attempt <= maxAttempts; attempt++ {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			err := db.PingContext(ctx)
-			cancel()
-			if err == nil {
-				lastErr = nil
-				break
-			}
-			lastErr = err
-			if attempt == maxAttempts {
-				break
-			}
-			log.Printf("⏳ postgres not ready yet (attempt %d/%d: %v); retrying in %s…",
-				attempt, maxAttempts, err, delay)
-			time.Sleep(delay)
+		var err error
+		db, err = sql.Open("pgx", dsn)
+		if err != nil {
+			log.Fatalf("💀 sql.Open: %v", err)
 		}
-		if lastErr != nil {
-			log.Fatalf("💀 db.Ping after %d attempts: %v", maxAttempts, lastErr)
+		defer db.Close()
+
+		// Retry the initial Ping — postgres often isn't Ready when the app
+		// pod starts (helm install kicks both in parallel; postgres init
+		// takes 5-15s). A Fatal exit here loops us in CrashLoop with k8s
+		// recreating us before postgres comes up. Retrying gives postgres
+		// time to finish init while we keep the process alive.
+		{
+			const maxAttempts = 60
+			const delay = 2 * time.Second
+			var lastErr error
+			for attempt := 1; attempt <= maxAttempts; attempt++ {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				err := db.PingContext(ctx)
+				cancel()
+				if err == nil {
+					lastErr = nil
+					break
+				}
+				lastErr = err
+				if attempt == maxAttempts {
+					break
+				}
+				log.Printf("⏳ postgres not ready yet (attempt %d/%d: %v); retrying in %s…",
+					attempt, maxAttempts, err, delay)
+				time.Sleep(delay)
+			}
+			if lastErr != nil {
+				log.Fatalf("💀 db.Ping after %d attempts: %v", maxAttempts, lastErr)
+			}
 		}
-	}
-	log.Printf("✅ Connected to PostgreSQL at %s:%s", host, envWithPrefix("PORT", "5432"))
+		log.Printf("✅ Connected to PostgreSQL at %s:%s", host, envWithPrefix("PORT", "5432"))
 
-	if _, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS messages (
-			id         SERIAL PRIMARY KEY,
-			body       TEXT NOT NULL CHECK (char_length(body) <= 280),
-			created_at TIMESTAMPTZ DEFAULT NOW()
-		)`); err != nil {
-		log.Fatalf("💀 create table: %v", err)
-	}
-	log.Printf("✅ Table ready")
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS messages (
+				id         SERIAL PRIMARY KEY,
+				body       TEXT NOT NULL CHECK (char_length(body) <= 280),
+				created_at TIMESTAMPTZ DEFAULT NOW()
+			)`); err != nil {
+			log.Fatalf("💀 create table: %v", err)
+		}
+		log.Printf("✅ Table ready")
 
-	// Seed gauge with current count.
-	var initial int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM messages`).Scan(&initial); err == nil {
-		messagesCurrent.Set(float64(initial))
+		// Seed gauge with current count.
+		var initial int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM messages`).Scan(&initial); err == nil {
+			messagesCurrent.Set(float64(initial))
+		}
 	}
 
 	tpl := template.Must(template.New("page").Parse(htmlPage))
@@ -164,6 +172,11 @@ func main() {
 
 	mux.HandleFunc("/api/messages", func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
+		if !dbEnabled {
+			http.Error(w, "messages api unavailable: no postgres binding configured (set services[].type=postgresql in deploy/values.yaml)", http.StatusServiceUnavailable)
+			observe(r.Method, "/api/messages", 503, t)
+			return
+		}
 		switch r.Method {
 		case http.MethodGet:
 			rows, err := db.Query(`SELECT id, body, created_at FROM messages ORDER BY created_at DESC LIMIT 50`)
@@ -256,12 +269,14 @@ func main() {
 
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := db.PingContext(ctx); err != nil {
-			http.Error(w, "not-ready: "+err.Error(), 503)
-			observe(r.Method, "/ready", 503, t)
-			return
+		if dbEnabled {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+			if err := db.PingContext(ctx); err != nil {
+				http.Error(w, "not-ready: "+err.Error(), 503)
+				observe(r.Method, "/ready", 503, t)
+				return
+			}
 		}
 		_, _ = w.Write([]byte("ready"))
 		observe(r.Method, "/ready", 200, t)
