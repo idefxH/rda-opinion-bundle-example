@@ -81,12 +81,21 @@ var (
 	authURL      = os.Getenv(authPrefix + "_URL")
 	// Back-compat alias for projects that haven't migrated to AUTH_BINDING.
 	dexPublicURL = authPublicURL
-	oidcClientID     = envOrDefault("OIDC_CLIENT_ID", "message-wall")
+	// Bundle 0.11.32+ projects <authPrefix>_CLIENT_ID via the binding-
+	// secret (read from dex.config.staticClients[0].id post-render).
+	// Fallback to legacy OIDC_CLIENT_ID for projects predating that
+	// scaffold. The "message-wall" default is the very-last-resort
+	// (when neither env is set + dex is unconfigured).
+	oidcClientID     = envOrDefault(authPrefix+"_CLIENT_ID", envOrDefault("OIDC_CLIENT_ID", "message-wall"))
 	// oidcClientSecret is required for the /login → /auth/callback browser
 	// flow (OAuth2 code grant). The Bearer path doesn't need it. Set it
 	// via suse-library.env in deploy/values.yaml (or, better, projected
 	// from a Secret). Empty → /login returns 503 with a remediation hint.
-	oidcClientSecret = os.Getenv("OIDC_CLIENT_SECRET")
+	// Bundle 0.11.32+ projects <authPrefix>_CLIENT_SECRET via the
+	// binding-secret (read from dex.config.staticClients[0].secret).
+	// Fallback to legacy OIDC_CLIENT_SECRET for projects predating that
+	// scaffold. Empty → /login returns 503 with a remediation hint.
+	oidcClientSecret = envOrDefault(authPrefix+"_CLIENT_SECRET", os.Getenv("OIDC_CLIENT_SECRET"))
 	// sessionCookieName is what /auth/callback sets and /admin reads.
 	// Override via SESSION_COOKIE_NAME if you have multiple apps on the
 	// same parent domain (cookies are scoped by domain, not path).
