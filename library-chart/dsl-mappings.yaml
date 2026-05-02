@@ -553,6 +553,62 @@ charts:
           passthrough.config.staticPasswords:
             default: []
 
+        # ─── Capabilities (Phase 2 of DO 0001-A) ───────────────────
+        # Bootstrap-data the dex chart accepts: a typed list of users
+        # the IdP should know about, and a typed list of OIDC clients
+        # apps register with. Devs declare these under
+        # `services[].bootstrap.auth.users:` / `bootstrap.auth.clients:`
+        # in their values.yaml — the renderer materialises them at
+        # `dex.config.staticPasswords` / `dex.config.staticClients`,
+        # the same shape this chart's scaffold pre-fills as `[]`.
+        #
+        # Once a chart declares a capability, the user has two API
+        # surfaces for the same data:
+        #   1. `services[].passthrough.config.staticPasswords:` (verbatim)
+        #   2. `services[].bootstrap.auth.users:`           (typed)
+        # Capabilities project AFTER passthrough at render time, so
+        # `bootstrap.auth.users` wins when both are set. The
+        # passthrough path stays for ad-hoc fields that don't yet have
+        # a capability declared (kubernetes-storage tuning, custom
+        # connector blocks, etc).
+        #
+        # The CLI (`rda bootstrap auth.users add ...` / `rda bootstrap
+        # auth.clients add ...`) edits this same `bootstrap.<cap>` list
+        # in values.yaml, with field-validation against the schema below.
+        capabilities:
+          auth.users:
+            backend: file-static
+            order: 1
+            schema:
+              name:     { type: string, required: true }
+              password: { type: string, required: true, secret: true }
+            projection:
+              target:    dex.config.staticPasswords
+              transform: bcrypt-password-to-hash
+              # User writes `name:`; dex's staticPasswords expects `email:`.
+              # The bcrypt transform replaces `password:` with `hash:` (the
+              # field dex actually consumes, with $2a$ cost-10 bcrypt).
+              field_map:
+                name: email
+          auth.clients:
+            backend: file-static
+            order: 2
+            schema:
+              id:           { type: string,        required: true }
+              secret:       { type: string,        required: true, secret: true }
+              redirectURIs: { type: list,          required: true }
+              # `name` is the optional human-readable label dex shows
+              # on the consent screen. Apps that never display the
+              # consent screen (skipApprovalScreen=true, the bundle
+              # default) can omit it.
+              name:         { type: string }
+            projection:
+              target: dex.config.staticClients
+              # No field_map — dex's staticClients schema is identical
+              # to ours: id / secret / redirectURIs / name.
+              # No transform — secrets are stored verbatim (dev-mode);
+              # ExternalSecrets / Vault is the production path.
+
   mariadb:
     versions:
       - constraint: ">=0.1.0 <1.0.0"
