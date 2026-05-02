@@ -948,3 +948,56 @@ Status: in-progress
   paths both verify against the same id_token.
 
 - Spec library-chart version 0.11.33 → 0.11.34.
+
+## MILESTONE: 0.11.35
+
+- BUGFIX: web-go and web-nodejs templates now gate `/` server-side
+  when OIDC is configured. Pre-fix: `/` always returned the home
+  page HTML; only `/admin` was server-gated. The home page's JS
+  `oidc-client-ts` was the only gating mechanism, which fails
+  silently if the CDN is blocked, the user has stale localStorage,
+  or the browser blocks ESM imports.
+
+- Symptom: a freshly created project with dex bound and ingress
+  enabled would render `http://<project>.localtest.me/` without
+  ever asking for credentials. Users expected "OIDC configured →
+  everything is gated", which the post-fix behavior now matches.
+
+- Fix: in both templates, `/`'s handler gets a server-side check at
+  the top:
+
+      // web-go (main.go)
+      if oidcVerifier != nil {
+        if c, err := r.Cookie(sessionCookieName); err != nil || c.Value == "" {
+          http.Redirect(w, r, "/login", http.StatusFound)
+          return
+        }
+      }
+
+      // web-nodejs (src/index.js)
+      if (AUTH_URL && AUTH_ISSUER && OIDC_CLIENT_ID) {
+        const cookies = parseCookies(req.headers.cookie);
+        if (!cookies[SESSION_COOKIE_NAME]) {
+          res.writeHead(302, { Location: '/login' });
+          res.end();
+          return;
+        }
+      }
+
+- When OIDC isn't configured (no auth binding declared on the
+  project), `/` stays public — the Message Wall demo is meant to be
+  readable without auth in that mode. So the change is opt-in via
+  binding: deploy a dex binding ⇒ get full-site gating; don't ⇒ get
+  the public-home behavior. No new flag, no new env var.
+
+- The existing browser-side `oidc-client-ts` JS stays — it now
+  handles the "auto-refresh expired id_token" path (which the
+  server-side check doesn't do, it only checks for cookie presence).
+
+- Validated end-to-end on M2 Studio: `curl -i http://test.localtest.me/`
+  with the post-fix template returns `302 Location: /login` instead
+  of `200 <html>` when no session cookie is present. After /login
+  flow completes, the session cookie is set and `/` returns 200
+  normally. Same behavior on web-nodejs.
+
+- Spec library-chart version 0.11.34 → 0.11.35.

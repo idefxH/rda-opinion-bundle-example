@@ -458,6 +458,24 @@ async function start() {
     let status = 200;
     try {
       if (req.method === 'GET' && req.url === '/') {
+        // Server-side auth gate: when OIDC is configured, redirect to
+        // /login if there's no session cookie. Makes the home page
+        // gated identically to /admin — deterministic and independent
+        // of the browser-side oidc-client-ts JS (which can fail
+        // silently if the CDN is blocked or localStorage is stale).
+        //
+        // When OIDC isn't configured (no auth binding) the home page
+        // stays public — the Message Wall demo is meant to be
+        // readable without auth in that mode.
+        if (AUTH_URL && AUTH_ISSUER && OIDC_CLIENT_ID) {
+          const cookies = parseCookies(req.headers.cookie);
+          if (!cookies[SESSION_COOKIE_NAME]) {
+            res.writeHead(302, { Location: '/login' });
+            res.end();
+            end({ method: 'GET', path: '/', status: 302 });
+            return;
+          }
+        }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html());
         end({ method: 'GET', path: '/', status: 200 });
