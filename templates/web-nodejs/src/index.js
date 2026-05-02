@@ -56,11 +56,19 @@ const AUTH_URL = process.env[`${authPrefix}_URL`] || '';
 // the chart's dex.config.issuer. Auto-derived alongside AUTH_PUBLIC_URL
 // (bundle 0.11.27+).
 const AUTH_ISSUER = process.env[`${authPrefix}_ISSUER`] || AUTH_PUBLIC_URL;
-const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID || 'message-wall';
+// Bundle 0.11.32+ projects <authPrefix>_CLIENT_ID via the binding-secret
+// (read from dex.config.staticClients[0].id post-render). Fallback to legacy
+// OIDC_CLIENT_ID for projects predating that scaffold. 'message-wall' is the
+// last-resort default (neither env set + dex unconfigured).
+const OIDC_CLIENT_ID = process.env[`${authPrefix}_CLIENT_ID`] || process.env.OIDC_CLIENT_ID || 'message-wall';
 // OIDC_CLIENT_SECRET is required for the /login → /auth/callback browser
 // flow (OAuth2 code grant). The Bearer path doesn't need it. Set via
 // suse-library.env or project from a Secret. Empty → /login returns 503.
-const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || '';
+// Bundle 0.11.32+ projects <authPrefix>_CLIENT_SECRET via the binding-secret
+// (read from dex.config.staticClients[0].secret). Fallback to legacy
+// OIDC_CLIENT_SECRET for projects predating that scaffold. Empty → /login
+// returns 503 with a remediation hint.
+const OIDC_CLIENT_SECRET = process.env[`${authPrefix}_CLIENT_SECRET`] || process.env.OIDC_CLIENT_SECRET || '';
 const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'id_token';
 const STATE_COOKIE_NAME = 'oidc_state';
 // Holds the JWKS fetcher once jose is loaded + AUTH_URL is set. Keep

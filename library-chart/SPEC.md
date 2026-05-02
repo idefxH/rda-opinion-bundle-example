@@ -907,3 +907,44 @@ Status: in-progress
   from the current template Procfile into the project's Procfile.
 
 - Spec library-chart version 0.11.32 → 0.11.33.
+
+## MILESTONE: 0.11.34
+
+- BUGFIX: web-go `main.go` and web-nodejs `src/index.js` templates
+  now read `<authPrefix>_CLIENT_ID` / `<authPrefix>_CLIENT_SECRET`
+  (with fallback to legacy `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET`)
+  instead of the bare `OIDC_*` names. Fixes a misalignment that
+  appeared when bundle 0.11.32 started projecting these fields via
+  the binding-secret (`AUTH_CLIENT_ID`, etc.) — the templates
+  weren't reading them, so the home page rendered with the
+  hardcoded fallback `client_id=message-wall` (which dex doesn't
+  know) and the JS browser flow's `signinRedirect()` failed
+  silently with `invalid_client`.
+
+- Why the misalignment: pre-0.11.32, devs had to write
+  `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` as literal `value:` env
+  entries in deploy/values.yaml, or as Secret references they
+  managed themselves. Bundle 0.11.32 added the
+  `bootstrap.auth.clients` capability and the binding-secret
+  exposure of `client_id` / `client_secret` / `redirect_uri`, but
+  the templates' env-var-name reads weren't updated to follow.
+
+- Convention going forward: ALL OIDC reads in the templates use
+  the `<authPrefix>_*` form (matching the existing
+  `<authPrefix>_PUBLIC_URL`, `<authPrefix>_ISSUER`,
+  `<authPrefix>_URL` reads). `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET`
+  remain accepted as fallbacks for projects predating 0.11.32 — no
+  forced migration. The hint message in `/admin`'s 503 response
+  still mentions `OIDC_CLIENT_ID` for backwards-compat doc reasons.
+
+- Result: a dev project created with `rda new myapp --template
+  web-go && rda add-service dex auth` (no manual yaml edits beyond
+  flipping the bindings' `enabled: true` and dex's
+  `ingress.enabled: true`) now produces a fully working OIDC
+  browser flow end-to-end. The template's HTML page picks up the
+  real client_id, the JS calls `signinRedirect()` against
+  `auth.<project>.localtest.me` with the correct credentials, dex
+  presents the login form, callback works, `/admin` Bearer / cookie
+  paths both verify against the same id_token.
+
+- Spec library-chart version 0.11.33 → 0.11.34.
