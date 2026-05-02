@@ -19,6 +19,12 @@
 const http = require('http');
 const { Client } = require('pg');
 const promClient = require('prom-client');
+const crypto = require('crypto');
+const { URL, URLSearchParams } = require('url');
+// jose: pure-JS, lightweight JWKS fetcher + JWT verifier. Imported
+// dynamically inside the OIDC bootstrap to keep startup fast when
+// auth is disabled (the dep tree is ~50 modules).
+let jose = null;
 
 const PORT = parseInt(process.env.PORT || '8080');
 
@@ -35,7 +41,26 @@ const ACCENT_COLOR = "#736def";
 // needed in deploy/values.yaml.
 const authPrefix = (process.env.AUTH_BINDING || 'AUTH').toUpperCase();
 const AUTH_PUBLIC_URL = process.env[`${authPrefix}_PUBLIC_URL`] || '';
+// AUTH_URL is the in-cluster URL (auth-binding-secret host:port). Used
+// for JWKS fetch + token-exchange POST since localtest.me ingresses
+// don't resolve from inside the pod. AUTH_PUBLIC_URL is what the
+// browser hits.
+const AUTH_URL = process.env[`${authPrefix}_URL`] || '';
+// AUTH_ISSUER is what tokens claim in their `iss` field — must match
+// the chart's dex.config.issuer. Auto-derived alongside AUTH_PUBLIC_URL
+// (bundle 0.11.27+).
+const AUTH_ISSUER = process.env[`${authPrefix}_ISSUER`] || AUTH_PUBLIC_URL;
 const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID || 'message-wall';
+// OIDC_CLIENT_SECRET is required for the /login → /auth/callback browser
+// flow (OAuth2 code grant). The Bearer path doesn't need it. Set via
+// suse-library.env or project from a Secret. Empty → /login returns 503.
+const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || '';
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'id_token';
+const STATE_COOKIE_NAME = 'oidc_state';
+// Holds the JWKS fetcher once jose is loaded + AUTH_URL is set. Keep
+// outside any one request handler so the keyset cache (HTTP TTL handled
+// by jose) is shared across requests.
+let jwksFetcher = null;
 // Back-compat alias: older code (and anyone who copy-pasted the
 // pre-0.11.27 template) still references DEX_PUBLIC_URL. Keep it
 // working when AUTH_PUBLIC_URL is set.
@@ -298,6 +323,81 @@ const startTime = Date.now();
 // failure instead of exiting — so the readiness probe never gets a
 // healthy response and the pod gets killed anyway. Retrying gives
 // postgres time to finish init while we keep the process alive.
+// ─── OIDC server-side helpers (browser cookie flow + Bearer) ────
+
+function appBaseURL(req) {
+  // Honour X-Forwarded-Proto from the Ingress controller. Falls back
+  // to http (Tilt's local dev).
+  const proto = req.headers['x-forwarded-proto'] || 'http';
+  return `${proto}://${req.headers.host}`;
+}
+
+function parseCookies(cookieHeader) {
+  if (!cookieHeader) return {};
+  const out = {};
+  for (const c of cookieHeader.split(';')) {
+    const [k, ...rest] = c.trim().split('=');
+    if (k) out[k] = rest.join('=');
+  }
+  return out;
+}
+
+function setCookie(res, name, value, opts = {}) {
+  const parts = [`${name}=${value}`, 'Path=/', 'HttpOnly', 'SameSite=Lax'];
+  if (opts.maxAge !== undefined) parts.push(`Max-Age=${opts.maxAge}`);
+  if (opts.secure) parts.push('Secure');
+  // Append to any existing Set-Cookie (Node lets you pass an array).
+  const prev = res.getHeader('Set-Cookie');
+  const cookie = parts.join('; ');
+  res.setHeader('Set-Cookie', prev ? [].concat(prev, cookie) : cookie);
+}
+
+function clearCookie(res, name) {
+  setCookie(res, name, '', { maxAge: 0 });
+}
+
+// Initialise the JWKS keyset on first use. Lazy because jose's import
+// + JWKS fetch are non-trivial; only pay the cost when /admin or
+// /auth/callback fires for the first time.
+async function getJWKS() {
+  if (!AUTH_URL || !AUTH_ISSUER || !OIDC_CLIENT_ID) return null;
+  if (jwksFetcher) return jwksFetcher;
+  if (!jose) jose = await import('jose');
+  // JWKS URI uses the in-cluster URL (pod-reachable) even though the
+  // OIDC discovery's jwks_uri claims the browser-facing one — same
+  // keys served at <issuer>/keys whichever URL gets us there.
+  jwksFetcher = jose.createRemoteJWKSet(new URL(`${AUTH_URL}/keys`));
+  return jwksFetcher;
+}
+
+// Validate a JWT against the configured issuer + audience.  Returns
+// the decoded payload on success; throws on any failure (signature,
+// expiry, issuer mismatch, audience mismatch).
+async function verifyIDToken(rawJWT) {
+  const jwks = await getJWKS();
+  if (!jwks) throw new Error('OIDC not configured');
+  if (!jose) jose = await import('jose');
+  const { payload } = await jose.jwtVerify(rawJWT, jwks, {
+    issuer: AUTH_ISSUER,
+    audience: OIDC_CLIENT_ID,
+  });
+  return payload;
+}
+
+// Extract the id_token from cookie OR Authorization: Bearer header.
+// Returns { token, source } or { token: '' } if neither is present.
+function extractIDToken(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  if (cookies[SESSION_COOKIE_NAME]) {
+    return { token: cookies[SESSION_COOKIE_NAME], source: 'cookie' };
+  }
+  const auth = req.headers.authorization || '';
+  if (auth.startsWith('Bearer ')) {
+    return { token: auth.slice('Bearer '.length), source: 'bearer' };
+  }
+  return { token: '', source: '' };
+}
+
 async function connectWithRetry(maxAttempts, delayMs) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -355,6 +455,152 @@ async function start() {
         res.end(metrics);
         return; // don't pollute the histogram with /metrics noise
       }
+
+      // ── OIDC: /login → /auth/callback → /admin (browser cookie)
+      //         /admin (Bearer too — same verify, no cookie needed)
+      //         /logout
+      if (req.url === '/login' || req.url.startsWith('/login?')) {
+        if (!AUTH_URL || !AUTH_ISSUER || !OIDC_CLIENT_ID) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'oidc not configured', hint: 'set AUTH_BINDING + bind dex via rda add-service dex auth' }));
+          end({ method: req.method, path: '/login', status: 503 });
+          return;
+        }
+        if (!OIDC_CLIENT_SECRET) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'OIDC_CLIENT_SECRET unset',
+            hint: 'required for browser flow (the staticClient secret in dex passthrough); set via suse-library.env or project from a Secret',
+          }));
+          end({ method: req.method, path: '/login', status: 503 });
+          return;
+        }
+        const state = crypto.randomBytes(16).toString('hex');
+        setCookie(res, STATE_COOKIE_NAME, state, { maxAge: 600 });
+        const redirectURI = appBaseURL(req) + '/auth/callback';
+        const params = new URLSearchParams({
+          response_type: 'code',
+          client_id: OIDC_CLIENT_ID,
+          redirect_uri: redirectURI,
+          scope: 'openid profile email',
+          state: state,
+        });
+        res.writeHead(302, { Location: AUTH_PUBLIC_URL + '/auth?' + params.toString() });
+        res.end();
+        end({ method: req.method, path: '/login', status: 302 });
+        return;
+      }
+
+      if (req.url.startsWith('/auth/callback')) {
+        const u = new URL(req.url, appBaseURL(req));
+        const cookies = parseCookies(req.headers.cookie);
+        const expectedState = cookies[STATE_COOKIE_NAME];
+        if (!expectedState) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: `missing ${STATE_COOKIE_NAME} cookie — start at /login` }));
+          end({ method: req.method, path: '/auth/callback', status: 400 });
+          return;
+        }
+        if (u.searchParams.get('state') !== expectedState) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'state mismatch — possible CSRF' }));
+          end({ method: req.method, path: '/auth/callback', status: 400 });
+          return;
+        }
+        const code = u.searchParams.get('code');
+        if (!code) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'missing code query param' }));
+          end({ method: req.method, path: '/auth/callback', status: 400 });
+          return;
+        }
+        try {
+          // Exchange code → tokens via the IN-CLUSTER URL (AUTH_URL).
+          const tokenResp = await fetch(AUTH_URL + '/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code: code,
+              redirect_uri: appBaseURL(req) + '/auth/callback',
+              client_id: OIDC_CLIENT_ID,
+              client_secret: OIDC_CLIENT_SECRET,
+            }),
+          });
+          if (!tokenResp.ok) {
+            const body = await tokenResp.text();
+            throw new Error(`token endpoint returned ${tokenResp.status}: ${body}`);
+          }
+          const tokens = await tokenResp.json();
+          if (!tokens.id_token) throw new Error('no id_token in token response');
+          // Defence in depth — verify before trusting.
+          await verifyIDToken(tokens.id_token);
+          // Cookie matches the dex default 1h token life.
+          clearCookie(res, STATE_COOKIE_NAME);
+          setCookie(res, SESSION_COOKIE_NAME, tokens.id_token, { maxAge: 3600 });
+          res.writeHead(302, { Location: '/' });
+          res.end();
+          end({ method: req.method, path: '/auth/callback', status: 302 });
+          return;
+        } catch (err) {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+          end({ method: req.method, path: '/auth/callback', status: 502 });
+          return;
+        }
+      }
+
+      if (req.url === '/logout') {
+        clearCookie(res, SESSION_COOKIE_NAME);
+        res.writeHead(302, { Location: '/' });
+        res.end();
+        end({ method: req.method, path: '/logout', status: 302 });
+        return;
+      }
+
+      if (req.url === '/admin') {
+        if (!AUTH_URL || !AUTH_ISSUER || !OIDC_CLIENT_ID) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'oidc not configured' }));
+          end({ method: req.method, path: '/admin', status: 503 });
+          return;
+        }
+        const { token, source } = extractIDToken(req);
+        if (!token) {
+          res.writeHead(401, {
+            'Content-Type': 'application/json',
+            'WWW-Authenticate': `Bearer realm="${AUTH_ISSUER}"`,
+          });
+          res.end(JSON.stringify({
+            error: 'unauthenticated — no Bearer header AND no session cookie',
+            hint: 'GET /login to start the browser flow, OR send Authorization: Bearer <jwt>',
+            issuer: AUTH_ISSUER,
+          }));
+          end({ method: req.method, path: '/admin', status: 401 });
+          return;
+        }
+        try {
+          const claims = await verifyIDToken(token);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            authenticated: true,
+            source,
+            subject: claims.sub,
+            issuer: claims.iss,
+            audience: claims.aud,
+            expires_at: claims.exp,
+            claims,
+          }, null, 2));
+          end({ method: req.method, path: '/admin', status: 200 });
+          return;
+        } catch (err) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'id_token verification failed: ' + err.message, source }));
+          end({ method: req.method, path: '/admin', status: 401 });
+          return;
+        }
+      }
+
       if (req.url === '/api/messages') {
         if (!dbEnabled) {
           status = 503;

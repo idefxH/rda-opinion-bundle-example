@@ -8,13 +8,17 @@
 //      browser-side login via oidc-client-ts (CDN). AUTH_BINDING
 //      defaults to 'AUTH'; override (e.g. AUTH_BINDING=idp) to read
 //      from a different binding's PUBLIC_URL projection.
-//   4. /admin endpoint — Bearer-token-validated server-side route.
-//      When AUTH_ISSUER + OIDC_CLIENT_ID are set, /admin verifies an
-//      id_token (Authorization: Bearer <jwt>) against the issuer's
-//      JWKS endpoint via in-cluster URL (so localtest.me ingress URLs
-//      stay browser-only — see InsecureIssuerURLContext rationale in
-//      the verifier init below). Returns claims JSON on success, 401
-//      on failure.  Browser-cookie session flow is a follow-on PR.
+//   4. OIDC server-side flow — Browser-cookie session + Bearer API.
+//      When AUTH_URL + AUTH_ISSUER + OIDC_CLIENT_ID are set, the app
+//      gates /admin behind a verified id_token. Two ways to provide
+//      the token:
+//        a. session cookie (id_token), set by /auth/callback after
+//           the OAuth2 code grant flow (/login → dex authorize →
+//           callback → cookie → /admin).
+//        b. Authorization: Bearer <jwt> header, for server-to-server
+//           or curl. The Bearer path doesn't need OIDC_CLIENT_SECRET.
+//      The browser flow needs OIDC_CLIENT_SECRET (the staticClient's
+//      secret field in dex's passthrough.config.staticClients).
 //
 // The Postgres binding is read from env vars projected by the rda
 // library helper (services[].binding=db => DB_HOST, DB_PORT,
@@ -25,13 +29,16 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -68,8 +75,20 @@ var (
 	authURL      = os.Getenv(authPrefix + "_URL")
 	// Back-compat alias for projects that haven't migrated to AUTH_BINDING.
 	dexPublicURL = authPublicURL
-	oidcClientID = envOrDefault("OIDC_CLIENT_ID", "message-wall")
-	startTime    = time.Now()
+	oidcClientID     = envOrDefault("OIDC_CLIENT_ID", "message-wall")
+	// oidcClientSecret is required for the /login → /auth/callback browser
+	// flow (OAuth2 code grant). The Bearer path doesn't need it. Set it
+	// via suse-library.env in deploy/values.yaml (or, better, projected
+	// from a Secret). Empty → /login returns 503 with a remediation hint.
+	oidcClientSecret = os.Getenv("OIDC_CLIENT_SECRET")
+	// sessionCookieName is what /auth/callback sets and /admin reads.
+	// Override via SESSION_COOKIE_NAME if you have multiple apps on the
+	// same parent domain (cookies are scoped by domain, not path).
+	sessionCookieName = envOrDefault("SESSION_COOKIE_NAME", "id_token")
+	// stateCookieName is the short-lived random anti-CSRF cookie set by
+	// /login and verified by /auth/callback.
+	stateCookieName = "oidc_state"
+	startTime       = time.Now()
 
 	// OIDC verifier — populated in main() if OIDC is configured.
 	// nil otherwise; /admin returns 503 in that case.
@@ -311,21 +330,151 @@ func main() {
 		}
 	})
 
-	// /admin — protected route. Validates an Authorization: Bearer
-	// <jwt> against the OIDC verifier (configured at startup from
-	// AUTH_URL + AUTH_ISSUER + OIDC_CLIENT_ID). Returns the token's
-	// claims as JSON on success.
+	// ─── OIDC: /login → /auth/callback → /admin (browser flow) ─────
+	//                /admin (Bearer flow for API/curl)
+	//                /logout
 	//
-	// To get a token from the dex IdP:
-	//   curl -X POST <AUTH_URL>/token \\
-	//     -d grant_type=password -d username=<staticPasswords email> \\
-	//     -d password=... -d client_id=<staticClient id> \\
-	//     -d client_secret=... -d "scope=openid profile email"
-	// Then:
-	//   curl -H "Authorization: Bearer <id_token>" http://<app>/admin
-	//
-	// Browser-cookie session flow (/login → /auth/callback → cookie)
-	// is the next step — currently this route is API-only.
+	// Two-mode protected route. The browser path uses an OAuth2
+	// authorization-code flow with a session cookie holding the
+	// id_token. The API path takes Authorization: Bearer <jwt>. Both
+	// validate the id_token via the same oidcVerifier — issuer,
+	// signature, audience, expiry. Bearer doesn't need
+	// OIDC_CLIENT_SECRET; the browser flow does.
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		t := time.Now()
+		if oidcVerifier == nil {
+			httpJSONError(w, 503, fmt.Errorf("oidc not configured"))
+			observe(r.Method, "/login", 503, t)
+			return
+		}
+		if oidcClientSecret == "" {
+			httpJSONError(w, 503, fmt.Errorf("OIDC_CLIENT_SECRET unset — required for browser flow (the staticClient's secret in dex's passthrough.config.staticClients[].secret); set via suse-library.env in deploy/values.yaml or project from a Secret"))
+			observe(r.Method, "/login", 503, t)
+			return
+		}
+		state, err := randomHex(16)
+		if err != nil {
+			httpJSONError(w, 500, fmt.Errorf("state gen: %w", err))
+			observe(r.Method, "/login", 500, t)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name: stateCookieName, Value: state, Path: "/",
+			HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 600,
+			Secure: cookieSecure(r),
+		})
+		redirectURI := appBaseURL(r) + "/auth/callback"
+		params := url.Values{
+			"response_type": {"code"},
+			"client_id":     {oidcClientID},
+			"redirect_uri":  {redirectURI},
+			"scope":         {"openid profile email"},
+			"state":         {state},
+		}
+		http.Redirect(w, r, authPublicURL+"/auth?"+params.Encode(), http.StatusFound)
+		observe(r.Method, "/login", http.StatusFound, t)
+	})
+
+	mux.HandleFunc("/auth/callback", func(w http.ResponseWriter, r *http.Request) {
+		t := time.Now()
+		if oidcVerifier == nil {
+			httpJSONError(w, 503, fmt.Errorf("oidc not configured"))
+			observe(r.Method, "/auth/callback", 503, t)
+			return
+		}
+		stateCookie, err := r.Cookie(stateCookieName)
+		if err != nil || stateCookie.Value == "" {
+			httpJSONError(w, 400, fmt.Errorf("missing %s cookie — start at /login", stateCookieName))
+			observe(r.Method, "/auth/callback", 400, t)
+			return
+		}
+		if r.URL.Query().Get("state") != stateCookie.Value {
+			httpJSONError(w, 400, fmt.Errorf("state mismatch — possible CSRF"))
+			observe(r.Method, "/auth/callback", 400, t)
+			return
+		}
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			httpJSONError(w, 400, fmt.Errorf("missing code query param"))
+			observe(r.Method, "/auth/callback", 400, t)
+			return
+		}
+		// Exchange code for tokens via the IN-CLUSTER URL (authURL),
+		// not authPublicURL — the pod can't necessarily reach the
+		// browser-facing ingress. dex accepts both; the redirect_uri
+		// param must match exactly what /login sent (browser-facing).
+		form := url.Values{
+			"grant_type":    {"authorization_code"},
+			"code":          {code},
+			"redirect_uri":  {appBaseURL(r) + "/auth/callback"},
+			"client_id":     {oidcClientID},
+			"client_secret": {oidcClientSecret},
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		req, _ := http.NewRequestWithContext(ctx, "POST", authURL+"/token",
+			strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			httpJSONError(w, 502, fmt.Errorf("token exchange POST %s/token failed: %w", authURL, err))
+			observe(r.Method, "/auth/callback", 502, t)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			body, _ := io.ReadAll(resp.Body)
+			httpJSONError(w, 502, fmt.Errorf("token endpoint returned %d: %s", resp.StatusCode, body))
+			observe(r.Method, "/auth/callback", 502, t)
+			return
+		}
+		var tokenResp struct {
+			AccessToken string `json:"access_token"`
+			IDToken     string `json:"id_token"`
+			TokenType   string `json:"token_type"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+			httpJSONError(w, 502, fmt.Errorf("decode token response: %w", err))
+			observe(r.Method, "/auth/callback", 502, t)
+			return
+		}
+		if tokenResp.IDToken == "" {
+			httpJSONError(w, 502, fmt.Errorf("no id_token in token response"))
+			observe(r.Method, "/auth/callback", 502, t)
+			return
+		}
+		// Validate the id_token before trusting it (defence in depth —
+		// dex already signed it, but we want to fail loud on issuer /
+		// audience mismatches that would later trip /admin too).
+		if _, err := oidcVerifier.Verify(ctx, tokenResp.IDToken); err != nil {
+			httpJSONError(w, 502, fmt.Errorf("received id_token failed verification: %w", err))
+			observe(r.Method, "/auth/callback", 502, t)
+			return
+		}
+		// Set the session cookie + clear the state cookie. id_token JWTs
+		// from dex with default config are ~1h; cookie matches.
+		http.SetCookie(w, &http.Cookie{
+			Name: stateCookieName, Value: "", Path: "/", MaxAge: -1,
+		})
+		http.SetCookie(w, &http.Cookie{
+			Name: sessionCookieName, Value: tokenResp.IDToken, Path: "/",
+			HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 3600,
+			Secure: cookieSecure(r),
+		})
+		http.Redirect(w, r, "/", http.StatusFound)
+		observe(r.Method, "/auth/callback", http.StatusFound, t)
+	})
+
+	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		t := time.Now()
+		http.SetCookie(w, &http.Cookie{
+			Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1,
+		})
+		http.Redirect(w, r, "/", http.StatusFound)
+		observe(r.Method, "/logout", http.StatusFound, t)
+	})
+
+	// /admin — Bearer header OR session cookie. Both verified the same way.
 	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
 		if oidcVerifier == nil {
@@ -338,25 +487,26 @@ func main() {
 			observe(r.Method, "/admin", 503, t)
 			return
 		}
-		authHdr := r.Header.Get("Authorization")
-		if !strings.HasPrefix(authHdr, "Bearer ") {
+		rawIDToken, source := extractIDToken(r)
+		if rawIDToken == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("WWW-Authenticate", "Bearer realm=\""+authIssuer+"\"")
 			w.WriteHeader(401)
 			_ = json.NewEncoder(w).Encode(map[string]string{
-				"error": "missing or malformed Authorization: Bearer <jwt> header",
+				"error":  "unauthenticated — no Bearer header AND no session cookie",
+				"hint":   "GET /login to start the browser flow, OR send Authorization: Bearer <jwt>",
 				"issuer": authIssuer,
 			})
 			observe(r.Method, "/admin", 401, t)
 			return
 		}
-		rawIDToken := strings.TrimPrefix(authHdr, "Bearer ")
 		idToken, err := oidcVerifier.Verify(r.Context(), rawIDToken)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(401)
 			_ = json.NewEncoder(w).Encode(map[string]string{
-				"error": "id_token verification failed: " + err.Error(),
+				"error":  "id_token verification failed: " + err.Error(),
+				"source": source,
 			})
 			observe(r.Method, "/admin", 401, t)
 			return
@@ -370,6 +520,7 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"authenticated": true,
+			"source":        source,
 			"subject":       idToken.Subject,
 			"issuer":        idToken.Issuer,
 			"audience":      idToken.Audience,
@@ -649,3 +800,51 @@ const htmlPage = `<!DOCTYPE html>
   {{end}}
 </body>
 </html>`
+
+// extractIDToken returns the JWT and which source it came from
+// ("cookie" or "bearer"). Cookie wins when both are present (browser
+// session is the canonical path; Bearer is for curl/API).
+func extractIDToken(r *http.Request) (string, string) {
+	if c, err := r.Cookie(sessionCookieName); err == nil && c.Value != "" {
+		return c.Value, "cookie"
+	}
+	auth := r.Header.Get("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer "), "bearer"
+	}
+	return "", ""
+}
+
+// randomHex generates n random bytes hex-encoded — used for the state
+// cookie's anti-CSRF nonce. crypto/rand for non-predictability.
+func randomHex(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// appBaseURL returns the scheme://host the user's browser sees,
+// honouring X-Forwarded-Proto (set by the Ingress controller) so we
+// build the redirect_uri correctly when behind TLS termination.
+func appBaseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if fwd := r.Header.Get("X-Forwarded-Proto"); fwd != "" {
+		scheme = fwd
+	}
+	return scheme + "://" + r.Host
+}
+
+// cookieSecure flags the cookie Secure when serving over https. Lax-only
+// in HTTP dev (Tilt's default) so the cookie is still set.
+func cookieSecure(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
