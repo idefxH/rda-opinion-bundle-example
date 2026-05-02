@@ -24,7 +24,14 @@ spec:
               service:
                 name: {{ include "suse-library.name" $ }}
                 port:
-                  name: http
+                  # Use port NUMBER, not name. Traefik 2.x on k3s
+                  # (Rancher Desktop's default) fails to resolve
+                  # port-name references on Service backends, returning
+                  # 503 Service Unavailable with the misleading
+                  # `service not found` log. The Service template
+                  # hardcodes `port: 80`, so we mirror that here.
+                  # Future: parameterise both via .Values.service.port.
+                  number: 80
     {{- end }}
   {{- with .Values.ingress.tls }}
   tls:
