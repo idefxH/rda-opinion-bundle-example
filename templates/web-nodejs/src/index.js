@@ -27,13 +27,19 @@ const PORT = parseInt(process.env.PORT || '8080');
 const ACCENT_COLOR = "#736def";
 // ─────────────────────────────────────────────
 
-// ─── Dex SSO (optional) ──────────────────────
-// Set DEX_PUBLIC_URL to the external (Ingress) URL of your dex
-// instance, e.g. "http://dex.localtest.me/dex". OIDC client lookup
-// uses standard discovery at <issuer>/.well-known/openid-configuration.
-// The client_id must match a staticClient registered in dex's config.
-const DEX_PUBLIC_URL = process.env.DEX_PUBLIC_URL || '';
+// ─── OIDC SSO (optional) ─────────────────────
+// Reads <AUTH_BINDING>_PUBLIC_URL from the binding-secret. Default binding
+// name is "auth"; override via AUTH_BINDING=<name> to read from a different
+// binding (e.g. binding=idp → IDP_PUBLIC_URL). Auto-derived from the dex
+// chart's ingress.host (or in-cluster URL if no ingress) — no manual edit
+// needed in deploy/values.yaml.
+const authPrefix = (process.env.AUTH_BINDING || 'AUTH').toUpperCase();
+const AUTH_PUBLIC_URL = process.env[`${authPrefix}_PUBLIC_URL`] || '';
 const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID || 'message-wall';
+// Back-compat alias: older code (and anyone who copy-pasted the
+// pre-0.11.27 template) still references DEX_PUBLIC_URL. Keep it
+// working when AUTH_PUBLIC_URL is set.
+const DEX_PUBLIC_URL = AUTH_PUBLIC_URL;
 // ─────────────────────────────────────────────
 
 // ─── Prometheus metrics ──────────────────────
@@ -445,7 +451,7 @@ async function start() {
   server.listen(PORT, () => {
     console.log('🚀 Server running on http://localhost:' + PORT);
     console.log('📊 Metrics at http://localhost:' + PORT + '/metrics');
-    if (DEX_PUBLIC_URL) console.log('🔐 OIDC: ' + DEX_PUBLIC_URL);
+    if (AUTH_PUBLIC_URL) console.log('🔐 OIDC: ' + AUTH_PUBLIC_URL);
   });
 }
 
