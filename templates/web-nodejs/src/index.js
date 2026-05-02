@@ -39,7 +39,13 @@ const ACCENT_COLOR = "#736def";
 // binding (e.g. binding=idp → IDP_PUBLIC_URL). Auto-derived from the dex
 // chart's ingress.host (or in-cluster URL if no ingress) — no manual edit
 // needed in deploy/values.yaml.
-const authPrefix = (process.env.AUTH_BINDING || 'AUTH').toUpperCase();
+// AUTH_BINDING may contain dashes (e.g. 'auth-prod'). The bundle's
+// binding-secret helper projects env vars with dashes converted to
+// underscores (AUTH_PROD_*), so we apply the same normalisation when
+// computing the lookup prefix. Without this, a dashed binding name
+// silently disables OIDC (the env vars exist but under names the app
+// never reads).
+const authPrefix = (process.env.AUTH_BINDING || 'AUTH').toUpperCase().replace(/-/g, '_');
 const AUTH_PUBLIC_URL = process.env[`${authPrefix}_PUBLIC_URL`] || '';
 // AUTH_URL is the in-cluster URL (auth-binding-secret host:port). Used
 // for JWKS fetch + token-exchange POST since localtest.me ingresses
