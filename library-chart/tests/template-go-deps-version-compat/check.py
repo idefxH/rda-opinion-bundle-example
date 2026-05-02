@@ -36,6 +36,10 @@ TEMPLATES_DIR = os.path.join(REPO_ROOT, "..", "templates")
 # directive must be >= 1.<required_go_minor>.
 DEP_FLOORS = [
     ("github.com/jackc/pgx/v5", (5, 7, 0), 23),
+    # go-oidc/v3 v3.18.0+ requires go 1.25; older 3.x worked with 1.21.
+    # If you see this floor mismatch on a fresh tidy, downgrade to
+    # v3.17.x or bump the go directive to 1.25.0.
+    ("github.com/coreos/go-oidc/v3", (3, 18, 0), 25),
     # Add more as new deps surface go-floor mismatches:
     # ("github.com/foo/bar", (1, 2, 3), 22),
 ]

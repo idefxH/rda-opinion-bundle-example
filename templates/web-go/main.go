@@ -8,6 +8,13 @@
 //      browser-side login via oidc-client-ts (CDN). AUTH_BINDING
 //      defaults to 'AUTH'; override (e.g. AUTH_BINDING=idp) to read
 //      from a different binding's PUBLIC_URL projection.
+//   4. /admin endpoint — Bearer-token-validated server-side route.
+//      When AUTH_ISSUER + OIDC_CLIENT_ID are set, /admin verifies an
+//      id_token (Authorization: Bearer <jwt>) against the issuer's
+//      JWKS endpoint via in-cluster URL (so localtest.me ingress URLs
+//      stay browser-only — see InsecureIssuerURLContext rationale in
+//      the verifier init below). Returns claims JSON on success, 401
+//      on failure.  Browser-cookie session flow is a follow-on PR.
 //
 // The Postgres binding is read from env vars projected by the rda
 // library helper (services[].binding=db => DB_HOST, DB_PORT,
@@ -30,6 +37,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -48,10 +56,24 @@ var (
 	// public_url key (bundle 0.11.27+). Empty when no auth binding is
 	// configured; the home page renders without the login UI.
 	authPublicURL = os.Getenv(authPrefix + "_PUBLIC_URL")
+	// authIssuer is what tokens claim in their `iss` field — same value
+	// as authPublicURL today (auto-derived together) but kept distinct
+	// so apps can branch if a future config splits them.
+	authIssuer = os.Getenv(authPrefix + "_ISSUER")
+	// authURL is the in-cluster Service URL — what the pod uses to reach
+	// dex's discovery + token + JWKS endpoints. Browser uses authPublicURL
+	// (the ingress URL), pod uses authURL (svc.cluster.local). Without
+	// this split, a localtest.me-only browser-facing URL wouldn't be
+	// reachable from inside the cluster for token verification.
+	authURL      = os.Getenv(authPrefix + "_URL")
 	// Back-compat alias for projects that haven't migrated to AUTH_BINDING.
 	dexPublicURL = authPublicURL
 	oidcClientID = envOrDefault("OIDC_CLIENT_ID", "message-wall")
 	startTime    = time.Now()
+
+	// OIDC verifier — populated in main() if OIDC is configured.
+	// nil otherwise; /admin returns 503 in that case.
+	oidcVerifier *oidc.IDTokenVerifier
 
 	// Prometheus registry — explicit (vs default) so tests can drive it.
 	registry = prometheus.NewRegistry()
@@ -80,6 +102,25 @@ var (
 
 func main() {
 	registry.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+
+	// OIDC bootstrap. Only fires when the binding contract is satisfied:
+	// AUTH_URL (in-cluster, reachable for JWKS fetch) AND AUTH_ISSUER
+	// (what tokens claim) AND OIDC_CLIENT_ID. Missing any → /admin
+	// returns 503 with a remediation hint.
+	//
+	// Why split URLs: dex sets discovery's `issuer` + jwks_uri using
+	// the chart's config.issuer (= AUTH_ISSUER, browser-facing). Pods
+	// inside the cluster can't resolve auth.test.localtest.me. We
+	// build the keyset directly from <AUTH_URL>/keys (in-cluster) and
+	// configure the verifier to expect AUTH_ISSUER in the `iss` claim.
+	if authURL != "" && authIssuer != "" && oidcClientID != "" {
+		ctx := context.Background()
+		keySet := oidc.NewRemoteKeySet(ctx, authURL+"/keys")
+		oidcVerifier = oidc.NewVerifier(authIssuer, keySet, &oidc.Config{ClientID: oidcClientID})
+		log.Printf("🔐 OIDC verifier ready (issuer=%s, jwks=%s/keys, client=%s)", authIssuer, authURL, oidcClientID)
+	} else {
+		log.Printf("ℹ️  OIDC verifier disabled — set <%s>_URL, <%s>_ISSUER, OIDC_CLIENT_ID to enable /admin", authPrefix, authPrefix)
+	}
 
 	port := envOrDefault("PORT", "8080")
 
@@ -268,6 +309,74 @@ func main() {
 		default:
 			http.Error(w, "method not allowed", 405)
 		}
+	})
+
+	// /admin — protected route. Validates an Authorization: Bearer
+	// <jwt> against the OIDC verifier (configured at startup from
+	// AUTH_URL + AUTH_ISSUER + OIDC_CLIENT_ID). Returns the token's
+	// claims as JSON on success.
+	//
+	// To get a token from the dex IdP:
+	//   curl -X POST <AUTH_URL>/token \\
+	//     -d grant_type=password -d username=<staticPasswords email> \\
+	//     -d password=... -d client_id=<staticClient id> \\
+	//     -d client_secret=... -d "scope=openid profile email"
+	// Then:
+	//   curl -H "Authorization: Bearer <id_token>" http://<app>/admin
+	//
+	// Browser-cookie session flow (/login → /auth/callback → cookie)
+	// is the next step — currently this route is API-only.
+	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		t := time.Now()
+		if oidcVerifier == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(503)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": "oidc not configured",
+				"hint":  "set AUTH_BINDING (or bind dex via rda add-service dex auth) and OIDC_CLIENT_ID env",
+			})
+			observe(r.Method, "/admin", 503, t)
+			return
+		}
+		authHdr := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authHdr, "Bearer ") {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("WWW-Authenticate", "Bearer realm=\""+authIssuer+"\"")
+			w.WriteHeader(401)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": "missing or malformed Authorization: Bearer <jwt> header",
+				"issuer": authIssuer,
+			})
+			observe(r.Method, "/admin", 401, t)
+			return
+		}
+		rawIDToken := strings.TrimPrefix(authHdr, "Bearer ")
+		idToken, err := oidcVerifier.Verify(r.Context(), rawIDToken)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(401)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": "id_token verification failed: " + err.Error(),
+			})
+			observe(r.Method, "/admin", 401, t)
+			return
+		}
+		var claims map[string]any
+		if err := idToken.Claims(&claims); err != nil {
+			httpJSONError(w, 500, fmt.Errorf("unmarshal claims: %w", err))
+			observe(r.Method, "/admin", 500, t)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"authenticated": true,
+			"subject":       idToken.Subject,
+			"issuer":        idToken.Issuer,
+			"audience":      idToken.Audience,
+			"expires_at":    idToken.Expiry,
+			"claims":        claims,
+		})
+		observe(r.Method, "/admin", 200, t)
 	})
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
