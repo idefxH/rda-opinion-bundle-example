@@ -795,3 +795,65 @@ Status: in-progress
   bundle.
 
 - Spec library-chart version 0.11.30 → 0.11.31.
+
+## MILESTONE: 0.11.32
+
+- FEATURE: dex scaffold is now OIDC-dev-ready in 2 commands (`rda new
+  <p>` + `rda add-service dex auth`) without ANY manual values.yaml
+  edit. Three additions to the dex catalogue entry:
+
+  1. `passthrough.config.oauth2.passwordConnector: local` is added
+     to the scaffold defaults. dex's `/token` endpoint refuses
+     `grant_type=password` with `unsupported_grant_type` unless this
+     is set to a connector supporting password auth — `local` is the
+     built-in passwordDB connector. Required for `curl -X POST
+     /token`-style password-grant flows (the canonical e2e check).
+     Browser-cookie OIDC flows work without it; we set it because the
+     cost is zero.
+
+  2. `bootstrap.auth.users` and `bootstrap.auth.clients` are
+     pre-filled in the scaffold defaults:
+
+         bootstrap:
+           auth.users:
+             - name: dev@example.com
+               password: dev
+           auth.clients:
+             - id: "{{.ProjectName}}-client"
+               secret: dev-secret
+               name:   "{{.ProjectName}}"
+               redirectURIs:
+                 - "http://{{.ProjectName}}.localtest.me/auth/callback"
+                 - "http://localhost:18081/auth/callback"
+
+     Templating uses the existing `{{.ProjectName}}` placeholder
+     (already supported by `renderScaffoldTemplate` in rda-cli; no
+     code change needed). The second redirectURI handles the
+     `kubectl port-forward 18081:80` flow used in dev / e2e.
+
+  3. `binding_secret` gains three new keys so the app pod env reads
+     `<BINDING>_CLIENT_ID`, `<BINDING>_CLIENT_SECRET`, and
+     `<BINDING>_REDIRECT_URI` automatically (no hand-written
+     `value:` literals). Each is templated against
+     `.Values.dex.config.staticClients[0].*` so the source of truth
+     stays the dev-editable `bootstrap.auth.clients[0]` (or whatever
+     the first staticClients entry resolves to post-render).
+
+     Result: `rda add-service dex auth` now scaffolds 8 env entries
+     under `suse-library.env` instead of 5
+     (`AUTH_HOST/PORT/URL/ISSUER/PUBLIC_URL` + the 3 new
+     `CLIENT_ID/CLIENT_SECRET/REDIRECT_URI`).
+
+- User-visible result: `rda new myapp --template web-go && cd myapp
+  && rda add-service dex auth && tilt up` (after flipping
+  `enabled: true` on the binding) gives a working OIDC chain. No
+  manual yaml editing, no `htpasswd`, no `--field redirectURIs=...`
+  CLI gymnastics.
+
+- The pre-filled `dev@example.com / dev` is a DEV credential —
+  staging+ devs replace the bootstrap.auth.users entries (`rda
+  bootstrap auth.users rm dev@example.com` then `add` real users)
+  and swap the connector to github / oidc / ldap per the
+  production flow documented in `concepts/auth.md`.
+
+- Spec library-chart version 0.11.31 → 0.11.32.
