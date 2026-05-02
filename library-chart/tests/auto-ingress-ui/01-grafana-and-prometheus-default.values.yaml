@@ -2,5 +2,7 @@ services: []
 grafana:
   enabled: true
   adminPassword: x
+  ui: {expose: true}
 prometheus:
   enabled: true
+  ui: {expose: true}

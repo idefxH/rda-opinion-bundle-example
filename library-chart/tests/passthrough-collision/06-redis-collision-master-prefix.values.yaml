@@ -1,3 +1,9 @@
+# Collision: DSL persistence.enabled=false vs passthrough re-asserting
+# the same path under the chart's standalone schema. AppCo redis 2.x
+# is single-replica (no master.* prefix); the canonical persistence
+# key is `redis.persistence.enabled`, which the DSL maps from
+# `persistence.enabled`. Setting passthrough.persistence.enabled is
+# the same target — must fail-loud.
 services:
   - binding: cache
     type: redis
@@ -6,9 +12,8 @@ services:
     persistence:
       enabled: false
     passthrough:
-      master:
-        persistence:
-          enabled: true
+      persistence:
+        enabled: true
 
 redis:
   enabled: true

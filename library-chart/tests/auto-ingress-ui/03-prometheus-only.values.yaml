@@ -1,3 +1,4 @@
 services: []
 prometheus:
   enabled: true
+  ui: {expose: true}

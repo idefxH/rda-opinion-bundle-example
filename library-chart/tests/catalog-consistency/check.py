@@ -150,7 +150,21 @@ def chart_names_from_catalog(path):
 
 
 def main():
-    catalog_path = os.environ.get("CATALOG_MD_PATH", DEFAULT_CATALOG_PATH)
+    explicit_path = os.environ.get("CATALOG_MD_PATH", "")
+    catalog_path = explicit_path or DEFAULT_CATALOG_PATH
+
+    # Soft-skip when no explicit path AND the default sibling-clone
+    # location doesn't exist. This covers two real cases:
+    #   - dev cloned only the bundle repo, no rda-docs sibling
+    #   - tests run from a worktree (no sibling rda-docs in /tmp)
+    # CI always sets CATALOG_MD_PATH, so the cross-repo drift guard
+    # still triggers there. Hard-fails when CATALOG_MD_PATH is set
+    # but unreadable (caller meant to point at it; missing is a bug).
+    if not explicit_path and not os.path.isfile(catalog_path):
+        print("⊘ catalog-consistency: skipped — no rda-docs sibling clone")
+        print("  (default path: %s)" % catalog_path)
+        print("  Set CATALOG_MD_PATH to enable the cross-repo drift check.")
+        return 0
 
     yaml_charts = chart_names_from_mapping(MAPPING_FILE)
     if yaml_charts is None:
