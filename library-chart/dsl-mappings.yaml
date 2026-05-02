@@ -371,10 +371,12 @@ charts:
             # Cross-binding refs see DEX_GRPC_PORT / DEX_GRPC_URL.
             grpc: { port: 5557, scheme: tcp }
         values_mapping:
-          # Issuer URL — the canonical "where this dex thinks it lives"
-          # value baked into the OIDC discovery endpoint. Required to
-          # be set; the scaffold defaults to the in-cluster Service URL.
-          issuer: dex.config.issuer
+          # Issuer URL is NOT in values_mapping — it's auto-derived via
+          # `derived_values:` below from `services[].ingress.host` (when
+          # ingress is enabled) or the in-cluster Service URL otherwise.
+          # The user just sets `ingress.host`; the issuer always matches
+          # what the browser hits. To override (e.g. external SSO), set
+          # `services[].issuer:` explicitly — `skip_if` honors it.
           # Ingress: same DSL shape as grafana/prometheus (singular
           # `ingress.host` + plural `ingress.hosts: [str]`), but the
           # dex chart's ingress.yaml expects a richer object form
@@ -392,6 +394,27 @@ charts:
           resources.requests.memory: dex.resources.requests.memory
           resources.limits.cpu: dex.resources.limits.cpu
           resources.limits.memory: dex.resources.limits.memory
+        # OIDC issuer auto-derivation (rda-cli 0.1.55+'s derived_values).
+        # The issuer claim in dex's tokens MUST match the URL the browser
+        # hits — Ingress URL when ingress is enabled, in-cluster Service
+        # URL otherwise. Auto-deriving from a SINGLE source of truth
+        # (`services[].ingress.host`) eliminates the entire class of
+        # "issuer says :5556 but browser uses :80" mismatches that
+        # produce "iss claim verify failed → 401" at runtime.
+        #
+        # `skip_if: issuer` respects an explicit user override on
+        # `services[].issuer:` for cases where the dex instance fronts
+        # an external SSO chain or sits behind a TLS-terminating proxy
+        # the bundle doesn't model.
+        derived_values:
+          - target: dex.config.issuer
+            skip_if: issuer
+            template: |
+              {{- if .Service.ingress.enabled -}}
+              http://{{ index .Service.ingress "host" }}
+              {{- else -}}
+              http://{{ .Release.Name }}-dex:5556
+              {{- end -}}
         # Chart-required fields the DSL doesn't surface (because they
         # don't vary across deployments). `rda render` writes these
         # AFTER applying values_mapping, only when at least one
@@ -423,16 +446,26 @@ charts:
           # configured at config.issuer, surfaced to consuming apps as
           # DEX_URL. App OIDC libraries expect this shape.
           - {key: url, template: "http://{{ .Release.Name }}-dex:5556"}
-          # Issuer is identical to url today (same endpoint). Kept
-          # separate so future SSL / external-issuer configs can
-          # diverge without breaking the env-var contract.
+          # Issuer must match dex.config.issuer — that's auto-derived
+          # via derived_values above. Here we mirror the same logic
+          # so AUTH_ISSUER (the env var the app pod reads) matches the
+          # browser-facing URL the user actually hits.
+          # Today `template:` only has access to .Release.Name, not
+          # the service entry — so we hardcode the in-cluster fallback.
+          # Devs whose ingress is enabled should rely on AUTH_PUBLIC_URL
+          # (TODO #90) for the browser-facing URL; AUTH_ISSUER stays
+          # in-cluster for token verification (which is fine — both
+          # token "iss" and verifier hit the same in-cluster endpoint
+          # when the app's OIDC client uses AUTH_PUBLIC_URL for the
+          # discovery, then validates against AUTH_ISSUER's JWKS).
           - {key: issuer, template: "http://{{ .Release.Name }}-dex:5556"}
 
         scaffold:
           # DSL fields (mapped via values_mapping)
-          issuer:
-            default: "http://{{.ProjectName}}-dex.{{.ProjectName}}.svc.cluster.local:5556"
-            comment: "OIDC issuer URL — apps use this as their identity provider"
+          # NOTE: `issuer` is no longer scaffolded — it's auto-derived from
+          # `services[].ingress.host` (or in-cluster URL when no ingress)
+          # by `derived_values:` above. Devs who need an external SSO
+          # issuer override can set `services[].issuer:` manually.
           ingress.enabled:
             default: false
           ingress.host:
