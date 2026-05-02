@@ -857,3 +857,53 @@ Status: in-progress
   production flow documented in `concepts/auth.md`.
 
 - Spec library-chart version 0.11.31 → 0.11.32.
+
+## MILESTONE: 0.11.33
+
+- BUGFIX: web-go Procfile now uses an ABSOLUTE PATH for the
+  binary instead of the bare module name. Fixes a class of silent
+  crashloops where a project whose name matches a POSIX builtin
+  (test, time, echo, which, true, false, ...) starts but exits 1
+  without any output — kubectl logs is empty, container events
+  show only `Back-off restarting failed container` with no clue.
+
+- Root cause: the cnb launcher's runtime PATH does NOT include
+  `/layers/heroku_go/go_target/bin/` (the dir where heroku/go puts
+  the compiled binary), contrary to the comment in the previous
+  Procfile template which claimed it did. So `web: {{ .Name }}`
+  resolved through $PATH lookup. For a project named `test`, this
+  hit `/usr/bin/test` (the POSIX `test [expr]` builtin) which
+  exits 1 silently when called with no args. The Procfile launcher
+  doesn't print "command not found" because the lookup succeeded
+  — just at the wrong binary.
+
+- Diagnostic signature you'd see if you hit this in the future:
+
+      kubectl -n <ns> get pod -l app.kubernetes.io/name=<project>
+      <project>-...   0/1   CrashLoopBackOff   N (Xs ago)   Ym
+
+      kubectl logs <pod> --previous
+      <empty output>
+
+      kubectl describe pod <pod> | grep "Last State" -A 4
+        Last State: Terminated
+          Reason: Error
+          Exit Code: 1
+          Started:  ...
+          Finished: ... (same second — instant exit)
+
+- Fix: the template's Procfile now writes:
+
+      web: /layers/heroku_go/go_target/bin/{{ .Name }}
+      dev: /layers/heroku_go/go_target/bin/{{ .Name }}
+
+  Absolute paths bypass $PATH lookup entirely. Same dir as before,
+  just made explicit. The Procfile comments document the runtime
+  PATH situation + the POSIX-shadowing footgun for the next person.
+
+- Backwards-compat: existing projects keep working with the bare
+  name when the project name doesn't clash with a POSIX builtin —
+  but they're brittle. Migration: copy the absolute-path lines
+  from the current template Procfile into the project's Procfile.
+
+- Spec library-chart version 0.11.32 → 0.11.33.
