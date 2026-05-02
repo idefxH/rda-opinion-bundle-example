@@ -4,8 +4,10 @@
 //   1. PostgreSQL binding (env vars projected from the SBS Secret).
 //   2. Prometheus metrics on /metrics (HTTP duration histogram +
 //      domain counters/gauges).
-//   3. Optional Dex (OIDC) login when DEX_PUBLIC_URL is set —
-//      browser-side login via oidc-client-ts, served from CDN.
+//   3. Optional OIDC login when <AUTH_BINDING>_PUBLIC_URL is set —
+//      browser-side login via oidc-client-ts (CDN). AUTH_BINDING
+//      defaults to 'AUTH'; override (e.g. AUTH_BINDING=idp) to read
+//      from a different binding's PUBLIC_URL projection.
 //
 // The Postgres binding is read from env vars projected by the rda
 // library helper (services[].binding=db => DB_HOST, DB_PORT,
@@ -39,8 +41,15 @@ import (
 const accentColor = "#736def"
 
 var (
-	dbPrefix    = strings.ToUpper(envOrDefault("DB_BINDING", "DB"))
-	dexPublicURL = os.Getenv("DEX_PUBLIC_URL")
+	dbPrefix     = strings.ToUpper(envOrDefault("DB_BINDING", "DB"))
+	authPrefix   = strings.ToUpper(envOrDefault("AUTH_BINDING", "AUTH"))
+	// authPublicURL is the browser-facing OIDC issuer URL — auto-derived
+	// from services[].ingress.host by rda render + the binding-secret's
+	// public_url key (bundle 0.11.27+). Empty when no auth binding is
+	// configured; the home page renders without the login UI.
+	authPublicURL = os.Getenv(authPrefix + "_PUBLIC_URL")
+	// Back-compat alias for projects that haven't migrated to AUTH_BINDING.
+	dexPublicURL = authPublicURL
 	oidcClientID = envOrDefault("OIDC_CLIENT_ID", "message-wall")
 	startTime    = time.Now()
 
@@ -285,8 +294,8 @@ func main() {
 	addr := ":" + port
 	log.Printf("🚀 Server running on http://localhost%s", addr)
 	log.Printf("📊 Metrics at http://localhost%s/metrics", addr)
-	if dexPublicURL != "" {
-		log.Printf("🔐 OIDC: %s", dexPublicURL)
+	if authPublicURL != "" {
+		log.Printf("🔐 OIDC: %s", authPublicURL)
 	}
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal(err)
