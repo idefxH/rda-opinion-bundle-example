@@ -244,6 +244,22 @@ func main() {
 			return
 		}
 		t := time.Now()
+		// Server-side auth gate: when OIDC is configured, redirect to
+		// /login if there's no session cookie. This makes the home page
+		// behave the same as /admin — gated server-side, deterministic,
+		// independent of the browser-side oidc-client-ts JS (which can
+		// fail silently if the CDN is blocked or localStorage is stale).
+		//
+		// When OIDC isn't configured (no auth binding) the home page
+		// stays public — the Message Wall demo is meant to be readable
+		// without auth in that mode.
+		if oidcVerifier != nil {
+			if c, err := r.Cookie(sessionCookieName); err != nil || c.Value == "" {
+				http.Redirect(w, r, "/login", http.StatusFound)
+				observe("GET", "/", http.StatusFound, t)
+				return
+			}
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = tpl.Execute(w, pageData{
 			Name:         "{{ .Name }}",
