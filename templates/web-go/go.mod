@@ -1,12 +1,18 @@
 module example.com/{{ .Name }}
 
-// pgx v5.7+ requires go >= 1.23. We pin 1.24 for forward compatibility
-// (heroku/go fetches the requested toolchain from go.dev/dl at build).
-go 1.24
+// pgx v5.7+ requires go >= 1.23. We pin 1.25 (required by go-oidc/v3 v3.18+; heroku/go
+// fetches the requested toolchain from go.dev/dl at build).
+go 1.25.0
 
 require (
+	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/prometheus/client_golang v1.21.1
+)
+
+require (
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 )
 
 // Indirect deps. Pinned by go mod tidy on the rendered template — ship
