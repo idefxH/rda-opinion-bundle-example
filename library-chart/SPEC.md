@@ -1001,3 +1001,49 @@ Status: in-progress
   normally. Same behavior on web-nodejs.
 
 - Spec library-chart version 0.11.34 → 0.11.35.
+
+## MILESTONE: 0.11.36
+
+- BUGFIX: `library-chart/templates/ingress.yaml` now references the
+  Service backend port by NUMBER (`port.number: 80`) instead of by
+  NAME (`port.name: http`). Fixes a 503 Service Unavailable on
+  Traefik 2.x (k3s, Rancher Desktop default).
+
+- Symptom: a project with `suse-library.ingress.enabled: true` and
+  a healthy app pod returned `503 Service Unavailable` from
+  `http://<host>.localtest.me/` even though the Service had endpoints
+  and `kubectl port-forward svc/<name> 18081:80` worked. Traefik
+  logs showed:
+
+      ERR Cannot create service error="service not found"
+        ingress=test namespace=test
+        serviceName=test
+        servicePort=&ServiceBackendPort{Name:http,Number:0}
+
+  The misleading "service not found" message is what Traefik emits
+  when it can't resolve a port-name backend reference on an
+  otherwise-existing Service.
+
+- Root cause: Traefik 2.x on k3s has a known issue resolving
+  `port.name` Service-backend references in some configurations
+  (the IngressClass+EndpointSlice path). `port.number` is always
+  reliable.
+
+- Fix is a 4-line YAML change: `port.name: http` → `port.number: 80`.
+  The number matches the Service template's hardcoded `port: 80`
+  (also in library-chart). Future cleanup: parameterise both via
+  `.Values.service.port`.
+
+- The dex-idp upstream chart already uses `port.number: 5556`, which
+  is why `auth.<host>.localtest.me` worked while `<host>.localtest.me`
+  was 503 with the same Traefik installation — different Ingress
+  template paths, only the library-chart's app Ingress was affected.
+
+- The `ingress-ui.yaml` template (services with `ui.expose: true`)
+  was already using `port.number: {{ $cfg.port }}` and was unaffected.
+
+- Validated end-to-end on M2 Studio: post-fix, `curl -i http://test.localtest.me/`
+  returns `HTTP/1.1 302 Found Location: /login` (the OIDC gate from
+  0.11.35), matching the expected behavior.
+
+- Spec library-chart version 0.11.35 → 0.11.36.
