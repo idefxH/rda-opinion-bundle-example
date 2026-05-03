@@ -1088,3 +1088,56 @@ Status: in-progress
   out of scope.
 
 - Spec library-chart version 0.11.36 → 0.11.37.
+
+## MILESTONE: 0.11.38
+
+- REVERT (partial of 0.11.32 + revert of 0.11.37): the dex scaffold
+  is reverted to its pre-0.11.32 shape on two points:
+
+  1. `bootstrap.auth.users` and `bootstrap.auth.clients` pre-fill is
+     removed. These pre-filled credentials (`dev@example.com / dev`,
+     `<project>-client / dev-secret`) made the demo work in 2
+     commands but introduced 3 real problems:
+
+     - **Pedagogy lost**: devs never discover `rda bootstrap
+       auth.users add` because the project "just works".
+     - **Dev→prod anti-pattern**: pre-filled `staticPasswords` is
+       dev-only and dex-specific. In prod, auth uses connectors +
+       ExternalSecrets.
+     - **Multi-provider incoherence**: `bootstrap.auth.users` is a
+       generic capability, but the pre-fill content is dex-specific.
+       Keycloak users live in a realm; github oauth users are
+       external. Pre-filling ties the scaffold to a single backend.
+
+  2. `ingress.enabled: default: true` (added in 0.11.37) reverts to
+     `false` — consistent with all other bindings. Devs flip it
+     explicitly to true when they want browser-side OIDC, with a
+     scaffolded comment that explains the contract.
+
+- The recommended dev workflow is now **explicit gestures**:
+
+      rda new myapp --template web-go
+      cd myapp
+      rda add-service dex auth
+      # in deploy/values.yaml, flip:
+      #   services[binding=auth].enabled: true
+      #   services[binding=auth].ingress.enabled: true
+      rda bootstrap auth.users add <email> --field password=<pw>
+      # auth.clients still requires yq for redirectURIs (list-typed
+      # field — rda-cli issue: support list --field). For dex:
+      yq -i '...bootstrap.auth.clients = [...]' deploy/values.yaml
+      tilt up
+
+  See `concepts/capabilities.md` (the three-tier DSL surface:
+  hardcoded / capabilities / passthrough) and `concepts/auth.md`.
+
+- KEPT from 0.11.32:
+  - `passthrough.config.oauth2.passwordConnector: local` — legitimate
+    dex-specific config on the verbatim escape hatch.
+  - `binding_secret` keys `client_id` / `client_secret` /
+    `redirect_uri` — proto-contract for the future `category:
+    auth.oidc` formalisation.
+  - All template fixes (Procfile absolute path, OIDC env name
+    alignment, server-side gate on `/`, ingress port.number).
+
+- Spec library-chart version 0.11.37 → 0.11.38.
