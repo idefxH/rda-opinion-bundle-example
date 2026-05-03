@@ -558,17 +558,21 @@ charts:
           # by `derived_values:` above. Devs who need an external SSO
           # issuer override can set `services[].issuer:` manually.
           #
-          # Ingress.enabled defaults to TRUE for dex (overriding the
-          # convention used for postgres/redis/etc which default false).
-          # Without it, the binding-secret's `public_url` falls back to
-          # the in-cluster URL `http://<release>-dex:5556` which the
-          # BROWSER cannot reach — every browser-side OIDC flow then
-          # redirects to that unreachable URL and stalls. The other
-          # bindings (postgres etc) are pod-internal so their default
-          # of `ingress.enabled: false` is correct.
+          # ingress.enabled defaults to false (consistent with all other
+          # bindings — postgres, redis, mariadb, etc are pod-internal so
+          # don't need ingress). DEX is the exception: when the project
+          # uses BROWSER-side OIDC, the dev MUST flip this to true so the
+          # binding-secret's `public_url` carries the ingress URL, not
+          # the in-cluster fallback. The recommended workflow:
+          #
+          #   rda add-service dex auth
+          #   # in deploy/values.yaml: flip enabled + ingress.enabled
+          #   rda bootstrap auth.users add <email> --field password=<pw>
+          #
+          # See concepts/auth.md and concepts/capabilities.md for the
+          # explicit-gestures workflow.
           ingress.enabled:
-            default: true
-            comment: "dex needs ingress for browser OIDC; flip to false only for pure server-to-server / Bearer use"
+            default: false
           ingress.host:
             default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"
@@ -610,27 +614,13 @@ charts:
           passthrough.config.oauth2.passwordConnector:
             default: local
             comment: "connector for password-grant; flip to '' if you only want browser flow"
-          # ─── Bootstrap-data defaults (Phase 2.4 of DO 0001) ────
-          # Pre-fills one dev user + one OIDC client so a fresh
-          # `rda new <p> && cd <p> && rda add-service dex auth &&
-          # tilt up` produces a working OIDC chain WITHOUT any
-          # manual values.yaml edit. Devs edit / replace these
-          # before promoting to staging+ (production: connectors,
-          # ExternalSecrets, real users — see concepts/auth.md).
-          bootstrap:
-            comment: "dev bootstrap data — replace before staging+"
-            default:
-              auth.users:
-                - name: dev@example.com
-                  password: dev
-              auth.clients:
-                - id: "{{.ProjectName}}-client"
-                  secret: dev-secret
-                  name: "{{.ProjectName}}"
-                  redirectURIs:
-                    - "http://{{.ProjectName}}.localtest.me/auth/callback"
-                    # second URL for `kubectl port-forward 18081:80` flow
-                    - "http://localhost:18081/auth/callback"
+          # NOTE: `bootstrap.auth.users` and `bootstrap.auth.clients`
+          # are NOT pre-filled. The dev declares them explicitly via
+          # `rda bootstrap auth.users add ...` (typed CLI) or by
+          # editing `services[binding=auth].bootstrap.*` directly.
+          # This avoids burying default credentials (dev/dev) in
+          # scaffolded yaml where they easily survive into staging.
+          # See concepts/auth.md for the recommended workflow.
 
         # ─── Capabilities (Phase 2 of DO 0001-A) ───────────────────
         # Bootstrap-data the dex chart accepts: a typed list of users
