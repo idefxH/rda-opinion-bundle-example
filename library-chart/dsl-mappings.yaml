@@ -557,8 +557,18 @@ charts:
           # `services[].ingress.host` (or in-cluster URL when no ingress)
           # by `derived_values:` above. Devs who need an external SSO
           # issuer override can set `services[].issuer:` manually.
+          #
+          # Ingress.enabled defaults to TRUE for dex (overriding the
+          # convention used for postgres/redis/etc which default false).
+          # Without it, the binding-secret's `public_url` falls back to
+          # the in-cluster URL `http://<release>-dex:5556` which the
+          # BROWSER cannot reach — every browser-side OIDC flow then
+          # redirects to that unreachable URL and stalls. The other
+          # bindings (postgres etc) are pod-internal so their default
+          # of `ingress.enabled: false` is correct.
           ingress.enabled:
-            default: false
+            default: true
+            comment: "dex needs ingress for browser OIDC; flip to false only for pure server-to-server / Bearer use"
           ingress.host:
             default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"

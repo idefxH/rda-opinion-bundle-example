@@ -1047,3 +1047,44 @@ Status: in-progress
   0.11.35), matching the expected behavior.
 
 - Spec library-chart version 0.11.35 → 0.11.36.
+
+## MILESTONE: 0.11.37
+
+- BUGFIX: dex `scaffold.ingress.enabled` now defaults to `true`
+  (was `false`). Without ingress on a dex binding, the
+  binding-secret's `public_url` falls back to the in-cluster URL
+  `http://<release>-dex:5556` — which the BROWSER cannot reach.
+  Browser-side OIDC flows redirect to that unreachable URL and
+  stall ("ERR_NAME_NOT_RESOLVED" or worse, just hang).
+
+- This was the last friction in the "OIDC dev-ready in 2 commands"
+  promise. Pre-fix sequence required:
+    1. `rda new myapp --template web-go`
+    2. `cd myapp && rda add-service dex auth`
+    3. flip `services[binding=auth].enabled: true`     ← user edit
+    4. flip `services[binding=auth].ingress.enabled: true`  ← user edit (FORGOTTEN)
+    5. `tilt up`
+
+  The 4th step was the silent killer — devs flip step 3 and forget
+  step 4 because the scaffold doesn't hint that ingress matters
+  for OIDC. Post-fix, only step 3 remains; step 4 is the new
+  default.
+
+- Why dex-specific (not all bindings): postgres/redis/mariadb/etc
+  are pod-internal — apps reach them via `<BINDING>_HOST`
+  (in-cluster Service URL), no browser involved. Their default
+  `ingress.enabled: false` is correct. Dex is the only bundled
+  service whose flow REQUIRES the browser to reach it — hence
+  the special-case default.
+
+- Devs who want server-to-server / Bearer-only OIDC (no browser
+  flow, no consent UI) can flip back to false explicitly. The
+  scaffold comment documents both paths.
+
+- Side note: a follow-up could also flip `services[binding].enabled`
+  to true on dex specifically (since `rda add-service dex auth`
+  is itself an explicit user gesture meaning \"I want this enabled\"),
+  reducing the recipe from 1 manual edit to zero. Not in this PR;
+  out of scope.
+
+- Spec library-chart version 0.11.36 → 0.11.37.
