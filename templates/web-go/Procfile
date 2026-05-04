@@ -15,15 +15,11 @@
 #   2. Even non-clashing names rely on bash $PATH lookup which is
 #      brittle when buildpack versions change the runtime PATH.
 #
-# - web: production launch.
-# - dev: same as web for now. The Tilt extension's live_update
-#   path-sync copies source files into /workspace on every save;
-#   the running container keeps the existing binary until the next
-#   pack rebuild. For a true sub-2s live recompile, install air
-#   locally (`go install github.com/air-verse/air@latest`) and
-#   override `dev:` here to `air -c .air.toml`. (We can't ship air
-#   in go.mod's `tool` directive — it breaks heroku/go's `web`
-#   process auto-registration: 'tried to set web to default but it
-#   doesn't exist'.)
+# - web: production launch (compiled binary).
+# - dev: live-reload via air. The Tilt extension syncs source files
+#   into /workspace and air recompiles + re-execs on change (~2s).
+#   Air is installed at build time via the Tilt extension's
+#   live_update_install_cmd (go install). Not in go.mod's tool
+#   directive because it breaks heroku/go's web process discovery.
 web: /layers/heroku_go/go_target/bin/{{ .Name }}
-dev: /layers/heroku_go/go_target/bin/{{ .Name }}
+dev: air -c .air.toml
