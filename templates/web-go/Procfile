@@ -16,10 +16,9 @@
 #      brittle when buildpack versions change the runtime PATH.
 #
 # - web: production launch (compiled binary).
-# - dev: live-reload via air. The Tilt extension syncs source files
-#   into /workspace and air recompiles + re-execs on change (~2s).
-#   Air is installed at build time via the Tilt extension's
-#   live_update_install_cmd (go install). Not in go.mod's tool
-#   directive because it breaks heroku/go's web process discovery.
+# - dev: same binary. Go SDK is not in the CNB runtime image
+#   (heroku/heroku:24), so in-container recompilation (air) is not
+#   possible. Tilt does a full pack rebuild on each source change;
+#   heroku/go's layer cache keeps subsequent builds fast (~10-15s).
 web: /layers/heroku_go/go_target/bin/{{ .Name }}
-dev: air -c .air.toml
+dev: /layers/heroku_go/go_target/bin/{{ .Name }}
