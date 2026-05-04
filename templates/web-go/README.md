@@ -26,13 +26,11 @@ A Go web service scaffolded by `rda new <name> --template web-go`.
 The `GET /` endpoint will then report the postgres binding it found
 under `/bindings/db/` (host, port, database — credentials redacted).
 
-## SBS discovery
+## Database discovery
 
-The example app discovers the database **by type, not by name**:
-
-    findBindingByType(root, "postgresql")
-
-Whatever binding name you pass to `rda add-service` is irrelevant to
-the app code — same convention as Paketo and Spring Cloud Bindings.
-Set `DB_BINDING_NAME=<binding>` to disambiguate when there are multiple
-bindings of the same type.
+The example app discovers its database binding via env vars projected
+by the rda library helper (`DB_HOST`, `DB_PORT`, `DB_USERNAME`,
+`DB_PASSWORD`, `DB_DATABASE`). The binding name you pass to
+`rda add-service` becomes the env prefix (uppercase). Set
+`DB_BINDING=<binding>` to override when multiple postgres bindings
+exist.

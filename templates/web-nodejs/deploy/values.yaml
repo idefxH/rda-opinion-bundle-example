@@ -93,7 +93,8 @@ suse-library:
   # overlay stays in sync. Don't edit values.generated.yaml by hand
   # — your changes will be overwritten on the next render.
   #
-  # The bundled example app (src/index.js) discovers its DB binding
-  # by type (`findBindingByType('postgresql')`), so the binding name
-  # you pick is up to you — `db`, `orders-db`, anything unique
-  # within services[].
+  # The bundled example app discovers its DB binding via env vars
+  # projected by the rda library helper (DB_HOST, DB_PORT, DB_USERNAME,
+  # DB_PASSWORD, DB_DATABASE). The binding name you pass to
+  # `rda add-service` becomes the env prefix (uppercase). Override
+  # via DB_BINDING env var if multiple postgres bindings exist.
