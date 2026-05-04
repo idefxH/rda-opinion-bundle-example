@@ -52,6 +52,13 @@ templates:
       fit for queue consumers (Kafka, Redis pub/sub), cron schedulers,
       and data pipeline processors.
     path_in_bundle: templates/worker-go
+  - id: worker-java
+    display_name: Worker / Consumer (Java)
+    language: java
+    description: |
+      Java 21 background worker — no HTTP server, no Service, no Ingress.
+      Natural fit for Kafka consumers, batch processors, schedulers.
+    path_in_bundle: templates/worker-java
 
 library_chart:
   # v1: file:// URI relative to bundle root. The rda HelmClient.PullChart

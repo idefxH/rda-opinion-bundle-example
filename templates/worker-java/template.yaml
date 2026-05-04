@@ -1,0 +1,17 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: worker-java
+  display_name: Worker / Consumer (Java)
+  language: java
+  description: |
+    Java 21 background worker — no HTTP server, no Service, no Ingress.
+    Natural fit for Kafka consumers, batch processors, schedulers.
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier.
+      autoCompute: from-template-language
