@@ -1,39 +1,21 @@
 # Project values for {{ .Name }}.
 #
-# This template is DSL-first (suse-library v0.11.0+). To attach a
-# backing service (postgres, redis, grafana, ...), use:
+# Add backing services:  rda add-service <type> <binding>
+# Wire datasources:      rda add-datasource <source> --to <consumer>
+# Bootstrap auth:        rda bootstrap auth.clients init --binding <b>
 #
-#   rda add-service postgresql payments-db
-#
-# It writes a `services[]` entry below AND auto-flips
-# `<chart>.enabled: true` for Helm dep resolution. Both halves are
-# required: services[] drives the DSL helpers (Secret + env wiring),
-# and <chart>.enabled gates the AppCo sub-chart deployment in
-# library-chart's Chart.yaml.
-#
-# Edit the auth/persistence/metrics blocks under each service entry
-# to taste — defaults are dev-tuned, not prod.
+# `rda render` projects services[] into .rda/values.generated.yaml.
+# Don't edit values.generated.yaml — it's overwritten on each render.
 
 suse-library:
   name: {{ .Name }}
   replicas: 1
   port: 8080
 
-  # ─── Ingress (cluster Traefik / FIPS variant) ──────────────────────
-  # The library auto-renders an Ingress when this block is present.
-  #
-  # Default host uses localtest.me — a public wildcard DNS that resolves
-  # *.localtest.me to 127.0.0.1 from any OS, no /etc/hosts edits needed.
-  # Works on macOS, Linux, AND Windows out of the box. The shorter
-  # `<name>.localhost` form is also fine on macOS / Linux (where modern
-  # mDNS resolves *.localhost to 127.0.0.1) but it's NOT universal
-  # — Windows resolution is hit-or-miss without registry tweaks.
-  # Change all hosts for staging+.
   ingress:
     enabled: true
     hosts:
       - {{ .Name }}.localtest.me
-      # - {{ .Name }}.localhost  # alternative (macOS / Linux only)
 
   image:
     repository: {{ .Name }}
@@ -43,58 +25,11 @@ suse-library:
   imagePullSecrets:
     - name: application-collection
 
-  # ─── Workload env block ────────────────────────────────────────────
-  # Explicit env vars projected into your application container,
-  # following Design Orientation 0001 Appendix A (rda-cli 0.1.52+ /
-  # suse-library 0.11.28+).
-  #
-  # Each entry can be:
-  #   - A bare ${binding:NAME.field} → the value comes via
-  #     valueFrom.secretKeyRef from the binding-secret. The actual
-  #     value never appears in `kubectl get deployment -o yaml`. Use
-  #     for secrets and fields backed by binding_secret keys
-  #     (host, port, username, password, database, ...).
-  #   - A composed string with embedded ${binding:...} → resolved
-  #     at render time to a literal `value:` (the resolved string
-  #     IS visible in the deployment spec — fine for dev, OK if no
-  #     secret leaks; the lint flags plaintext passwords leaking
-  #     into overrides.<non-dev>).
-  #   - A pure literal → emitted as `value: "<literal>"`.
-  #
-  # `rda add-service` will scaffold the conventional set for each
-  # binding type as you go (e.g. DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/
-  # DB_NAME for postgresql). Edit / rename / remove freely.
-  #
-  # See https://github.com/idefxH/rda-docs/blob/main/design-orientations/0001-appendix-a-score-comparison.md
+  # Env vars projected into your container. `rda add-service` scaffolds
+  # entries here automatically. Values use ${binding:NAME.field} syntax
+  # — resolved at render time from the binding-secret.
   env: {}
-  # Example, once you've added a postgres binding:
-  # env:
-  #   DB_HOST:        ${binding:db.host}
-  #   DB_PORT:        ${binding:db.port}
-  #   DB_USER:        ${binding:db.username}
-  #   DB_PASSWORD:    ${binding:db.password}
-  #   DB_NAME:        ${binding:db.database}
-  #   DATABASE_URL:   "postgres://${binding:db.username}:${binding:db.password}@${binding:db.host}:${binding:db.port}/${binding:db.database}"
 
-
-  # ─── Backing services ──────────────────────────────────────────────
-  # Add via `rda add-service <type> <binding>`, e.g.:
-  #
-  #   rda add-service postgresql db
-  #
-  # The CLI appends a services[] entry here (block style). Before
-  # `tilt up`, edit the appended entry's auth.user.password — it
-  # ships empty by design (no plaintext default in the template).
-  #
-  # The DSL is the source of truth. `rda render` projects services[]
-  # into deploy/.rda/values.generated.yaml (the AppCo sub-chart values
-  # Helm needs). The Tilt extension auto-runs `rda render` before
-  # every `helm template`, so as you edit services[] here, the
-  # overlay stays in sync. Don't edit values.generated.yaml by hand
-  # — your changes will be overwritten on the next render.
-  #
-  # Your app discovers its DB binding via env vars projected by the
-  # rda library helper (DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD,
-  # DB_DATABASE). The binding name you pass to `rda add-service`
-  # becomes the env prefix (uppercase). Override via DB_BINDING env
-  # var if multiple postgres bindings exist.
+  # Backing services — added by `rda add-service`.
+  # Flip `enabled: true` and fill credentials before `tilt up`.
+  # services: []
