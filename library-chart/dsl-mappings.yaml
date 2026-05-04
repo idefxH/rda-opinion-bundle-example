@@ -329,11 +329,11 @@ charts:
           resources.requests.cpu:
             default: "50m"
           resources.requests.memory:
-            default: "128Mi"
+            default: "256Mi"
           resources.limits.cpu:
             default: "200m"
           resources.limits.memory:
-            default: "256Mi"
+            default: "512Mi"
 
   dex:
     versions:

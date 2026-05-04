@@ -117,7 +117,21 @@ const client = new Client({
   database: env('DATABASE'),
 });
 
-const html = () => `<!DOCTYPE html>
+function usernameFromCookie(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[SESSION_COOKIE_NAME] || '';
+  if (!token) return '';
+  const parts = token.split('.');
+  if (parts.length < 2) return '';
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    return payload.preferred_username || payload.name || payload.email || 'user';
+  } catch { return ''; }
+}
+
+const html = (req) => {
+  const username = AUTH_PUBLIC_URL ? usernameFromCookie(req) : '';
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -179,7 +193,7 @@ const html = () => `<!DOCTYPE html>
       <div class="info-pill"><span class="dot"></span> <span id="pod">—</span></div>
       <div class="info-pill">⏱ Uptime: <span id="uptime">—</span></div>
       <div class="info-pill">💬 <span id="count">0</span> messages</div>
-      ${DEX_PUBLIC_URL ? '<div class="info-pill">🔐 <span id="username">…</span> <a id="logout-btn" href="#" style="margin-left:0.4rem;color:#ef4444;text-decoration:none;font-weight:600;display:none" title="Logout">✕</a></div>' : ''}
+      ${username ? `<div class="info-pill">🔐 ${username} <a href="/logout" style="margin-left:0.4rem;color:#ef4444;text-decoration:none;font-weight:600" title="Logout">✕</a></div>` : ''}
     </div>
   </header>
 
@@ -276,55 +290,12 @@ const html = () => `<!DOCTYPE html>
     }
 
     window._appLoad = load;
-    ${DEX_PUBLIC_URL ? '' : `
     load();
     setInterval(load, 3000);
-    `}
   </script>
-  ${DEX_PUBLIC_URL ? `
-  <script type="module">
-    // ─── Dex SSO (ES module, OIDC via oidc-client-ts) ────
-    function startApp() { window._appLoad(); setInterval(window._appLoad, 3000); }
-    try {
-      const { UserManager, WebStorageStateStore } = await import('https://cdn.jsdelivr.net/npm/oidc-client-ts@3/+esm');
-      const um = new UserManager({
-        authority: '${DEX_PUBLIC_URL}',
-        client_id: '${OIDC_CLIENT_ID}',
-        redirect_uri: window.location.origin + '/',
-        post_logout_redirect_uri: window.location.origin + '/',
-        response_type: 'code',
-        scope: 'openid profile email',
-        userStore: new WebStorageStateStore({ store: window.localStorage }),
-      });
-      if (window.location.search.includes('code=')) {
-        await um.signinRedirectCallback();
-        history.replaceState({}, document.title, window.location.pathname);
-      }
-      let user = await um.getUser();
-      if (!user || user.expired) {
-        await um.signinRedirect();
-        return;
-      }
-      const name = (user.profile && (user.profile.preferred_username || user.profile.name || user.profile.email)) || 'user';
-      document.getElementById('username').textContent = name;
-      const logoutBtn = document.getElementById('logout-btn');
-      if (logoutBtn) {
-        logoutBtn.style.display = 'inline';
-        logoutBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          um.signoutRedirect();
-        });
-      }
-      startApp();
-    } catch (err) {
-      console.warn('Dex/OIDC not available:', err);
-      const el = document.getElementById('username'); if (el) el.textContent = '(no auth)';
-      startApp();
-    }
-  </script>
-  ` : ''}
 </body>
-</html>`;
+</html>`};
+
 
 const startTime = Date.now();
 
@@ -453,6 +424,22 @@ async function start() {
     messagesCurrent.set(parseInt(count));
   }
 
+  let endSessionEndpoint = '';
+  if (AUTH_URL) {
+    try {
+      const resp = await fetch(AUTH_URL + '/.well-known/openid-configuration');
+      const doc = await resp.json();
+      if (doc.end_session_endpoint) {
+        endSessionEndpoint = doc.end_session_endpoint;
+        console.log('🔐 OIDC end_session_endpoint: ' + endSessionEndpoint);
+      } else {
+        console.log('ℹ️  OIDC provider has no end_session_endpoint (logout will clear cookie only)');
+      }
+    } catch (err) {
+      console.log('⚠️  OIDC discovery failed: ' + err.message + ' (logout will clear cookie only)');
+    }
+  }
+
   const server = http.createServer(async (req, res) => {
     const end = httpDuration.startTimer();
     let status = 200;
@@ -477,7 +464,7 @@ async function start() {
           }
         }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(html());
+        res.end(html(req));
         end({ method: 'GET', path: '/', status: 200 });
         return;
       }
@@ -583,7 +570,24 @@ async function start() {
       }
 
       if (req.url === '/logout') {
+        // Capture the id_token BEFORE clearing the cookie — needed as
+        // id_token_hint for RP-Initiated Logout at the IdP.
+        const cookies = parseCookies(req.headers.cookie);
+        const rawIDToken = cookies[SESSION_COOKIE_NAME] || '';
         clearCookie(res, SESSION_COOKIE_NAME);
+        // If OIDC is configured, perform RP-Initiated Logout against
+        // dex's end_session_endpoint so the IdP session is terminated
+        // too — not just the local cookie.
+        if (endSessionEndpoint && rawIDToken) {
+          const params = new URLSearchParams({
+            id_token_hint: rawIDToken,
+            post_logout_redirect_uri: appBaseURL(req) + '/',
+          });
+          res.writeHead(302, { Location: endSessionEndpoint + '?' + params.toString() });
+          res.end();
+          end({ method: req.method, path: '/logout', status: 302 });
+          return;
+        }
         res.writeHead(302, { Location: '/' });
         res.end();
         end({ method: req.method, path: '/logout', status: 302 });

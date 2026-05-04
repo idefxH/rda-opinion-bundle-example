@@ -31,6 +31,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -107,7 +108,8 @@ var (
 
 	// OIDC verifier — populated in main() if OIDC is configured.
 	// nil otherwise; /admin returns 503 in that case.
-	oidcVerifier *oidc.IDTokenVerifier
+	oidcVerifier      *oidc.IDTokenVerifier
+	endSessionEndpoint string
 
 	// Prometheus registry — explicit (vs default) so tests can drive it.
 	registry = prometheus.NewRegistry()
@@ -152,6 +154,7 @@ func main() {
 		keySet := oidc.NewRemoteKeySet(ctx, authURL+"/keys")
 		oidcVerifier = oidc.NewVerifier(authIssuer, keySet, &oidc.Config{ClientID: oidcClientID})
 		log.Printf("🔐 OIDC verifier ready (issuer=%s, jwks=%s/keys, client=%s)", authIssuer, authURL, oidcClientID)
+		endSessionEndpoint = discoverEndSessionEndpoint(authURL)
 	} else {
 		log.Printf("ℹ️  OIDC verifier disabled — set <%s>_URL, <%s>_ISSUER, OIDC_CLIENT_ID to enable /admin", authPrefix, authPrefix)
 	}
@@ -262,10 +265,10 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = tpl.Execute(w, pageData{
-			Name:         "{{ .Name }}",
-			Accent:       accentColor,
-			DexPublicURL: dexPublicURL,
-			OIDCClientID: oidcClientID,
+			Name:     "{{ .Name }}",
+			Accent:   accentColor,
+			Username: usernameFromCookie(r),
+			HasAuth:  oidcVerifier != nil,
 		})
 		observe("GET", "/", 200, t)
 	})
@@ -498,9 +501,27 @@ func main() {
 
 	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
 		t := time.Now()
+		// Capture the id_token BEFORE clearing the cookie — needed as
+		// id_token_hint for RP-Initiated Logout at the IdP.
+		var rawIDToken string
+		if c, err := r.Cookie(sessionCookieName); err == nil {
+			rawIDToken = c.Value
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1,
 		})
+		// If OIDC is configured, perform RP-Initiated Logout against
+		// dex's end_session_endpoint so the IdP session is terminated
+		// too — not just the local cookie.
+		if endSessionEndpoint != "" && rawIDToken != "" {
+			params := url.Values{
+				"id_token_hint":            {rawIDToken},
+				"post_logout_redirect_uri": {appBaseURL(r) + "/"},
+			}
+			http.Redirect(w, r, endSessionEndpoint+"?"+params.Encode(), http.StatusFound)
+			observe(r.Method, "/logout", http.StatusFound, t)
+			return
+		}
 		http.Redirect(w, r, "/", http.StatusFound)
 		observe(r.Method, "/logout", http.StatusFound, t)
 	})
@@ -600,10 +621,59 @@ type messageDTO struct {
 }
 
 type pageData struct {
-	Name         string
-	Accent       string
-	DexPublicURL string
-	OIDCClientID string
+	Name     string
+	Accent   string
+	Username string
+	HasAuth  bool
+}
+
+func discoverEndSessionEndpoint(baseURL string) string {
+	resp, err := http.Get(baseURL + "/.well-known/openid-configuration")
+	if err != nil {
+		log.Printf("⚠️  OIDC discovery failed: %v (logout will clear cookie only)", err)
+		return ""
+	}
+	defer resp.Body.Close()
+	var doc map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
+		log.Printf("⚠️  OIDC discovery parse failed: %v", err)
+		return ""
+	}
+	if ep, ok := doc["end_session_endpoint"].(string); ok && ep != "" {
+		log.Printf("🔐 OIDC end_session_endpoint: %s", ep)
+		return ep
+	}
+	log.Printf("ℹ️  OIDC provider has no end_session_endpoint (logout will clear cookie only)")
+	return ""
+}
+
+func usernameFromCookie(r *http.Request) string {
+	c, err := r.Cookie(sessionCookieName)
+	if err != nil || c.Value == "" {
+		return ""
+	}
+	parts := strings.SplitN(c.Value, ".", 3)
+	if len(parts) < 2 {
+		return ""
+	}
+	payload := parts[1]
+	if m := len(payload) % 4; m != 0 {
+		payload += strings.Repeat("=", 4-m)
+	}
+	decoded, err := base64.URLEncoding.DecodeString(payload)
+	if err != nil {
+		return ""
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(decoded, &claims); err != nil {
+		return ""
+	}
+	for _, key := range []string{"preferred_username", "name", "email"} {
+		if v, ok := claims[key].(string); ok && v != "" {
+			return v
+		}
+	}
+	return "user"
 }
 
 func observe(method, path string, status int, t time.Time) {
@@ -693,7 +763,7 @@ const htmlPage = `<!DOCTYPE html>
       <div class="info-pill"><span class="dot"></span> <span id="pod">—</span></div>
       <div class="info-pill">⏱ Uptime: <span id="uptime">—</span></div>
       <div class="info-pill">💬 <span id="count">0</span> messages</div>
-      {{if .DexPublicURL}}<div class="info-pill">🔐 <span id="username">…</span> <a id="logout-btn" href="#" style="margin-left:0.4rem;color:#ef4444;text-decoration:none;font-weight:600;display:none" title="Logout">✕</a></div>{{end}}
+      {{if .HasAuth}}<div class="info-pill">🔐 {{.Username}} <a href="/logout" style="margin-left:0.4rem;color:#ef4444;text-decoration:none;font-weight:600" title="Logout">✕</a></div>{{end}}
     </div>
   </header>
   <main>
@@ -786,49 +856,9 @@ const htmlPage = `<!DOCTYPE html>
       await load();
     }
     window._appLoad = load;
-    {{if not .DexPublicURL}}
     load();
     setInterval(load, 3000);
-    {{end}}
   </script>
-  {{if .DexPublicURL}}
-  <script type="module">
-    function startApp() { window._appLoad(); setInterval(window._appLoad, 3000); }
-    try {
-      const { UserManager, WebStorageStateStore } = await import('https://cdn.jsdelivr.net/npm/oidc-client-ts@3/+esm');
-      const um = new UserManager({
-        authority: '{{.DexPublicURL}}',
-        client_id: '{{.OIDCClientID}}',
-        redirect_uri: window.location.origin + '/',
-        post_logout_redirect_uri: window.location.origin + '/',
-        response_type: 'code',
-        scope: 'openid profile email',
-        userStore: new WebStorageStateStore({ store: window.localStorage }),
-      });
-      if (window.location.search.includes('code=')) {
-        await um.signinRedirectCallback();
-        history.replaceState({}, document.title, window.location.pathname);
-      }
-      let user = await um.getUser();
-      if (!user || user.expired) {
-        await um.signinRedirect();
-        return;
-      }
-      const name = (user.profile && (user.profile.preferred_username || user.profile.name || user.profile.email)) || 'user';
-      document.getElementById('username').textContent = name;
-      const logoutBtn = document.getElementById('logout-btn');
-      if (logoutBtn) {
-        logoutBtn.style.display = 'inline';
-        logoutBtn.addEventListener('click', (e) => { e.preventDefault(); um.signoutRedirect(); });
-      }
-      startApp();
-    } catch (err) {
-      console.warn('Dex/OIDC not available:', err);
-      const el = document.getElementById('username'); if (el) el.textContent = '(no auth)';
-      startApp();
-    }
-  </script>
-  {{end}}
 </body>
 </html>`
 
