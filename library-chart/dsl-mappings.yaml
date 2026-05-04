@@ -673,10 +673,13 @@ charts:
               name:         { type: string }
             projection:
               target: dex.config.staticClients
-              # No field_map — dex's staticClients schema is identical
-              # to ours: id / secret / redirectURIs / name.
-              # No transform — secrets are stored verbatim (dev-mode);
-              # ExternalSecrets / Vault is the production path.
+            init:
+              id: "{{project}}-client"
+              name: "{{project}}"
+              secret: "{{random:hex:24}}"
+              redirectURIs:
+                - "http://{{ingress.host}}/auth/callback"
+                - "http://localhost:18081/auth/callback"
 
   mariadb:
     versions:
