@@ -678,7 +678,7 @@ charts:
               name: "{{project}}"
               secret: "{{random:hex:24}}"
               redirectURIs:
-                - "http://{{ingress.host}}/auth/callback"
+                - "http://{{app.ingress.hosts.0}}/auth/callback"
                 - "http://localhost:18081/auth/callback"
 
   mariadb:
