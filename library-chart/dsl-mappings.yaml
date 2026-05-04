@@ -212,6 +212,7 @@ charts:
         # the UI in shared clusters. No auth_seed_paths since there's
         # no PVC-baked credential to drift against; the time-series
         # database is data, not auth state.
+        datasource_type: prometheus
         service:
           host: "{{ .Release.Name }}-prometheus-server.{{ .Release.Namespace }}.svc.cluster.local"
           port: 80
@@ -283,6 +284,7 @@ charts:
       - constraint: ">=12.0.0"
         # AppCo grafana 12.x. Service maps port 80 (chart default) to pod
         # port 3000. The library's auto-Ingress (issue #8) uses port 80.
+        datasources_target: grafana.datasources
         service:
           host: "{{ .Release.Name }}-grafana.{{ .Release.Namespace }}.svc.cluster.local"
           port: 80
