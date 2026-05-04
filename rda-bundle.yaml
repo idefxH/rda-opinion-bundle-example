@@ -83,3 +83,19 @@ service_catalog:
     local_chart_ref: file://library-chart
   - type_name: apache-kafka
     local_chart_ref: file://library-chart
+  - type_name: valkey
+    local_chart_ref: file://library-chart
+  - type_name: minio
+    local_chart_ref: file://library-chart
+  - type_name: vault
+    local_chart_ref: file://library-chart
+  - type_name: etcd
+    local_chart_ref: file://library-chart
+  - type_name: nats
+    local_chart_ref: file://library-chart
+  - type_name: opensearch
+    local_chart_ref: file://library-chart
+  - type_name: influxdb
+    local_chart_ref: file://library-chart
+  - type_name: harbor
+    local_chart_ref: file://library-chart

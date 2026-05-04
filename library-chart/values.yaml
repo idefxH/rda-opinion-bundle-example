@@ -158,3 +158,19 @@ minio:
 # passthrough.server for production. Injector sidecar off by default.
 vault:
   enabled: false
+
+# Charts added in 0.11.39
+etcd:
+  enabled: false
+
+nats:
+  enabled: false
+
+opensearch:
+  enabled: false
+
+influxdb:
+  enabled: false
+
+harbor:
+  enabled: false

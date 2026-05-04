@@ -1024,3 +1024,202 @@ charts:
             default: "500m"
           resources.limits.memory:
             default: "1Gi"
+
+  # ─── Charts added in 0.11.39 ────────────────────────────────────
+
+  etcd:
+    versions:
+      - constraint: ">=0.3.0 <1.0.0"
+        service:
+          host: "{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 2379
+        values_mapping:
+          auth.rbac.rootPassword: etcd.auth.rbac.rootPassword
+          persistence.enabled: etcd.persistence.enabled
+          persistence.size: etcd.persistence.size
+          resources.requests.cpu: etcd.resources.requests.cpu
+          resources.requests.memory: etcd.resources.requests.memory
+          resources.limits.cpu: etcd.resources.limits.cpu
+          resources.limits.memory: etcd.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: etcd, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-etcd"}
+          - {key: port, literal: "2379"}
+          - {key: url, template: "http://{{ .Release.Name }}-etcd:2379"}
+        scaffold:
+          auth.rbac.rootPassword:
+            default: ""
+            comment: "etcd root password — required"
+          persistence.enabled:
+            default: false
+          persistence.size:
+            default: "2Gi"
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "128Mi"
+          resources.limits.cpu:
+            default: "500m"
+          resources.limits.memory:
+            default: "512Mi"
+
+  nats:
+    versions:
+      - constraint: ">=2.0.0 <3.0.0"
+        service:
+          host: "{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 4222
+        values_mapping:
+          resources.requests.cpu: nats.resources.requests.cpu
+          resources.requests.memory: nats.resources.requests.memory
+          resources.limits.cpu: nats.resources.limits.cpu
+          resources.limits.memory: nats.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: nats, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-nats"}
+          - {key: port, literal: "4222"}
+          - {key: url, template: "nats://{{ .Release.Name }}-nats:4222"}
+        scaffold:
+          resources.requests.cpu:
+            default: "50m"
+          resources.requests.memory:
+            default: "64Mi"
+          resources.limits.cpu:
+            default: "200m"
+          resources.limits.memory:
+            default: "256Mi"
+
+  opensearch:
+    versions:
+      - constraint: ">=3.0.0 <4.0.0"
+        service:
+          host: "{{ .Release.Name }}-opensearch.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 9200
+        values_mapping:
+          persistence.enabled: opensearch.persistence.enabled
+          persistence.size: opensearch.persistence.size
+          resources.requests.cpu: opensearch.resources.requests.cpu
+          resources.requests.memory: opensearch.resources.requests.memory
+          resources.limits.cpu: opensearch.resources.limits.cpu
+          resources.limits.memory: opensearch.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: opensearch, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-opensearch"}
+          - {key: port, literal: "9200"}
+          - {key: url, template: "http://{{ .Release.Name }}-opensearch:9200"}
+        scaffold:
+          persistence.enabled:
+            default: false
+          persistence.size:
+            default: "8Gi"
+          resources.requests.cpu:
+            default: "500m"
+          resources.requests.memory:
+            default: "1Gi"
+          resources.limits.cpu:
+            default: "2"
+          resources.limits.memory:
+            default: "2Gi"
+
+  influxdb:
+    versions:
+      - constraint: ">=2.0.0 <3.0.0"
+        service:
+          host: "{{ .Release.Name }}-influxdb.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 8086
+        values_mapping:
+          auth.admin.token: influxdb.auth.admin.token
+          auth.admin.org: influxdb.auth.admin.org
+          auth.admin.bucket: influxdb.auth.admin.bucket
+          persistence.enabled: influxdb.persistence.enabled
+          persistence.size: influxdb.persistence.size
+          resources.requests.cpu: influxdb.resources.requests.cpu
+          resources.requests.memory: influxdb.resources.requests.memory
+          resources.limits.cpu: influxdb.resources.limits.cpu
+          resources.limits.memory: influxdb.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: influxdb, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-influxdb"}
+          - {key: port, literal: "8086"}
+          - {key: url, template: "http://{{ .Release.Name }}-influxdb:8086"}
+          - {key: token, from_dsl: auth.admin.token, required: true}
+          - {key: org, from_dsl: auth.admin.org}
+          - {key: bucket, from_dsl: auth.admin.bucket}
+        scaffold:
+          auth.admin.token:
+            default: ""
+            comment: "InfluxDB admin API token — required"
+          auth.admin.org:
+            default: "default-org"
+          auth.admin.bucket:
+            default: "default-bucket"
+          persistence.enabled:
+            default: false
+          persistence.size:
+            default: "5Gi"
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "256Mi"
+          resources.limits.cpu:
+            default: "1"
+          resources.limits.memory:
+            default: "1Gi"
+
+  harbor:
+    versions:
+      - constraint: ">=1.0.0 <2.0.0"
+        service:
+          host: "{{ .Release.Name }}-harbor-core.{{ .Release.Namespace }}.svc.cluster.local"
+          ports:
+            http: {port: 80, scheme: http, primary: true}
+            https: {port: 443, scheme: https}
+        values_mapping:
+          auth.admin.password: harbor.harborAdminPassword
+          ingress.enabled: harbor.expose.ingress.enabled
+          persistence.enabled: harbor.persistence.enabled
+          resources.requests.cpu: harbor.core.resources.requests.cpu
+          resources.requests.memory: harbor.core.resources.requests.memory
+          resources.limits.cpu: harbor.core.resources.limits.cpu
+          resources.limits.memory: harbor.core.resources.limits.memory
+        dependencies:
+          - chart: postgresql
+            required: false
+            dsl_field: database
+            wiring:
+              harbor.database.type: __literal:external
+              harbor.database.external.host: __host__
+              harbor.database.external.port: __port__
+              harbor.database.external.username: auth.user.name
+              harbor.database.external.password: auth.user.password
+              harbor.database.external.coreDatabase: __literal:harbor_core
+              harbor.database.external.sslmode: __literal:disable
+          - chart: redis
+            required: false
+            dsl_field: cache
+            wiring:
+              harbor.redis.type: __literal:external
+              harbor.redis.external.addr: __host__
+              harbor.redis.external.password: auth.password
+        binding_secret:
+          - {key: type, literal: harbor, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-harbor-core"}
+          - {key: port, literal: "80"}
+          - {key: url, template: "http://{{ .Release.Name }}-harbor-core:80"}
+          - {key: admin_password, from_dsl: auth.admin.password, required: true}
+        scaffold:
+          auth.admin.password:
+            default: ""
+            comment: "Harbor admin password — required"
+          ingress.enabled:
+            default: true
+          persistence.enabled:
+            default: false
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "256Mi"
+          resources.limits.cpu:
+            default: "1"
+          resources.limits.memory:
+            default: "1Gi"

@@ -99,3 +99,26 @@ dependencies:
     version: "0.32.0-1.1"
     repository: oci://dp.apps.rancher.io/charts
     condition: vault.enabled
+  # etcd/nats/opensearch/influxdb/harbor — added in 0.11.39 to expand
+  # the catalog with the remaining AppCo charts relevant for
+  # cloud-native dev workflows.
+  - name: etcd
+    version: "0.3.16"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: etcd.enabled
+  - name: nats
+    version: "2.12.6"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: nats.enabled
+  - name: opensearch
+    version: "3.6.0"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: opensearch.enabled
+  - name: influxdb
+    version: "2.1.2"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: influxdb.enabled
+  - name: harbor
+    version: "1.18.3"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: harbor.enabled
