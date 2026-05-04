@@ -564,21 +564,10 @@ charts:
           # by `derived_values:` above. Devs who need an external SSO
           # issuer override can set `services[].issuer:` manually.
           #
-          # ingress.enabled defaults to false (consistent with all other
-          # bindings — postgres, redis, mariadb, etc are pod-internal so
-          # don't need ingress). DEX is the exception: when the project
-          # uses BROWSER-side OIDC, the dev MUST flip this to true so the
-          # binding-secret's `public_url` carries the ingress URL, not
-          # the in-cluster fallback. The recommended workflow:
-          #
-          #   rda add-service dex auth
-          #   # in deploy/values.yaml: flip enabled + ingress.enabled
-          #   rda bootstrap auth.users add <email> --field password=<pw>
-          #
-          # See concepts/auth.md and concepts/capabilities.md for the
-          # explicit-gestures workflow.
+          # Dex needs browser access for OIDC flows, so ingress defaults
+          # to true (unlike postgres/redis which are pod-internal).
           ingress.enabled:
-            default: false
+            default: true
           ingress.host:
             default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"
