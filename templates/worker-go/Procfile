@@ -1,0 +1,2 @@
+web: /layers/heroku_go/go_target/bin/{{ .Name }}
+dev: /layers/heroku_go/go_target/bin/{{ .Name }}

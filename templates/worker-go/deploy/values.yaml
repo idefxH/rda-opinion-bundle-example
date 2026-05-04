@@ -1,0 +1,31 @@
+# Project values for {{ .Name }} (worker).
+#
+# Worker: no HTTP server, no Service, no Ingress.
+#
+# Add backing services: rda add-service <type> <binding>
+
+suse-library:
+  name: "{{ .Name }}"
+  replicas: 1
+  port: 8080
+
+  ingress:
+    enabled: false
+  service:
+    enabled: false
+
+  image:
+    repository: "{{ .Name }}"
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  imagePullSecrets:
+    - name: application-collection
+
+  probes:
+    liveness: null
+    readiness: null
+
+  env: {}
+
+  # services: []

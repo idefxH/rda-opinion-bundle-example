@@ -1,0 +1,2 @@
+web: java -jar target/{{ .Name }}-0.1.0.jar
+dev: java -jar target/{{ .Name }}-0.1.0.jar

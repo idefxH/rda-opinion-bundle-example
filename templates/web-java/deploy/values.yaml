@@ -1,0 +1,25 @@
+# Project values for {{ .Name }}.
+#
+# Add backing services:  rda add-service <type> <binding>
+
+suse-library:
+  name: "{{ .Name }}"
+  replicas: 1
+  port: 8080
+
+  ingress:
+    enabled: true
+    hosts:
+      - "{{ .Name }}.localtest.me"
+
+  image:
+    repository: "{{ .Name }}"
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  imagePullSecrets:
+    - name: application-collection
+
+  env: {}
+
+  # services: []

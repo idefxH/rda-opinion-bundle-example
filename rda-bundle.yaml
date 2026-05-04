@@ -34,6 +34,24 @@ templates:
       inbound traffic. Pair with `rda add-service apache-kafka events`
       or `rda add-service redis events-bus` for an actual consumer.
     path_in_bundle: templates/worker-nodejs
+  - id: web-java
+    display_name: Web Service (Java)
+    language: java
+    description: |
+      Plain Java 21 HTTP server ready to bind any catalogued backing
+      service via the Kubernetes Service Binding Specification. Maven
+      build, heroku/java buildpack via CNB. SUSE Application Collection
+      Java images for production.
+    path_in_bundle: templates/web-java
+  - id: worker-go
+    display_name: Worker / Consumer (Go)
+    language: go
+    description: |
+      Long-running Go background worker — no HTTP server, no Service,
+      no Ingress. Heartbeat loop discovers bindings at startup. Natural
+      fit for queue consumers (Kafka, Redis pub/sub), cron schedulers,
+      and data pipeline processors.
+    path_in_bundle: templates/worker-go
 
 library_chart:
   # v1: file:// URI relative to bundle root. The rda HelmClient.PullChart

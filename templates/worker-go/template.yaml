@@ -1,0 +1,20 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: worker-go
+  display_name: Worker / Consumer (Go)
+  language: go
+  description: |
+    Long-running Go background worker — no HTTP server, no Service, no
+    Ingress. Heartbeat loop discovers bindings at startup. Natural fit
+    for queue consumers (Kafka, Redis pub/sub), cron schedulers, and
+    data pipeline processors.
+
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier from the template metadata.
+      autoCompute: from-template-language

@@ -1,0 +1,19 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: web-java
+  display_name: Web Service (Java)
+  language: java
+  description: |
+    Plain Java 21 HTTP server (no framework dependency) ready to bind
+    any catalogued backing service. Maven build, heroku/java buildpack
+    via CNB. SUSE Application Collection Java images for production.
+
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier from the template metadata.
+      autoCompute: from-template-language
