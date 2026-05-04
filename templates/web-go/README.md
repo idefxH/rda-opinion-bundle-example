@@ -20,7 +20,7 @@ A Go web service scaffolded by `rda new <name> --template web-go`.
 
     rda doctor                                 # green-light your local cluster
     rda add-service postgresql db              # append a postgres binding
-    # edit deploy/values.yaml: fill the FILL ME passwords, flip enabled: true
+    # edit deploy/values.yaml: fill the TODO: passwords, flip enabled: true
     tilt up                                    # build, deploy, port-forward
 
 The `GET /` endpoint will then report the postgres binding it found
