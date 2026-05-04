@@ -557,6 +557,25 @@ charts:
               {{- end -}}
               {{- end -}}
 
+        # DO-0004 Phase 1: optional postgresql dependency for persistent storage.
+        # When the dev provides a postgresql binding via the `state_db` field,
+        # rda render disables dex's internal memory/sqlite storage and wires
+        # the external postgresql connection. Without this field, dex uses
+        # in-memory storage (the scaffold default) — fine for dev, not for
+        # staging/prod where dex state must survive restarts.
+        dependencies:
+          - chart: postgresql
+            required: false
+            dsl_field: state_db
+            wiring:
+              dex.config.storage.type: __literal:postgres
+              dex.config.storage.config.host: __host__
+              dex.config.storage.config.port: __port__
+              dex.config.storage.config.user: auth.user.name
+              dex.config.storage.config.password: auth.user.password
+              dex.config.storage.config.database: auth.user.database
+              dex.config.storage.config.ssl.mode: __literal:disable
+
         scaffold:
           # DSL fields (mapped via values_mapping)
           # NOTE: `issuer` is no longer scaffolded — it's auto-derived from
@@ -566,6 +585,12 @@ charts:
           #
           # Dex needs browser access for OIDC flows, so ingress defaults
           # to true (unlike postgres/redis which are pod-internal).
+          # Optional: postgresql binding for persistent storage (DO-0004).
+          # When set, rda render wires dex's storage to the referenced
+          # postgresql binding. Without it, dex uses in-memory (dev default).
+          state_db:
+            default: ""
+            comment: "optional — binding name of a postgresql service for persistent storage"
           ingress.enabled:
             default: true
           ingress.host:
