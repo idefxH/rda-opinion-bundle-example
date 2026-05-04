@@ -55,7 +55,6 @@ suse-library:
   #   rda add-service apache-kafka events
   # Redis pub/sub worker:
   #   rda add-service redis events-bus
-  # The example src/index.js iterates /bindings/* and logs each
-  # binding's host/port — replace with kafkajs.consumer.run() (or your
-  # consumer of choice) to consume actual messages. SBS discovery is
-  # by TYPE, not name.
+  # Your app discovers bindings via env vars projected by the rda
+  # library helper (<BINDING>_HOST, <BINDING>_PORT, etc.). The
+  # binding name becomes the env prefix (uppercase).
