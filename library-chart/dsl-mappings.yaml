@@ -389,8 +389,12 @@ charts:
           # chart-side shape difference.
           ingress.enabled: dex.ingress.enabled
           ingress.host: dex.ingress.hosts[0].host
-          # ServiceMonitor (prometheus integration). Off by default.
-          metrics.enabled: dex.serviceMonitor.enabled
+          # Dex exposes /metrics natively — no enable flag needed.
+          # ServiceMonitor (Prometheus Operator CRD) is opt-in via
+          # passthrough only: passthrough.serviceMonitor.enabled: true
+          # The DSL metrics.enabled is intentionally unmapped for dex
+          # to avoid creating a CRD that doesn't exist on standalone
+          # Prometheus clusters.
           # Resources — the dex chart shape is a flat resources block.
           resources.requests.cpu: dex.resources.requests.cpu
           resources.requests.memory: dex.resources.requests.memory
@@ -578,8 +582,6 @@ charts:
           ingress.host:
             default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
             comment: "or use <binding>.<release>.localhost on macOS/Linux"
-          metrics.enabled:
-            default: false
           resources.requests.cpu:
             default: "50m"
           resources.requests.memory:
