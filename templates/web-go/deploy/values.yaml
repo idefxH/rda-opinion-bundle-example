@@ -8,17 +8,17 @@
 # Don't edit values.generated.yaml — it's overwritten on each render.
 
 suse-library:
-  name: {{ .Name }}
+  name: "{{ .Name }}"
   replicas: 1
   port: 8080
 
   ingress:
     enabled: true
     hosts:
-      - {{ .Name }}.localtest.me
+      - "{{ .Name }}.localtest.me"
 
   image:
-    repository: {{ .Name }}
+    repository: "{{ .Name }}"
     tag: dev
     pullPolicy: IfNotPresent
 
