@@ -30,6 +30,3 @@ suse-library:
   # — resolved at render time from the binding-secret.
   env: {}
 
-  # Backing services — added by `rda add-service`.
-  # Flip `enabled: true` and fill credentials before `tilt up`.
-  # services: []

@@ -29,6 +29,3 @@ suse-library:
 
   env: {}
 
-  # Backing services — added by `rda add-service`.
-  # Flip `enabled: true` and fill credentials before `tilt up`.
-  # services: []
