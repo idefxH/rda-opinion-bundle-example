@@ -90,9 +90,9 @@ catch step 3 if you forget; nothing else is automated.
 2. **`library-chart/values.yaml`** — add `<chart>: { enabled: false }`
    default block (with comments mirroring the other chart blocks).
 3. **`library-chart/dsl-mappings.yaml`** — add the entry: `service.host`
-   template (release-templated), `port`, `values_mapping` per dimension,
-   `binding_secret` keys, optional `auth_seed_paths` if stateful,
-   optional `env_aliases` for the SBS canonical keys.
+   template (release-templated), `port`, `values_mapping` for DSL fields,
+   `binding_secret` keys, optional `scaffold` defaults, optional
+   `capabilities`, optional `dependencies`.
 4. **`library-chart/SPEC.md`** — log the addition under the next
    MILESTONE block. Bump META.Version.
 5. **`rda-bundle.yaml`** — bump `library_chart.version` AND append the

@@ -18,7 +18,7 @@
   that maintaining a values-injection table is more brittle than just
   rendering one consistent Ingress here.
 
-  The registry below mirrors CATALOG.md's connectivity dimension. To
+  The registry below mirrors the catalog's ingress-capable charts. To
   add a new UI chart: add an entry to $uiCharts AND a `ui.expose: true`
   default in values.yaml under that chart.
 */}}
