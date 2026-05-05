@@ -1,7 +1,7 @@
 v1alpha1.extension_repo(
     name='suse-rda',
     url='https://github.com/idefxH/tilt-extension-suse-rda',
-    ref='v0.3.2',
+    ref='v0.3.3',
 )
 v1alpha1.extension(
     name='suse-rda',
