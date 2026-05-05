@@ -422,14 +422,13 @@ local-deploy convention.
   {{- $hostTpl := index $svcSpec "host" | default "" -}}
   {{- if eq $hostTpl "" -}}{{- fail (printf "dsl-mappings.yaml: charts.%s.versions[*].service.host is missing" $svc.type) -}}{{- end -}}
   {{- $host = tpl $hostTpl $root -}}
-  {{- /* Multi-instance alias: replace chart type in host with alias (#24). */ -}}
-  {{- $sl := index $root.Values "suse-library" | default dict -}}
-  {{- if hasKey $sl "_chart_aliases" -}}
-    {{- $aliasMap := index $sl "_chart_aliases" -}}
-    {{- if hasKey $aliasMap $svc.binding -}}
-      {{- $alias := index $aliasMap $svc.binding -}}
-      {{- $host = replace (printf "-%s." $svc.type) (printf "-%s." $alias) $host -}}
-    {{- end -}}
+  {{- /* Multi-instance alias: replace chart type in host with alias (#24).
+         Inside a sub-chart, $root.Values is already scoped to the library
+         chart's namespace, so _chart_aliases is at Values directly. */ -}}
+  {{- $aliasMap := $root.Values._chart_aliases | default dict -}}
+  {{- if hasKey $aliasMap $svc.binding -}}
+    {{- $alias := index $aliasMap $svc.binding -}}
+    {{- $host = replace (printf "-%s." $svc.type) (printf "-%s." $alias) $host -}}
   {{- end -}}
   {{- /* Two port shapes:
 
