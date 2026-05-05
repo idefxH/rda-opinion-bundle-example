@@ -21,6 +21,8 @@ each project at `deploy/charts/suse-library/` by `rda new`.
 
 ## dsl-mappings.yaml — the source of truth
 
+**[Maintenance guide](https://github.com/idefxH/rda-docs/blob/main/reference/dsl-mappings-guide.md)** — how to read, write, and maintain entries (render pipeline, template syntax, gotchas, checklist).
+
 This file is the **single source of truth** for:
 - Which chart types the catalog supports (15 types)
 - How DSL fields map to chart values (`values_mapping`)

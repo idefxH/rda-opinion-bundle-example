@@ -1,5 +1,7 @@
 # DSL → chart-values mapping (data-driven library helpers).
 #
+# Maintenance guide: https://github.com/idefxH/rda-docs/blob/main/reference/dsl-mappings-guide.md
+#
 # This file is the authoritative source for "how does a unified DSL services[]
 # entry of type X translate into the AppCo chart X's values.yaml shape, and
 # what binding-secret keys come out". The library's _helpers.tpl reads it
