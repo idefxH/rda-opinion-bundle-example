@@ -31,8 +31,8 @@ templates:
       Ingress. Heartbeat loop logs each binding under /bindings/ at
       startup. The natural template for queue consumers (Kafka, Redis
       pub/sub), cron-style schedulers, and sidecars that don't accept
-      inbound traffic. Pair with `rda add-service apache-kafka events`
-      or `rda add-service redis events-bus` for an actual consumer.
+      inbound traffic. Pair with `rda service add apache-kafka events`
+      or `rda service add redis events-bus` for an actual consumer.
     path_in_bundle: templates/worker-nodejs
   - id: web-java
     display_name: Web Service (Java)

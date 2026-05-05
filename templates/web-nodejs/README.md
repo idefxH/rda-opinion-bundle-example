@@ -22,7 +22,7 @@ Pick a binding name that reflects the role in your domain (`payments-db`,
 `users-db`, `events-db`), not the technology:
 
 ```bash
-rda add-service postgresql payments-db
+rda service add postgresql payments-db
 ```
 
 This appends a `services[]` entry to `deploy/values.yaml` and flips

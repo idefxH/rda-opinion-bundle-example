@@ -3,7 +3,7 @@
 # Worker: no HTTP server, no Service, no Ingress. The library chart
 # renders a Deployment + binding-secrets + env wiring.
 #
-# Add backing services: rda add-service <type> <binding>
+# Add backing services: rda service add <type> <binding>
 
 suse-library:
   name: "{{ .Name }}"

@@ -20,7 +20,7 @@ A long-running background worker scaffolded by
 ## Quick start
 
     rda doctor                                 # green-light cluster
-    rda add-service apache-kafka events        # add a kafka binding
+    rda service add apache-kafka events        # add a kafka binding
     # edit deploy/values.yaml: flip enabled: true
     tilt up                                    # build, deploy
 

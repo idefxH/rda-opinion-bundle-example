@@ -1,7 +1,7 @@
 # Project values for {{ .Name }}.
 #
-# Add backing services:  rda add-service <type> <binding>
-# Wire datasources:      rda add-datasource <source> --to <consumer>
+# Add backing services:  rda service add <type> <binding>
+# Wire datasources:      rda service wire <source> --to <consumer>
 # Bootstrap auth:        rda bootstrap auth.clients init --binding <b>
 #
 # `rda render` projects services[] into .rda/values.generated.yaml.
@@ -25,7 +25,7 @@ suse-library:
   imagePullSecrets:
     - name: application-collection
 
-  # Env vars projected into your container. `rda add-service` scaffolds
+  # Env vars projected into your container. `rda service add` scaffolds
   # entries here automatically. Values use ${binding:NAME.field} syntax
   # — resolved at render time from the binding-secret.
   env: {}

@@ -99,7 +99,7 @@ catch step 3 if you forget; nothing else is automated.
    chart's `type_name` under `service_catalog`.
 6. **`templates/web-nodejs/chart/Chart.yaml`** — bump the dep pin.
 7. **rda-cli** — companion PR adds a `case "<chart>"` to `dslDefaultsFor`
-   in `code/cmd/add_service.go` so `rda add-service <chart> <binding>`
+   in `code/cmd/add_service.go` so `rda service add <chart> <binding>`
    produces the right scaffold.
 
 ## Anatomy of a good PR description

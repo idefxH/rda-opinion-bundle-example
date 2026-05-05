@@ -1,6 +1,6 @@
 # Project values for {{ .Name }}.
 #
-# Add backing services:  rda add-service <type> <binding>
+# Add backing services:  rda service add <type> <binding>
 
 suse-library:
   name: "{{ .Name }}"

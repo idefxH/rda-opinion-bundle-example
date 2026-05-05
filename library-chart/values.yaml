@@ -10,7 +10,7 @@ global:
 # services[] is the single source of truth for catalogued sub-charts.
 # Each entry: { binding, type, enabled, auth?, persistence?, metrics?,
 # ingress?, resources?, bootstrap?, passthrough?, overrides? }.
-# `rda add-service <type> <binding>` writes scaffold entries; the
+# `rda service add <type> <binding>` writes scaffold entries; the
 # scaffold table in dsl-mappings.yaml drives the default shape per
 # chart. See concepts/dsl.md and concepts/scaffolds.md in rda-docs.
 services: []
@@ -121,7 +121,7 @@ redis:
 dex:
   enabled: false
   # dex requires `config:` set or the pod crashloops at startup. The
-  # `rda add-service dex` scaffold writes a sane bootstrap config
+  # `rda service add dex` scaffold writes a sane bootstrap config
   # (storage.memory + enablePasswordDB + oauth2 settings) via the
   # services[].passthrough block — no default needed here.
 

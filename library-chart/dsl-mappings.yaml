@@ -359,7 +359,7 @@ charts:
         # knobs (issuer URL, ingress, metrics, resources) — anything
         # else (connectors, oauth2 clients, staticPasswords, the
         # storage block) goes through `passthrough.config.*`. The
-        # `rda add-service dex` scaffold writes a sane bootstrap
+        # `rda service add dex` scaffold writes a sane bootstrap
         # config (storage.memory + enablePasswordDB) so a fresh
         # project starts with a working dex even before the dev edits
         # the connector list.
@@ -528,7 +528,7 @@ charts:
           # post-render. The bundle scaffold pre-fills one client
           # (id=<project>-client, secret=dev-secret, redirectURIs=
           # http://<project>.localtest.me/auth/callback) so a fresh
-          # `rda new + rda add-service dex auth + tilt up` boots a
+          # `rda new + rda service add dex auth + tilt up` boots a
           # working OIDC chain without manual edits. App pod env:
           # <BINDING>_CLIENT_ID / _CLIENT_SECRET / _REDIRECT_URI.
           # When the dev wants multiple clients (e.g. SPA + admin

@@ -19,7 +19,7 @@ A Go web service scaffolded by `rda new <name> --template web-go`.
 ## Quick start
 
     rda doctor                                 # green-light your local cluster
-    rda add-service postgresql db              # append a postgres binding
+    rda service add postgresql db              # append a postgres binding
     # edit deploy/values.yaml: fill the TODO: passwords, flip enabled: true
     tilt up                                    # build, deploy, port-forward
 
@@ -31,6 +31,6 @@ under `/bindings/db/` (host, port, database — credentials redacted).
 The example app discovers its database binding via env vars projected
 by the rda library helper (`DB_HOST`, `DB_PORT`, `DB_USERNAME`,
 `DB_PASSWORD`, `DB_DATABASE`). The binding name you pass to
-`rda add-service` becomes the env prefix (uppercase). Set
+`rda service add` becomes the env prefix (uppercase). Set
 `DB_BINDING=<binding>` to override when multiple postgres bindings
 exist.

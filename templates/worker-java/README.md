@@ -5,5 +5,5 @@ Scaffolded by `rda new <name> --template worker-java`.
 ## Quick start
 
     rda doctor
-    rda add-service postgresql db
+    rda service add postgresql db
     tilt up

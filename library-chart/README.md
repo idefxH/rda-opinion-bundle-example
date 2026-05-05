@@ -27,7 +27,7 @@ This file is the **single source of truth** for:
 - Which chart types the catalog supports (15 types)
 - How DSL fields map to chart values (`values_mapping`)
 - What binding secret keys each chart produces (`binding_secret`)
-- What fields `rda add-service` scaffolds (`scaffold`)
+- What fields `rda service add` scaffolds (`scaffold`)
 - What capabilities each chart has (`capabilities`)
 - What dependencies exist between charts (`dependencies`)
 - Service host/port for binding resolution (`service`)

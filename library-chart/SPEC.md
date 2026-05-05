@@ -166,7 +166,7 @@ binding, optionally aliased per dsl-mappings `env_aliases`) is gone.
 
 The dev's contract is now explicit: write `${binding:NAME.field}`
 references in `suse-library.env` (or rely on the scaffolds
-`rda add-service` produces); render writes the resolved list to
+`rda service add` produces); render writes the resolved list to
 `env_resolved`; deployment.yaml iterates the list. Aliases are now
 ordinary env-block entries the dev controls — the dsl-mappings
 `env_aliases` field has been retired (rendered tolerant: if present,
@@ -385,7 +385,7 @@ contributor reading SPEC.md sees both the rule AND the live evidence
 that produced it.
 
 **Lesson 1 — services-iteration drift (0.11.10).** A project with a
-service scaffolded by `rda add-service prometheus metrics` (which
+service scaffolded by `rda service add prometheus metrics` (which
 writes `enabled: false` per the inert-by-default contract from
 rda-cli#67) had its app pod fail with `MountVolume.SetUp failed:
 secret payments-metrics-binding not found`. binding-secret.yaml
@@ -499,7 +499,7 @@ Status: in-progress
   Comment reminds that the dex chart REQUIRES `config:` to be set
   or its pod crashloops at startup — the project's
   `deploy/values.yaml` supplies `passthrough.config.{issuer,storage,
-  enablePasswordDB}` (the `rda add-service dex` scaffold does this).
+  enablePasswordDB}` (the `rda service add dex` scaffold does this).
 - Tilt extension auto-discovery picks up dex's ingress block via the
   same `<chart>.ingress` → Tilt UI link path that grafana already
   uses; no Tiltfile changes needed.
@@ -632,14 +632,14 @@ Status: in-progress
   will see their pods boot with NO binding env vars — the legacy
   auto-projection is gone. Migration: add an `env:` block listing
   the `${binding:NAME.field}` references the workload reads. Future
-  `rda add-service` writes the canonical set automatically (rda-cli
+  `rda service add` writes the canonical set automatically (rda-cli
   Phase 1 sub-task #4, in flight).
 
 - Scaffolds (`templates/web-go/chart/values.yaml`,
   `templates/web-nodejs/chart/values.yaml`): add an empty `env: {}`
   block with a comment block pointing at the design doc + showing
   an example. Fresh `rda new` projects get the documented pattern
-  even without `rda add-service` writing entries yet.
+  even without `rda service add` writing entries yet.
 
 - TESTS:
   - `tests/env-aliases/`: rewritten. The legacy fixture asserted
@@ -656,7 +656,7 @@ Status: in-progress
 - Companion: rda-cli #108 (env_resolved producer, merged) +
   rda-cli #109 (BEHAVIOR/render step 5.5 spec, merged). Closes
   Phase 1 of Design Orientation 0001 Appendix A end-to-end:
-  fresh `rda new` + `rda add-service` (post Phase 1 #4) + `tilt
+  fresh `rda new` + `rda service add` (post Phase 1 #4) + `tilt
   up` produces a pod with exactly the env vars the dev declared.
 
 - Spec META.Version 0.11.22 → 0.11.28 (skips 0.11.23–0.11.27 used
@@ -799,7 +799,7 @@ Status: in-progress
 ## MILESTONE: 0.11.32
 
 - FEATURE: dex scaffold is now OIDC-dev-ready in 2 commands (`rda new
-  <p>` + `rda add-service dex auth`) without ANY manual values.yaml
+  <p>` + `rda service add dex auth`) without ANY manual values.yaml
   edit. Three additions to the dex catalogue entry:
 
   1. `passthrough.config.oauth2.passwordConnector: local` is added
@@ -839,13 +839,13 @@ Status: in-progress
      stays the dev-editable `bootstrap.auth.clients[0]` (or whatever
      the first staticClients entry resolves to post-render).
 
-     Result: `rda add-service dex auth` now scaffolds 8 env entries
+     Result: `rda service add dex auth` now scaffolds 8 env entries
      under `suse-library.env` instead of 5
      (`AUTH_HOST/PORT/URL/ISSUER/PUBLIC_URL` + the 3 new
      `CLIENT_ID/CLIENT_SECRET/REDIRECT_URI`).
 
 - User-visible result: `rda new myapp --template web-go && cd myapp
-  && rda add-service dex auth && tilt up` (after flipping
+  && rda service add dex auth && tilt up` (after flipping
   `enabled: true` on the binding) gives a working OIDC chain. No
   manual yaml editing, no `htpasswd`, no `--field redirectURIs=...`
   CLI gymnastics.
@@ -938,7 +938,7 @@ Status: in-progress
   still mentions `OIDC_CLIENT_ID` for backwards-compat doc reasons.
 
 - Result: a dev project created with `rda new myapp --template
-  web-go && rda add-service dex auth` (no manual yaml edits beyond
+  web-go && rda service add dex auth` (no manual yaml edits beyond
   flipping the bindings' `enabled: true` and dex's
   `ingress.enabled: true`) now produces a fully working OIDC
   browser flow end-to-end. The template's HTML page picks up the
@@ -1060,7 +1060,7 @@ Status: in-progress
 - This was the last friction in the "OIDC dev-ready in 2 commands"
   promise. Pre-fix sequence required:
     1. `rda new myapp --template web-go`
-    2. `cd myapp && rda add-service dex auth`
+    2. `cd myapp && rda service add dex auth`
     3. flip `services[binding=auth].enabled: true`     ← user edit
     4. flip `services[binding=auth].ingress.enabled: true`  ← user edit (FORGOTTEN)
     5. `tilt up`
@@ -1082,7 +1082,7 @@ Status: in-progress
   scaffold comment documents both paths.
 
 - Side note: a follow-up could also flip `services[binding].enabled`
-  to true on dex specifically (since `rda add-service dex auth`
+  to true on dex specifically (since `rda service add dex auth`
   is itself an explicit user gesture meaning \"I want this enabled\"),
   reducing the recipe from 1 manual edit to zero. Not in this PR;
   out of scope.
@@ -1118,7 +1118,7 @@ Status: in-progress
 
       rda new myapp --template web-go
       cd myapp
-      rda add-service dex auth
+      rda service add dex auth
       # in deploy/values.yaml, flip:
       #   services[binding=auth].enabled: true
       #   services[binding=auth].ingress.enabled: true

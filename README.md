@@ -32,7 +32,7 @@ rda-opinion-bundle-example/
   opensearch, influxdb, harbor)
 - How DSL fields map to chart values
 - What binding secrets each chart produces
-- What fields are scaffolded by `rda add-service`
+- What fields are scaffolded by `rda service add`
 - What dependencies exist between charts
 - What capabilities each chart supports (auth.users, auth.clients, etc.)
 
