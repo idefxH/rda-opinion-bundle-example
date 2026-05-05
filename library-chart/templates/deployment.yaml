@@ -94,6 +94,23 @@ spec:
             periodSeconds: {{ .periodSeconds }}
           {{- end }}
           resources: {{ toYaml .Values.resources | nindent 12 }}
+        {{- /* DO-0004 Phase 3b: sidecar containers injected by rda render
+               from services[] entries with inject: sidecar. Each entry in
+               .Values.sidecars becomes an additional container in this pod.
+               The sidecar shares the pod's network namespace and volumes. */ -}}
+        {{- range $sc := .Values.sidecars | default list }}
+        - name: {{ $sc.name }}
+          image: {{ $sc.image }}
+          {{- with $sc.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $sc.env }}
+          env: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $sc.volumeMounts }}
+          volumeMounts: {{ toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
       volumes:
         {{- /*
             DSL binding volumes — one Secret-backed volume per non-external
