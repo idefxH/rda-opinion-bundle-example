@@ -67,6 +67,14 @@ library_chart:
   oci_ref: file://library-chart
   version: 0.11.38
 
+# Tilt extension version. Injected into scaffolded Tiltfiles at
+# `rda new` time. `rda upgrade` bumps existing Tiltfiles when this
+# changes. Single source of truth for the extension ref — templates
+# no longer carry hardcoded version strings.
+tilt_extension:
+  url: https://github.com/idefxH/tilt-extension-suse-rda
+  ref: v0.3.3
+
 # Catalogue surfaced by the library chart. Each AppCo chart is referenced
 # by its real name (no alias). The local_chart_ref points at the bundled
 # library chart that wires the SBS / 12-factor projections on top.
