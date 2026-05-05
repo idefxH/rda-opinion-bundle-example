@@ -264,11 +264,21 @@ func main() {
 			}
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		cacheHost := os.Getenv("CACHE_HOST")
+		if cacheHost == "" {
+			for _, e := range os.Environ() {
+				if strings.HasSuffix(strings.SplitN(e, "=", 2)[0], "_HOST") && strings.Contains(strings.ToLower(strings.SplitN(e, "=", 2)[0]), "cache") {
+					cacheHost = strings.SplitN(e, "=", 2)[1]
+					break
+				}
+			}
+		}
 		_ = tpl.Execute(w, pageData{
 			Name:     "{{ .Name }}",
 			Accent:   accentColor,
 			Username: usernameFromCookie(r),
 			HasAuth:  oidcVerifier != nil,
+			HasCache: cacheHost != "",
 		})
 		observe("GET", "/", 200, t)
 	})
@@ -625,6 +635,7 @@ type pageData struct {
 	Accent   string
 	Username string
 	HasAuth  bool
+	HasCache bool
 }
 
 func discoverEndSessionEndpoint(baseURL string) string {
@@ -763,6 +774,7 @@ const htmlPage = `<!DOCTYPE html>
       <div class="info-pill"><span class="dot"></span> <span id="pod">—</span></div>
       <div class="info-pill">⏱ Uptime: <span id="uptime">—</span></div>
       <div class="info-pill">💬 <span id="count">0</span> messages</div>
+      {{if .HasCache}}<div class="info-pill"><span class="dot"></span> Redis cache</div>{{end}}
       {{if .HasAuth}}<div class="info-pill">🔐 {{.Username}} <a href="/logout" style="margin-left:0.4rem;color:#ef4444;text-decoration:none;font-weight:600" title="Logout">✕</a></div>{{end}}
     </div>
   </header>

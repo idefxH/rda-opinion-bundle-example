@@ -193,6 +193,7 @@ const html = (req) => {
       <div class="info-pill"><span class="dot"></span> <span id="pod">—</span></div>
       <div class="info-pill">⏱ Uptime: <span id="uptime">—</span></div>
       <div class="info-pill">💬 <span id="count">0</span> messages</div>
+      ${cacheEnabled ? '<div class="info-pill"><span class="dot"></span> Redis cache</div>' : ''}
       ${username ? `<div class="info-pill">🔐 ${username} <a href="/logout" style="margin-left:0.4rem;color:#ef4444;text-decoration:none;font-weight:600" title="Logout">✕</a></div>` : ''}
     </div>
   </header>
@@ -403,6 +404,16 @@ async function connectWithRetry(maxAttempts, delayMs) {
 // 'no DB bound' placeholder. /metrics, /health, /ready still work.
 const dbEnabled = !!process.env[`${dbPrefix}_HOST`];
 
+// ─── Redis cache (optional) ─────────────────────
+// Reads <CACHE_BINDING>_HOST from the binding-secret. Default binding
+// name is "cache"; override via CACHE_BINDING=<name>.
+const cachePrefix = (process.env.CACHE_BINDING || 'CACHE').toUpperCase().replace(/-/g, '_');
+const cacheHost = process.env[`${cachePrefix}_HOST`] || '';
+const cachePort = process.env[`${cachePrefix}_PORT`] || '6379';
+const cachePass = process.env[`${cachePrefix}_PASSWORD`] || '';
+const cacheEnabled = !!cacheHost;
+let redisClient = null;
+
 async function start() {
   if (!dbEnabled) {
     console.log(`ℹ️  No ${dbPrefix}_HOST in env — postgres binding not configured; serving placeholder.`);
@@ -422,6 +433,24 @@ async function start() {
 
     const { rows: [{ count }] } = await client.query('SELECT COUNT(*) FROM messages');
     messagesCurrent.set(parseInt(count));
+  }
+
+  // Redis connection (optional)
+  if (cacheEnabled) {
+    try {
+      const net = require('net');
+      const sock = new net.Socket();
+      await new Promise((resolve, reject) => {
+        sock.connect(parseInt(cachePort), cacheHost, () => { sock.destroy(); resolve(); });
+        sock.on('error', reject);
+        sock.setTimeout(3000, () => { sock.destroy(); reject(new Error('timeout')); });
+      });
+      console.log(`✅ Redis reachable at ${cacheHost}:${cachePort}`);
+    } catch (err) {
+      console.log(`⚠️  Redis at ${cacheHost}:${cachePort} not reachable: ${err.message}`);
+    }
+  } else {
+    console.log(`ℹ️  No ${cachePrefix}_HOST in env — redis cache not configured.`);
   }
 
   let endSessionEndpoint = '';

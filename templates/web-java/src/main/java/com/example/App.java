@@ -14,7 +14,11 @@ public class App {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
         server.createContext("/", exchange -> {
-            String body = "{\"name\":\"{{ .Name }}\",\"status\":\"ok\",\"bindings\":" + discoverBindings() + "}";
+            boolean hasCache = System.getenv().entrySet().stream()
+                .anyMatch(e -> e.getKey().endsWith("_HOST") && e.getKey().toLowerCase().contains("cache"));
+            String body = "{\"name\":\"{{ .Name }}\",\"status\":\"ok\"" +
+                ",\"cache\":" + (hasCache ? "\"connected\"" : "\"not configured\"") +
+                ",\"bindings\":" + discoverBindings() + "}";
             sendJson(exchange, body);
         });
 
