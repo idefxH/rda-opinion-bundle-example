@@ -97,10 +97,12 @@ catch step 3 if you forget; nothing else is automated.
    MILESTONE block. Bump META.Version.
 5. **`rda-bundle.yaml`** — bump `library_chart.version` AND append the
    chart's `type_name` under `service_catalog`.
-6. **`templates/web-nodejs/chart/Chart.yaml`** — bump the dep pin.
-7. **rda-cli** — companion PR adds a `case "<chart>"` to `dslDefaultsFor`
-   in `code/cmd/add_service.go` so `rda service add <chart> <binding>`
-   produces the right scaffold.
+6. **All template Chart.yaml** — bump the dep pin in every
+   `templates/*/deploy/Chart.yaml`.
+7. **`rda-docs/reference/catalog.md`** — add the chart row to the
+   catalogued charts table.
+
+No rda-cli change needed — the CLI auto-discovers from dsl-mappings.yaml.
 
 ## Anatomy of a good PR description
 
