@@ -174,3 +174,6 @@ influxdb:
 
 harbor:
   enabled: false
+
+apache-airflow:
+  enabled: false

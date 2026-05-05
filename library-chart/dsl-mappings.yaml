@@ -1225,3 +1225,68 @@ charts:
             default: "1"
           resources.limits.memory:
             default: "1Gi"
+
+  apache-airflow:
+    versions:
+      - constraint: ">=1.0.0 <2.0.0"
+        service:
+          host: "{{ .Release.Name }}-webserver.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 8080
+        values_mapping:
+          auth.user.name: apache-airflow.createUserJob.defaultUser.username
+          auth.user.password: apache-airflow.createUserJob.defaultUser.password
+          ingress.enabled: apache-airflow.ingress.web.enabled
+          ingress.host: apache-airflow.ingress.web.hosts[0].name
+          resources.requests.cpu: apache-airflow.webserver.resources.requests.cpu
+          resources.requests.memory: apache-airflow.webserver.resources.requests.memory
+          resources.limits.cpu: apache-airflow.webserver.resources.limits.cpu
+          resources.limits.memory: apache-airflow.webserver.resources.limits.memory
+        dependencies:
+          - charts: [postgresql]
+            required: true
+            dsl_field: metadb
+            wiring:
+              apache-airflow.postgresql.enabled: __literal:false
+              apache-airflow.data.metadataConnection.host: __host_short__
+              apache-airflow.data.metadataConnection.port: __port__
+              apache-airflow.data.metadataConnection.user: auth.user.name
+              apache-airflow.data.metadataConnection.pass: auth.user.password
+              apache-airflow.data.metadataConnection.db: auth.user.database
+          - charts: [redis]
+            required: true
+            dsl_field: broker
+            wiring:
+              apache-airflow.redis.enabled: __literal:false
+        binding_secret:
+          - {key: type, literal: apache-airflow, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-webserver"}
+          - {key: port, literal: "8080"}
+          - {key: url, template: "http://{{ .Release.Name }}-webserver:8080"}
+          - {key: username, from_dsl: auth.user.name, default: admin}
+          - {key: password, from_dsl: auth.user.password, required: true}
+        scaffold:
+          auth.user.name:
+            default: "admin"
+            comment: "Airflow webserver admin username"
+          auth.user.password:
+            default: ""
+            comment: "Airflow webserver admin password — required"
+          metadb:
+            default: ""
+            comment: "binding name of your postgresql service (required for metadata DB)"
+          broker:
+            default: ""
+            comment: "binding name of your redis service (required for CeleryExecutor)"
+          ingress.enabled:
+            default: false
+          ingress.host:
+            default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
+          resources.requests.cpu:
+            default: "250m"
+          resources.requests.memory:
+            default: "512Mi"
+          resources.limits.cpu:
+            default: "1"
+          resources.limits.memory:
+            default: "2Gi"
