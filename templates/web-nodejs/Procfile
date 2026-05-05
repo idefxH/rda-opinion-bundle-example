@@ -1,12 +1,9 @@
 # CNB Procfile — declares the launch processes buildpacks register.
 #
 # - web: production launch via plain `node`.
-# - dev:  development launch via `node --watch` (built-in to Node 22+,
-#   no extra dep). Same role nodemon used to play in pre-0.11.23
-#   templates; node --watch obviates the dep entirely.
-#
-# heroku/nodejs's z_node_module_bins layer adds node_modules/.bin to
-# PATH at runtime — irrelevant here since both processes call `node`
-# directly, but kept for projects that add CLI deps later.
+# - dev:  development launch via `nodemon -L` (polling mode). Robust
+#   against containerd/overlayfs inotify quirks that break node --watch
+#   in k8s setups. nodemon polls every 1s — slower than inotify but
+#   reliable for live_update file syncs.
 web: node src/index.js
-dev: node --watch src/index.js
+dev: npx nodemon -L src/index.js
