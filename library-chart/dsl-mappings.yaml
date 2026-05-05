@@ -569,7 +569,7 @@ charts:
             dsl_field: state_db
             wiring:
               dex.config.storage.type: __literal:postgres
-              dex.config.storage.config.host: __host__
+              dex.config.storage.config.host: __host_short__
               dex.config.storage.config.port: __port__
               dex.config.storage.config.user: auth.user.name
               dex.config.storage.config.password: auth.user.password
