@@ -349,7 +349,7 @@ Status: in-progress
 - Why FQDN: NS Phase A made the deploy namespace explicit per project
   and per developer (multi-dev shared cluster pattern,
   `{{.project}}-{{.user}}`). Phase C unlocks the cross-namespace
-  shared-binding case (UC5) — a `provisioning: shared` postgres
+  shared-binding case (UC5) — a `provisioning: connect` postgres
   deployed in a third namespace, consumed by two project namespaces.
   Bare-name templates only resolve within the same namespace; FQDN
   resolves anywhere via cluster-DNS.

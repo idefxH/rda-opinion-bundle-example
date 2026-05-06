@@ -59,14 +59,14 @@ Without the override, the first matching binding wins.
 ## Switching to a managed instance
 
 For staging+ where the DB is operator-provisioned (CloudNativePG,
-Crossplane, Vault dynamic secrets), set `provisioning: external` on
+Crossplane, Vault dynamic secrets), set `provisioning: connect` on
 the service entry and supply the endpoint:
 
 ```yaml
 # deploy/values.yaml — under suse-library.services:
 - binding: payments-db
   type: postgresql
-  provisioning: external
+  provisioning: connect
   endpoint:
     host: pg-prod.cluster.svc
     port: 5432

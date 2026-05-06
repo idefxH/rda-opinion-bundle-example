@@ -7,7 +7,7 @@ defaults:
 services:
   - binding: app-dashboards
     type: grafana
-    provisioning: shared
+    provisioning: connect
     auth:
       admin:
         name: admin

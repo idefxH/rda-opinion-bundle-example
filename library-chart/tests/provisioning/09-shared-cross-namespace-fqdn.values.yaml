@@ -20,7 +20,7 @@ defaults:
 services:
   - binding: shared-events-db
     type: postgresql
-    provisioning: shared
+    provisioning: connect
     auth:
       user:
         name: app

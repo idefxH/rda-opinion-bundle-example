@@ -2,7 +2,7 @@
 services:
   - binding: db
     type: postgresql
-    provisioning: shared
+    provisioning: connect
     auth:
       user: { name: app, password: "x", database: y }
 

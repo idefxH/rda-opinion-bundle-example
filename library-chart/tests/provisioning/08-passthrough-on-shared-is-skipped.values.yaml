@@ -7,7 +7,7 @@ defaults:
 services:
   - binding: shared-pg
     type: postgresql
-    provisioning: shared
+    provisioning: connect
     persistence:
       enabled: true
     passthrough:

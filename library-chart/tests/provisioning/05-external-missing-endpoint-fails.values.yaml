@@ -1,7 +1,7 @@
 services:
   - binding: bad
     type: postgresql
-    provisioning: external        # no endpoint: → must fail loud
+    provisioning: connect        # no endpoint: → must fail loud
     auth:
       user:
         name: app

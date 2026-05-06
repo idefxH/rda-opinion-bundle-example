@@ -63,7 +63,7 @@ ingress:
 # ─────────────────────────────────────────────────────────────────────
 # Each <chart>.enabled defaults to false. `rda render` flips them to
 # true in the generated overlay (deploy/.rda/values.generated.yaml)
-# for every services[] entry with enabled: true and provisioning: local.
+# for every services[] entry with enabled: true and provisioning: deploy.
 # The dev never writes these flags directly; they're internal plumbing
 # between the unified DSL and Helm's `condition: <chart>.enabled` deps.
 #

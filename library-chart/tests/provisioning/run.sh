@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test runner for the provisioning: local|shared|external DSL field.
+# Test runner for the provisioning: deploy|shared|external DSL field.
 # Strategy: copy library-chart to a tmpdir, strip the SUSE Application
 # Collection dependencies from Chart.yaml so 'helm template' doesn't need
 # them vendored, then run each fixture and assert the expected outcome.

@@ -62,7 +62,7 @@ spec:
           volumeMounts:
             {{- /*
                 DSL binding mounts. Each services[] entry that isn't
-                `provisioning: external` mounts its binding-secret at
+                `provisioning: connect` mounts its binding-secret at
                 /bindings/<binding>/, so apps following the Service Binding
                 Spec convention find their credentials there. external
                 services have no Secret to mount (the dev wired the
