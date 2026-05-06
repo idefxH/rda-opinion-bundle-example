@@ -16,7 +16,7 @@ description: |
 
   See rda-docs/concepts/dsl.md for the full DSL contract.
 type: application
-version: 0.14.0
+version: 0.15.0
 appVersion: "1.0"
 keywords: [suse, rda, library, service-binding, application-collection]
 home: https://github.com/idefxH/rda-opinion-bundle-example
