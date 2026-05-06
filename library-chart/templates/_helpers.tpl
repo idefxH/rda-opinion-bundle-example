@@ -320,7 +320,7 @@ falsy value".
 {{- range $i, $svc := .Values.services -}}
 {{- $type := $svc.type -}}
 {{- $pt := $svc.passthrough | default dict -}}
-{{- $provisioning := $svc.provisioning | default "local" -}}
+{{- $provisioning := $svc.provisioning | default "deploy" -}}
 {{- /* Skip non-deploy: no sub-chart deployed = no passthrough collision possible */ -}}
 {{- if and (ne $provisioning "deploy") (ne $provisioning "local") -}}{{- continue -}}{{- end -}}
 {{- $entry := index $charts $type | default dict -}}
@@ -544,7 +544,7 @@ metadata:
            in dsl-mappings.yaml — grafana, prometheus). Only emitted for
            provisioning=local: shared/external bindings don't have a PVC
            to drift against. */ -}}
-    {{- if eq $provisioning "local" -}}
+    {{- if or (eq $provisioning "deploy") (eq $provisioning "local") -}}
     {{- $authSeed := include "suse-library.dsl.authSeed" (dict "svc" $svc "mapping" $mapping) -}}
     {{- if ne $authSeed "" }}
     rda.suse.com/auth-seed: {{ $authSeed | quote }}
