@@ -228,12 +228,8 @@ hand-written). Closes rda-cli#65, rda-cli#67.
   {{- fail (printf "duplicate binding %q in services[]: each entry needs a unique binding name." $svc.binding) -}}
   {{- end -}}
   {{- $_ := set $seen $svc.binding true -}}
-  {{- $provisioning := $svc.provisioning | default "local" -}}
-  {{- if eq $provisioning "deploy" -}}{{- $provisioning = "local" -}}{{- end -}}
-  {{- if eq $provisioning "connect" -}}
-    {{- if $svc.endpoint -}}{{- $provisioning = "external" -}}{{- else -}}{{- $provisioning = "shared" -}}{{- end -}}
-  {{- end -}}
-  {{- if eq $provisioning "local" -}}
+  {{- $provisioning := $svc.provisioning | default "deploy" -}}
+  {{- if or (eq $provisioning "deploy") (eq $provisioning "local") -}}
   {{- /* Auth-seed drift check (#63). Fires only when:
            1. the chart declares auth_seed_paths in dsl-mappings.yaml
            2. an existing binding-secret carries an auth-seed annotation
@@ -325,12 +321,8 @@ falsy value".
 {{- $type := $svc.type -}}
 {{- $pt := $svc.passthrough | default dict -}}
 {{- $provisioning := $svc.provisioning | default "local" -}}
-  {{- if eq $provisioning "deploy" -}}{{- $provisioning = "local" -}}{{- end -}}
-  {{- if eq $provisioning "connect" -}}
-    {{- if $svc.endpoint -}}{{- $provisioning = "external" -}}{{- else -}}{{- $provisioning = "shared" -}}{{- end -}}
-  {{- end -}}
-{{- /* Skip non-local: no sub-chart deployed = no passthrough collision possible */ -}}
-{{- if ne $provisioning "local" -}}{{- continue -}}{{- end -}}
+{{- /* Skip non-deploy: no sub-chart deployed = no passthrough collision possible */ -}}
+{{- if and (ne $provisioning "deploy") (ne $provisioning "local") -}}{{- continue -}}{{- end -}}
 {{- $entry := index $charts $type | default dict -}}
 {{- $versions := index $entry "versions" | default list -}}
 {{- if eq (len $versions) 0 -}}{{- continue -}}{{- end -}}
@@ -416,13 +408,30 @@ local-deploy convention.
 {{- $root := .root -}}
 {{- $release := $root.Release.Name -}}
 {{- $name := printf "%s-%s-binding" $release $svc.binding -}}
-{{- $provisioning := $svc.provisioning | default "local" -}}
-  {{- if eq $provisioning "deploy" -}}{{- $provisioning = "local" -}}{{- end -}}
-  {{- if eq $provisioning "connect" -}}
-    {{- if $svc.endpoint -}}{{- $provisioning = "external" -}}{{- else -}}{{- $provisioning = "shared" -}}{{- end -}}
+{{- $rawProv := $svc.provisioning | default "deploy" -}}
+{{- /* Normalize to deploy/connect. Legacy local/shared/external accepted. */ -}}
+{{- $provisioning := "deploy" -}}
+{{- if or (eq $rawProv "deploy") (eq $rawProv "local") -}}
+  {{- $provisioning = "deploy" -}}
+{{- else if or (eq $rawProv "connect") (eq $rawProv "shared") (eq $rawProv "external") -}}
+  {{- $provisioning = "connect" -}}
+{{- else -}}
+  {{- fail (printf "services[binding=%s].provisioning must be 'deploy' or 'connect' (got %q). See rda-docs/concepts/dsl.md#provisioning." $svc.binding $rawProv) -}}
+{{- end -}}
+{{- /* For connect mode, determine the credential source:
+       - endpoint.secretRef → secretRef mode (no binding-secret)
+       - endpoint.host → inline mode (dev-provided host/port)
+       - neither → overlay mode (ops pre-configured shared_services) */ -}}
+{{- $connectMode := "" -}}
+{{- if eq $provisioning "connect" -}}
+  {{- $ep := $svc.endpoint | default dict -}}
+  {{- if ne (index $ep "secretRef" | default "") "" -}}
+    {{- $connectMode = "secretRef" -}}
+  {{- else if ne (index $ep "host" | default "") "" -}}
+    {{- $connectMode = "inline" -}}
+  {{- else -}}
+    {{- $connectMode = "overlay" -}}
   {{- end -}}
-{{- if not (or (eq $provisioning "local") (or (eq $provisioning "shared") (eq $provisioning "external"))) -}}
-{{- fail (printf "services[binding=%s].provisioning must be 'deploy', 'connect', 'local', 'shared', or 'external' (got %q). See rda-docs/concepts/dsl.md#provisioning." $svc.binding $provisioning) -}}
 {{- end -}}
 {{- $mapping := include "suse-library.dsl.resolveMapping" (dict "chart" $svc.type "root" $root) | fromJson -}}
 {{- /* Resolve host / port / scheme depending on provisioning */ -}}
@@ -430,11 +439,10 @@ local-deploy convention.
 {{- $port := "" -}}
 {{- $scheme := "" -}}
 {{- $skipBindingSecret := false -}}
-{{- $ep := $svc.endpoint | default dict -}}
-{{- if and (eq $provisioning "external") (ne (index $ep "secretRef" | default "") "") -}}
+{{- if eq $connectMode "secretRef" -}}
   {{- $skipBindingSecret = true -}}
 {{- end -}}
-{{- if eq $provisioning "local" -}}
+{{- if eq $provisioning "deploy" -}}
   {{- $svcSpec := index $mapping "service" | default dict -}}
   {{- $hostTpl := index $svcSpec "host" | default "" -}}
   {{- if eq $hostTpl "" -}}{{- fail (printf "dsl-mappings.yaml: charts.%s.versions[*].service.host is missing" $svc.type) -}}{{- end -}}
@@ -482,32 +490,28 @@ local-deploy convention.
     {{- $port = (index $svcSpec "port" | default "") | toString -}}
     {{- $scheme = index $svcSpec "scheme" | default "http" -}}
   {{- end -}}
-{{- else if eq $provisioning "shared" -}}
-  {{- $defaults := index $root.Values "defaults" | default dict -}}
-  {{- $sharedRoot := index $defaults "shared_services" | default dict -}}
-  {{- $sharedMap := index $sharedRoot $svc.type | default dict -}}
-  {{- $sharedHost := index $sharedMap "host" | default "" -}}
-  {{- if eq $sharedHost "" -}}
-  {{- fail (printf "services[binding=%s].provisioning=shared but the overlay has no defaults.shared_services.%s.host. Either configure the overlay (rda-docs/operator.md Step 6 → 'Pre-fill the endpoints in the overlay') or set provisioning: external with an explicit endpoint:." $svc.binding $svc.type) -}}
-  {{- end -}}
-  {{- $host = $sharedHost -}}
-  {{- $port = index $sharedMap "port" | default "" | toString -}}
-  {{- $scheme = index $sharedMap "scheme" | default "http" -}}
-{{- else if eq $provisioning "external" -}}
-  {{- $ep := $svc.endpoint | default dict -}}
-  {{- $secretRef := index $ep "secretRef" | default "" -}}
-  {{- if ne $secretRef "" -}}
-    {{- /* secretRef mode: no binding-secret generated. The deployment
-           mounts the referenced secret directly at /bindings/<binding>/.
-           Skip the rest of this template for this service. */ -}}
-    {{- /* Return empty — the deployment template handles secretRef. */ -}}
-  {{- else -}}
-  {{- if eq (index $ep "host" | default "") "" -}}
-  {{- fail (printf "services[binding=%s].provisioning=external requires endpoint.secretRef or endpoint: { host, port, scheme }." $svc.binding) -}}
-  {{- end -}}
-  {{- $host = $ep.host -}}
-  {{- $port = $ep.port | default "" | toString -}}
-  {{- $scheme = $ep.scheme | default "http" -}}
+{{- else if eq $provisioning "connect" -}}
+  {{- if eq $connectMode "overlay" -}}
+    {{- /* Overlay mode: ops pre-configured shared_services in the overlay. */ -}}
+    {{- $defaults := index $root.Values "defaults" | default dict -}}
+    {{- $sharedRoot := index $defaults "shared_services" | default dict -}}
+    {{- $sharedMap := index $sharedRoot $svc.type | default dict -}}
+    {{- $sharedHost := index $sharedMap "host" | default "" -}}
+    {{- if eq $sharedHost "" -}}
+    {{- fail (printf "services[binding=%s].provisioning=connect but the overlay has no defaults.shared_services.%s.host. Configure the overlay or use --connect <secretName>." $svc.binding $svc.type) -}}
+    {{- end -}}
+    {{- $host = $sharedHost -}}
+    {{- $port = index $sharedMap "port" | default "" | toString -}}
+    {{- $scheme = index $sharedMap "scheme" | default "http" -}}
+  {{- else if eq $connectMode "inline" -}}
+    {{- /* Inline mode: dev provided endpoint.host/port directly. */ -}}
+    {{- $ep := $svc.endpoint | default dict -}}
+    {{- $host = $ep.host -}}
+    {{- $port = $ep.port | default "" | toString -}}
+    {{- $scheme = $ep.scheme | default "http" -}}
+  {{- else if eq $connectMode "secretRef" -}}
+    {{- /* secretRef mode: no binding-secret. Deployment mounts the
+           referenced Secret directly. Nothing to render here. */ -}}
   {{- end -}}
 {{- end -}}
 {{- /* When secretRef is set, the deployment mounts the external Secret

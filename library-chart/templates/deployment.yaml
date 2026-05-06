@@ -69,7 +69,7 @@ spec:
                 connection details elsewhere).
             */}}
             {{- range $i, $svc := $enabled }}
-            {{- $prov := $svc.provisioning | default "local" }}
+            {{- $prov := $svc.provisioning | default "deploy" }}
             {{- $ep := $svc.endpoint | default dict }}
             {{- $secretRef := index $ep "secretRef" | default "" }}
             {{- if or (ne $prov "external") (ne $secretRef "") }}
@@ -119,7 +119,7 @@ spec:
             services[] entry. Pairs with the volumeMounts loop above.
         */}}
         {{- range $i, $svc := $enabled }}
-        {{- $prov := $svc.provisioning | default "local" }}
+        {{- $prov := $svc.provisioning | default "deploy" }}
         {{- $ep := $svc.endpoint | default dict }}
         {{- $secretRef := index $ep "secretRef" | default "" }}
         {{- if ne $prov "external" }}
