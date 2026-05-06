@@ -598,13 +598,12 @@ stringData:
        discoverability — a dev who sees MINIO_S3_HOST in env knows
        what they're getting, vs MINIO_HOST aliasing to the same).
 
-       Only fires for provisioning=local: shared/external bindings
-       have a single endpoint per binding by definition (the overlay's
-       defaults.shared_services map carries one host/port pair, and
-       endpoint: in external mode is also a single triple). Named
-       ports are an in-cluster Service shape concept; they don't
-       generalise to remote endpoints. */ -}}
-{{- if eq $provisioning "local" -}}
+       Only fires for provisioning=deploy: connect bindings have a
+       single endpoint per binding by definition (overlay, inline, or
+       secretRef each carry one host/port pair). Named ports are an
+       in-cluster Service shape concept; they don't generalise to
+       remote endpoints. */ -}}
+{{- if or (eq $provisioning "deploy") (eq $provisioning "local") -}}
 {{- $svcSpec := index $mapping "service" | default dict -}}
 {{- $ports := index $svcSpec "ports" | default dict -}}
 {{- if $ports -}}
