@@ -566,7 +566,7 @@ charts:
         # in-memory storage (the scaffold default) — fine for dev, not for
         # staging/prod where dex state must survive restarts.
         dependencies:
-          - chart: postgresql
+          - charts: [postgresql]
             required: false
             dsl_field: state_db
             wiring:
@@ -577,6 +577,16 @@ charts:
               dex.config.storage.config.password: auth.user.password
               dex.config.storage.config.database: auth.user.database
               dex.config.storage.config.ssl.mode: __literal:disable
+          - charts: [mariadb]
+            required: false
+            dsl_field: state_db
+            wiring:
+              dex.config.storage.type: __literal:mysql
+              dex.config.storage.config.host: __host_short__
+              dex.config.storage.config.port: __port__
+              dex.config.storage.config.user: auth.user.name
+              dex.config.storage.config.password: auth.user.password
+              dex.config.storage.config.database: auth.user.database
 
         scaffold:
           # DSL fields (mapped via values_mapping)
