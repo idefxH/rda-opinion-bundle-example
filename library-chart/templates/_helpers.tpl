@@ -417,6 +417,11 @@ local-deploy convention.
 {{- $host := "" -}}
 {{- $port := "" -}}
 {{- $scheme := "" -}}
+{{- $skipBindingSecret := false -}}
+{{- $ep := $svc.endpoint | default dict -}}
+{{- if and (eq $provisioning "external") (ne (index $ep "secretRef" | default "") "") -}}
+  {{- $skipBindingSecret = true -}}
+{{- end -}}
 {{- if eq $provisioning "local" -}}
   {{- $svcSpec := index $mapping "service" | default dict -}}
   {{- $hostTpl := index $svcSpec "host" | default "" -}}
@@ -493,9 +498,10 @@ local-deploy convention.
   {{- $scheme = $ep.scheme | default "http" -}}
   {{- end -}}
 {{- end -}}
-{{- /* Render the Secret. Always start with --- on its own line, including
-       a leading newline so consecutive includes from a range loop don't
-       get glued together (fixes the multi-service rendering bug). */ -}}
+{{- /* When secretRef is set, the deployment mounts the external Secret
+       directly — no binding-secret to generate. */ -}}
+{{- if not $skipBindingSecret -}}
+{{- /* Render the Secret. */ -}}
 
 ---
 apiVersion: v1
@@ -595,4 +601,5 @@ stringData:
 {{- end }}
 {{- end -}}
 {{- end }}
+{{- end -}}
 {{- end -}}
