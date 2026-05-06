@@ -478,12 +478,20 @@ local-deploy convention.
   {{- $scheme = index $sharedMap "scheme" | default "http" -}}
 {{- else if eq $provisioning "external" -}}
   {{- $ep := $svc.endpoint | default dict -}}
+  {{- $secretRef := index $ep "secretRef" | default "" -}}
+  {{- if ne $secretRef "" -}}
+    {{- /* secretRef mode: no binding-secret generated. The deployment
+           mounts the referenced secret directly at /bindings/<binding>/.
+           Skip the rest of this template for this service. */ -}}
+    {{- /* Return empty — the deployment template handles secretRef. */ -}}
+  {{- else -}}
   {{- if eq (index $ep "host" | default "") "" -}}
-  {{- fail (printf "services[binding=%s].provisioning=external requires endpoint: { host, port, scheme } on the service entry." $svc.binding) -}}
+  {{- fail (printf "services[binding=%s].provisioning=external requires endpoint.secretRef or endpoint: { host, port, scheme }." $svc.binding) -}}
   {{- end -}}
   {{- $host = $ep.host -}}
   {{- $port = $ep.port | default "" | toString -}}
   {{- $scheme = $ep.scheme | default "http" -}}
+  {{- end -}}
 {{- end -}}
 {{- /* Render the Secret. Always start with --- on its own line, including
        a leading newline so consecutive includes from a range loop don't

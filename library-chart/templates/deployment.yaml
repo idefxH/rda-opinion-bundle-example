@@ -70,7 +70,9 @@ spec:
             */}}
             {{- range $i, $svc := $enabled }}
             {{- $prov := $svc.provisioning | default "local" }}
-            {{- if ne $prov "external" }}
+            {{- $ep := $svc.endpoint | default dict }}
+            {{- $secretRef := index $ep "secretRef" | default "" }}
+            {{- if or (ne $prov "external") (ne $secretRef "") }}
             - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
             {{- end }}
             {{- end }}
@@ -118,8 +120,13 @@ spec:
         */}}
         {{- range $i, $svc := $enabled }}
         {{- $prov := $svc.provisioning | default "local" }}
+        {{- $ep := $svc.endpoint | default dict }}
+        {{- $secretRef := index $ep "secretRef" | default "" }}
         {{- if ne $prov "external" }}
         - name: {{ printf "binding-%s" $svc.binding }}
           secret: {secretName: {{ printf "%s-%s-binding" (include "suse-library.name" $) $svc.binding }}}
+        {{- else if ne $secretRef "" }}
+        - name: {{ printf "binding-%s" $svc.binding }}
+          secret: {secretName: {{ $secretRef }}}
         {{- end }}
         {{- end }}
