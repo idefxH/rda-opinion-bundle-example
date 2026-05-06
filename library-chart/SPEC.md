@@ -1122,7 +1122,7 @@ Status: in-progress
       # in deploy/values.yaml, flip:
       #   services[binding=auth].enabled: true
       #   services[binding=auth].ingress.enabled: true
-      rda bootstrap auth.users add <email> --field password=<pw>
+      rda service bootstrap auth.users add <email> --field password=<pw>
       # auth.clients still requires yq for redirectURIs (list-typed
       # field — rda-cli issue: support list --field). For dex:
       yq -i '...bootstrap.auth.clients = [...]' deploy/values.yaml

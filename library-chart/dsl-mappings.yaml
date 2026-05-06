@@ -650,7 +650,7 @@ charts:
             comment: "connector for password-grant; flip to '' if you only want browser flow"
           # NOTE: `bootstrap.auth.users` and `bootstrap.auth.clients`
           # are NOT pre-filled. The dev declares them explicitly via
-          # `rda bootstrap auth.users add ...` (typed CLI) or by
+          # `rda service bootstrap auth.users add ...` (typed CLI) or by
           # editing `services[binding=auth].bootstrap.*` directly.
           # This avoids burying default credentials (dev/dev) in
           # scaffolded yaml where they easily survive into staging.
@@ -675,7 +675,7 @@ charts:
         # a capability declared (kubernetes-storage tuning, custom
         # connector blocks, etc).
         #
-        # The CLI (`rda bootstrap auth.users add ...` / `rda bootstrap
+        # The CLI (`rda service bootstrap auth.users add ...` / `rda bootstrap
         # auth.clients add ...`) edits this same `bootstrap.<cap>` list
         # in values.yaml, with field-validation against the schema below.
         capabilities:

@@ -2,7 +2,7 @@
 #
 # Add backing services:  rda service add <type> <binding>
 # Wire datasources:      rda service wire <source> --to <consumer>
-# Bootstrap auth:        rda bootstrap auth.clients init --binding <b>
+# Bootstrap auth:        rda service bootstrap auth.clients init --binding <b>
 #
 # `rda render` projects services[] into .rda/values.generated.yaml.
 # Don't edit values.generated.yaml — it's overwritten on each render.
