@@ -606,7 +606,7 @@ charts:
           # postgresql binding. Without it, dex uses in-memory (dev default).
           state_db:
             default: ""
-            comment: "optional — binding name of a postgresql service for persistent storage"
+            comment: "optional — binding name of a postgresql or mariadb service for persistent storage"
           ingress.enabled:
             default: true
           ingress.host:
