@@ -62,6 +62,10 @@ apiVersion: rda.suse.com/dsl-mapping/v1alpha1
 
 charts:
   postgresql:
+    default_branch: "17"
+    branches:
+      "17": {chart_version: "0.4.4-29.1"}
+      "16": {chart_version: "0.3.9-28.1"}
     versions:
       - constraint: ">=0.4.0 <1.0.0"
         # AppCo postgresql 0.4.x.
