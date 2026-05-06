@@ -8,7 +8,7 @@ keywords: [rda, {{ .Language }}]
 
 dependencies:
   - name: suse-library
-    version: 0.13.0
+    version: 0.14.0
     # Vendored at charts/suse-library/. Catalogued sub-charts
     # (postgresql, redis, prometheus, ...) are opted into via the
     # unified DSL `services[]` block in deploy/values.yaml — `rda
