@@ -229,6 +229,10 @@ hand-written). Closes rda-cli#65, rda-cli#67.
   {{- end -}}
   {{- $_ := set $seen $svc.binding true -}}
   {{- $provisioning := $svc.provisioning | default "local" -}}
+  {{- if eq $provisioning "deploy" -}}{{- $provisioning = "local" -}}{{- end -}}
+  {{- if eq $provisioning "connect" -}}
+    {{- if $svc.endpoint -}}{{- $provisioning = "external" -}}{{- else -}}{{- $provisioning = "shared" -}}{{- end -}}
+  {{- end -}}
   {{- if eq $provisioning "local" -}}
   {{- /* Auth-seed drift check (#63). Fires only when:
            1. the chart declares auth_seed_paths in dsl-mappings.yaml
@@ -321,6 +325,10 @@ falsy value".
 {{- $type := $svc.type -}}
 {{- $pt := $svc.passthrough | default dict -}}
 {{- $provisioning := $svc.provisioning | default "local" -}}
+  {{- if eq $provisioning "deploy" -}}{{- $provisioning = "local" -}}{{- end -}}
+  {{- if eq $provisioning "connect" -}}
+    {{- if $svc.endpoint -}}{{- $provisioning = "external" -}}{{- else -}}{{- $provisioning = "shared" -}}{{- end -}}
+  {{- end -}}
 {{- /* Skip non-local: no sub-chart deployed = no passthrough collision possible */ -}}
 {{- if ne $provisioning "local" -}}{{- continue -}}{{- end -}}
 {{- $entry := index $charts $type | default dict -}}
@@ -409,8 +417,12 @@ local-deploy convention.
 {{- $release := $root.Release.Name -}}
 {{- $name := printf "%s-%s-binding" $release $svc.binding -}}
 {{- $provisioning := $svc.provisioning | default "local" -}}
+  {{- if eq $provisioning "deploy" -}}{{- $provisioning = "local" -}}{{- end -}}
+  {{- if eq $provisioning "connect" -}}
+    {{- if $svc.endpoint -}}{{- $provisioning = "external" -}}{{- else -}}{{- $provisioning = "shared" -}}{{- end -}}
+  {{- end -}}
 {{- if not (or (eq $provisioning "local") (or (eq $provisioning "shared") (eq $provisioning "external"))) -}}
-{{- fail (printf "services[binding=%s].provisioning must be 'local', 'shared', or 'external' (got %q). See rda-docs/concepts/dsl.md#provisioning." $svc.binding $provisioning) -}}
+{{- fail (printf "services[binding=%s].provisioning must be 'deploy', 'connect', 'local', 'shared', or 'external' (got %q). See rda-docs/concepts/dsl.md#provisioning." $svc.binding $provisioning) -}}
 {{- end -}}
 {{- $mapping := include "suse-library.dsl.resolveMapping" (dict "chart" $svc.type "root" $root) | fromJson -}}
 {{- /* Resolve host / port / scheme depending on provisioning */ -}}
