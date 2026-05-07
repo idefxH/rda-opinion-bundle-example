@@ -12,6 +12,6 @@ load('ext://suse-rda', 'suse_app')
 
 suse_app(
     name='{{ .Name }}',
-    language='go',
+    language='{{ .Language }}',
     chart_path='deploy',
 )
