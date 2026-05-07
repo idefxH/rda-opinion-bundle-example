@@ -735,6 +735,7 @@ charts:
           auth.user.password: mariadb.auth.password
           auth.user.database: mariadb.auth.database
           auth.admin.password: mariadb.auth.rootPassword
+          persistence.enabled: mariadb.persistence.enabled
           persistence.size: mariadb.persistence.resources.requests.storage
           metrics.enabled: mariadb.metrics.enabled
           # mariadb chart's resources block lives under
@@ -808,6 +809,10 @@ charts:
           persistence.enabled: apache-kafka.broker.persistence.enabled
           persistence.size: apache-kafka.persistence.resources.requests.storage
           metrics.enabled: apache-kafka.metrics.enabled
+          resources.requests.cpu: apache-kafka.controller.podTemplates.containers.controller.resources.requests.cpu
+          resources.requests.memory: apache-kafka.controller.podTemplates.containers.controller.resources.requests.memory
+          resources.limits.cpu: apache-kafka.controller.podTemplates.containers.controller.resources.limits.cpu
+          resources.limits.memory: apache-kafka.controller.podTemplates.containers.controller.resources.limits.memory
         binding_secret:
           - {key: type, literal: apache-kafka, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
