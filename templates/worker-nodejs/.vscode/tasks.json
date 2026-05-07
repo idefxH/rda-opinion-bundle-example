@@ -9,9 +9,9 @@
       "runOptions": { "runOn": "folderOpen" },
       "problemMatcher": {
         "owner": "rda",
-        "fileLocation": "relative",
+        "fileLocation": ["relative", "${workspaceFolder}"],
         "pattern": {
-          "regexp": "^(.+):(\\d+):(\\d+): (warning|error): (.+)$",
+          "regexp": "^([^:]+):(\\d+):(\\d+): (warning|error): (.+)$",
           "file": 1,
           "line": 2,
           "column": 3,
@@ -21,7 +21,7 @@
         "background": {
           "activeOnStart": true,
           "beginsPattern": "^\\[rda\\] watching",
-          "endsPattern": "^$"
+          "endsPattern": "^\\s*$"
         }
       },
       "presentation": {
