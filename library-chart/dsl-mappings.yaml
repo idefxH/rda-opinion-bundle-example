@@ -806,7 +806,7 @@ charts:
           port: 9092
         values_mapping:
           persistence.enabled: apache-kafka.broker.persistence.enabled
-          persistence.size: apache-kafka.broker.persistence.size
+          persistence.size: apache-kafka.persistence.resources.requests.storage
           metrics.enabled: apache-kafka.metrics.enabled
         binding_secret:
           - {key: type, literal: apache-kafka, skip_env: true}
@@ -1054,10 +1054,10 @@ charts:
           auth.rbac.rootPassword: etcd.auth.rbac.rootPassword
           persistence.enabled: etcd.persistence.enabled
           persistence.size: etcd.persistence.size
-          resources.requests.cpu: etcd.resources.requests.cpu
-          resources.requests.memory: etcd.resources.requests.memory
-          resources.limits.cpu: etcd.resources.limits.cpu
-          resources.limits.memory: etcd.resources.limits.memory
+          resources.requests.cpu: etcd.podTemplates.containers.etcd.resources.requests.cpu
+          resources.requests.memory: etcd.podTemplates.containers.etcd.resources.requests.memory
+          resources.limits.cpu: etcd.podTemplates.containers.etcd.resources.limits.cpu
+          resources.limits.memory: etcd.podTemplates.containers.etcd.resources.limits.memory
         binding_secret:
           - {key: type, literal: etcd, skip_env: true}
           - {key: host, template: "{{ .Release.Name }}-etcd"}
@@ -1087,10 +1087,10 @@ charts:
           host: "{{ .Release.Name }}-nats.{{ .Release.Namespace }}.svc.cluster.local"
           port: 4222
         values_mapping:
-          resources.requests.cpu: nats.resources.requests.cpu
-          resources.requests.memory: nats.resources.requests.memory
-          resources.limits.cpu: nats.resources.limits.cpu
-          resources.limits.memory: nats.resources.limits.memory
+          resources.requests.cpu: nats.container.resources.requests.cpu
+          resources.requests.memory: nats.container.resources.requests.memory
+          resources.limits.cpu: nats.container.resources.limits.cpu
+          resources.limits.memory: nats.container.resources.limits.memory
         binding_secret:
           - {key: type, literal: nats, skip_env: true}
           - {key: host, template: "{{ .Release.Name }}-nats"}
@@ -1146,8 +1146,8 @@ charts:
           port: 8086
         values_mapping:
           auth.admin.token: influxdb.auth.admin.token
-          auth.admin.org: influxdb.auth.admin.org
-          auth.admin.bucket: influxdb.auth.admin.bucket
+          auth.admin.org: influxdb.adminUser.organization
+          auth.admin.bucket: influxdb.adminUser.bucket
           persistence.enabled: influxdb.persistence.enabled
           persistence.size: influxdb.persistence.size
           resources.requests.cpu: influxdb.resources.requests.cpu
