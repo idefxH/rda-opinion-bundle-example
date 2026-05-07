@@ -1245,17 +1245,17 @@ charts:
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         service:
-          host: "{{ .Release.Name }}-webserver.{{ .Release.Namespace }}.svc.cluster.local"
+          host: "{{ .Release.Name }}-api-server.{{ .Release.Namespace }}.svc.cluster.local"
           port: 8080
         values_mapping:
           auth.user.name: apache-airflow.createUserJob.defaultUser.username
           auth.user.password: apache-airflow.createUserJob.defaultUser.password
-          ingress.enabled: apache-airflow.ingress.web.enabled
-          ingress.host: apache-airflow.ingress.web.hosts[0].name
-          resources.requests.cpu: apache-airflow.webserver.resources.requests.cpu
-          resources.requests.memory: apache-airflow.webserver.resources.requests.memory
-          resources.limits.cpu: apache-airflow.webserver.resources.limits.cpu
-          resources.limits.memory: apache-airflow.webserver.resources.limits.memory
+          ingress.enabled: apache-airflow.ingress.apiServer.enabled
+          ingress.host: apache-airflow.ingress.apiServer.hosts[0].name
+          resources.requests.cpu: apache-airflow.apiServer.resources.requests.cpu
+          resources.requests.memory: apache-airflow.apiServer.resources.requests.memory
+          resources.limits.cpu: apache-airflow.apiServer.resources.limits.cpu
+          resources.limits.memory: apache-airflow.apiServer.resources.limits.memory
         dependencies:
           - charts: [postgresql]
             required: true
@@ -1275,9 +1275,9 @@ charts:
         binding_secret:
           - {key: type, literal: apache-airflow, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
-          - {key: host, template: "{{ .Release.Name }}-webserver"}
+          - {key: host, template: "{{ .Release.Name }}-api-server"}
           - {key: port, literal: "8080"}
-          - {key: url, template: "http://{{ .Release.Name }}-webserver:8080"}
+          - {key: url, template: "http://{{ .Release.Name }}-api-server:8080"}
           - {key: username, from_dsl: auth.user.name, default: admin}
           - {key: password, from_dsl: auth.user.password, required: true}
         scaffold:
