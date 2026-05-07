@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "rda-doctor-watch",
+      "type": "shell",
+      "command": "rda doctor --watch --output diagnostic",
+      "isBackground": true,
+      "runOptions": { "runOn": "folderOpen" },
+      "problemMatcher": {
+        "owner": "rda",
+        "fileLocation": "relative",
+        "pattern": {
+          "regexp": "^(.+):(\d+):(\d+): (warning|error): (.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\[rda\] watching",
+          "endsPattern": "^$"
+        }
+      },
+      "presentation": {
+        "reveal": "never",
+        "echo": false,
+        "close": true
+      }
+    }
+  ]
+}
