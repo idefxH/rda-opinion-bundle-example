@@ -81,10 +81,10 @@ charts:
           persistence.enabled: postgresql.persistence.enabled
           persistence.size: postgresql.persistence.resources.requests.storage
           metrics.enabled: postgresql.metrics.enabled
-          resources.requests.cpu: postgresql.primary.resources.requests.cpu
-          resources.requests.memory: postgresql.primary.resources.requests.memory
-          resources.limits.cpu: postgresql.primary.resources.limits.cpu
-          resources.limits.memory: postgresql.primary.resources.limits.memory
+          resources.requests.cpu: postgresql.podTemplates.containers.postgresql.resources.requests.cpu
+          resources.requests.memory: postgresql.podTemplates.containers.postgresql.resources.requests.memory
+          resources.limits.cpu: postgresql.podTemplates.containers.postgresql.resources.limits.cpu
+          resources.limits.memory: postgresql.podTemplates.containers.postgresql.resources.limits.memory
         # AppCo postgres init only runs once on empty PGDATA. Once these
         # values are baked into the volume, subsequent re-deploys keep the
         # ORIGINAL credentials/database — env-var changes are silently
