@@ -70,7 +70,7 @@ spec:
             */}}
             {{- range $i, $svc := $enabled }}
             {{- $prov := $svc.provisioning | default "deploy" }}
-            {{- $ep := $svc.endpoint | default dict }}
+            {{- $ep := $svc.credentials | default dict }}
             {{- $secretRef := index $ep "secretRef" | default "" }}
             {{- if or (ne $prov "external") (ne $secretRef "") }}
             - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
@@ -120,7 +120,7 @@ spec:
         */}}
         {{- range $i, $svc := $enabled }}
         {{- $prov := $svc.provisioning | default "deploy" }}
-        {{- $ep := $svc.endpoint | default dict }}
+        {{- $ep := $svc.credentials | default dict }}
         {{- $secretRef := index $ep "secretRef" | default "" }}
         {{- if ne $prov "external" }}
         - name: {{ printf "binding-%s" $svc.binding }}

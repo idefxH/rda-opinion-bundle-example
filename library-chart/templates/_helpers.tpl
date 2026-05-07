@@ -397,7 +397,7 @@ stringData. Each entry is one of:
 Provisioning:
   - local    : host = chart's mapping.service.host (templated), port = mapping.service.port
   - shared   : host/port from .Values.defaults.shared_services[<type>] (overlay)
-  - external : host/port from $svc.endpoint (dev fills in)
+  - external : host/port from $svc.credentials (dev fills in)
 
 The mapping's binding_secret host/port are overridden when provisioning is
 shared/external, because in those cases the host doesn't follow the
@@ -419,12 +419,12 @@ local-deploy convention.
   {{- fail (printf "services[binding=%s].provisioning must be 'deploy' or 'connect' (got %q). See rda-docs/concepts/dsl.md#provisioning." $svc.binding $rawProv) -}}
 {{- end -}}
 {{- /* For connect mode, determine the credential source:
-       - endpoint.secretRef → secretRef mode (no binding-secret)
-       - endpoint.host → inline mode (dev-provided host/port)
+       - credentials.secretRef → secretRef mode (no binding-secret)
+       - credentials.host → inline mode (dev-provided host/port)
        - neither → overlay mode (ops pre-configured shared_services) */ -}}
 {{- $connectMode := "" -}}
 {{- if eq $provisioning "connect" -}}
-  {{- $ep := $svc.endpoint | default dict -}}
+  {{- $ep := $svc.credentials | default dict -}}
   {{- if ne (index $ep "secretRef" | default "") "" -}}
     {{- $connectMode = "secretRef" -}}
   {{- else if ne (index $ep "host" | default "") "" -}}
@@ -504,8 +504,8 @@ local-deploy convention.
     {{- $port = index $sharedMap "port" | default "" | toString -}}
     {{- $scheme = index $sharedMap "scheme" | default "http" -}}
   {{- else if eq $connectMode "inline" -}}
-    {{- /* Inline mode: dev provided endpoint.host/port directly. */ -}}
-    {{- $ep := $svc.endpoint | default dict -}}
+    {{- /* Inline mode: dev provided credentials.host/port directly. */ -}}
+    {{- $ep := $svc.credentials | default dict -}}
     {{- $host = $ep.host -}}
     {{- $port = $ep.port | default "" | toString -}}
     {{- $scheme = $ep.scheme | default "http" -}}

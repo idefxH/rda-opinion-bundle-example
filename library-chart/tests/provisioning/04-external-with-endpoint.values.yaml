@@ -2,7 +2,7 @@ services:
   - binding: legacy-events
     type: postgresql
     provisioning: connect
-    endpoint:
+    credentials:
       host: legacy-postgres.corp.local
       port: 5432
       scheme: tcp
