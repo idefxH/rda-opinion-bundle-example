@@ -11,7 +11,7 @@
         "owner": "rda",
         "fileLocation": "relative",
         "pattern": {
-          "regexp": "^(.+):(\d+):(\d+): (warning|error): (.+)$",
+          "regexp": "^(.+):(\\d+):(\\d+): (warning|error): (.+)$",
           "file": 1,
           "line": 2,
           "column": 3,
@@ -20,7 +20,7 @@
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "^\[rda\] watching",
+          "beginsPattern": "^\\[rda\\] watching",
           "endsPattern": "^$"
         }
       },
