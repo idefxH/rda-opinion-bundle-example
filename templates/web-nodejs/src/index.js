@@ -109,13 +109,14 @@ const messagesCurrent = new promClient.Gauge({
 const dbPrefix = (process.env.DB_BINDING || 'DB').toUpperCase();
 const env = (suffix, fallback) => process.env[`${dbPrefix}_${suffix}`] || fallback;
 
-const client = new Client({
+const pgConfig = {
   host: env('HOST'),
   port: parseInt(env('PORT', '5432')),
   user: env('USERNAME'),
   password: env('PASSWORD'),
   database: env('DATABASE'),
-});
+};
+let client = new Client(pgConfig);
 
 function usernameFromCookie(req) {
   const cookies = parseCookies(req.headers.cookie);
@@ -387,6 +388,7 @@ function extractIDToken(req) {
 async function connectWithRetry(maxAttempts, delayMs) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      client = new Client(pgConfig);
       await client.connect();
       return;
     } catch (err) {
