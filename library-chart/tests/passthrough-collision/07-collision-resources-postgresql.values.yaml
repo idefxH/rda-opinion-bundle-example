@@ -11,10 +11,12 @@ services:
         cpu: 100m
         memory: 256Mi
     passthrough:
-      primary:
-        resources:
-          requests:
-            cpu: 500m
+      podTemplates:
+        containers:
+          postgresql:
+            resources:
+              requests:
+                cpu: 500m
 
 postgresql:
   enabled: true
