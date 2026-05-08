@@ -1,6 +1,10 @@
 # Project Templates
 
-Each directory is a project template scaffolded by `rda new --template <id>`.
+Each directory is a project template. Greenfield templates are scaffolded
+by `rda new --template <id>`. Brownfield templates are scaffolded by
+`rda init [--template <id>]`.
+
+## Greenfield (rda new)
 
 | Template | Language | Workload | HTTP? | Ingress? |
 |----------|----------|----------|-------|----------|
@@ -10,6 +14,17 @@ Each directory is a project template scaffolded by `rda new --template <id>`.
 | `worker-go` | Go | Background worker | No | No |
 | `worker-nodejs` | Node.js | Background worker | No | No |
 | `worker-java` | Java 21 | Background worker | No | No |
+
+## Brownfield (rda init)
+
+| Template | Language | Build | Use case |
+|----------|----------|-------|----------|
+| `brownfield-generic` | auto-detect | pack build | Existing source code |
+| `brownfield-image` | none | pre-built | Container image exists |
+| `brownfield-helm` | none | none | Existing Helm chart |
+
+Brownfield templates scaffold ONLY deployment files (deploy/, Tiltfile,
+.rda/). They do NOT scaffold source code.
 
 ## Template structure
 

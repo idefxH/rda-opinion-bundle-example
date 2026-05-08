@@ -9,27 +9,30 @@ Contains the chart catalog, project templates, and the library chart.
 rda-opinion-bundle-example/
 ├── rda-bundle.yaml                    ← bundle manifest
 ├── library-chart/                     ← the Helm library chart
-│   ├── dsl-mappings.yaml              ← THE SOURCE OF TRUTH (15 chart types)
+│   ├── dsl-mappings.yaml              ← THE SOURCE OF TRUTH (16 chart types)
 │   ├── Chart.yaml                     ← AppCo sub-chart dependencies
 │   ├── values.yaml                    ← defaults (each chart enabled: false)
 │   ├── templates/                     ← Helm templates (deployment, secrets, etc.)
 │   ├── tests/                         ← 18 invariant test suites
 │   └── scripts/                       ← maintenance scripts
-└── templates/                         ← project scaffolding templates
+└── templates/                         ← project scaffolding templates (9)
     ├── web-go/                        ← Go web service
     ├── web-nodejs/                    ← Node.js web service
     ├── web-java/                      ← Java web service
     ├── worker-go/                     ← Go background worker
     ├── worker-nodejs/                 ← Node.js background worker
-    └── worker-java/                   ← Java background worker
+    ├── worker-java/                   ← Java background worker
+    ├── brownfield-generic/            ← existing source code (auto-detect language)
+    ├── brownfield-image/              ← pre-built container image
+    └── brownfield-helm/               ← existing Helm chart
 ```
 
 ## Source of truth
 
 **`library-chart/dsl-mappings.yaml`** is the single source of truth for:
-- Which chart types are supported (15: postgresql, redis, valkey, mariadb,
+- Which chart types are supported (16: postgresql, redis, valkey, mariadb,
   apache-kafka, prometheus, grafana, dex, minio, vault, etcd, nats,
-  opensearch, influxdb, harbor)
+  opensearch, influxdb, harbor, apache-airflow)
 - How DSL fields map to chart values
 - What binding secrets each chart produces
 - What fields are scaffolded by `rda service add`
