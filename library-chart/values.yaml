@@ -46,7 +46,18 @@ metrics:
   path: /metrics
   # port: 8080  # defaults to .Values.port
 
-# Free-form pod annotations (Linkerd inject, Istio sidecar, etc.).
+securityContext: {}
+podSecurityContext: {}
+
+initContainers: []
+
+volumes: []
+volumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
 podAnnotations: {}
 
 # Application Ingress (one Ingress fronting the app's Service).
