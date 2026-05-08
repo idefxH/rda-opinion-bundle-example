@@ -162,7 +162,7 @@ charts:
           host: "{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local"
           port: 6379
         values_mapping:
-          auth.password: redis.auth.password
+          auth.user.password: redis.auth.user.password
           persistence.enabled: redis.persistence.enabled
           persistence.size: redis.persistence.resources.requests.storage
           metrics.enabled: redis.metrics.enabled
@@ -176,16 +176,16 @@ charts:
         # check still fires but is informational: the lookup finds no
         # PVC, the helper short-circuits with no warning.
         auth_seed_paths:
-          - auth.password
+          - auth.user.password
         binding_secret:
           - {key: type, literal: redis, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
           - {key: host, template: "{{ .Release.Name }}-redis"}
           - {key: port, literal: "6379"}
-          - {key: password, from_dsl: auth.password, required: true}
+          - {key: password, from_dsl: auth.user.password, required: true}
 
         scaffold:
-          auth.password:
+          auth.user.password:
             default: ""
             comment: "redis password — required"
           # Persistence-off default — flip to true for durable AOF/RDB
@@ -854,7 +854,7 @@ charts:
           host: "{{ .Release.Name }}-valkey.{{ .Release.Namespace }}.svc.cluster.local"
           port: 6379
         values_mapping:
-          auth.password: valkey.auth.password
+          auth.user.password: valkey.auth.user.password
           persistence.enabled: valkey.persistence.enabled
           persistence.size: valkey.persistence.resources.requests.storage
           metrics.enabled: valkey.metrics.enabled
@@ -866,15 +866,15 @@ charts:
         # password lives in the AOF/RDB snapshot — flipping post-init
         # requires a PVC reset.
         auth_seed_paths:
-          - auth.password
+          - auth.user.password
         binding_secret:
           - {key: type, literal: valkey, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
           - {key: host, template: "{{ .Release.Name }}-valkey"}
           - {key: port, literal: "6379"}
-          - {key: password, from_dsl: auth.password, required: true}
+          - {key: password, from_dsl: auth.user.password, required: true}
         scaffold:
-          auth.password:
+          auth.user.password:
             default: ""
             comment: "valkey password — required"
           persistence.enabled:
@@ -914,8 +914,8 @@ charts:
             # Cross-binding refs see MINIO_CONSOLE_PORT / MINIO_CONSOLE_URL.
             console: { port: 9001, scheme: http }
         values_mapping:
-          auth.user.name: minio.rootUser
-          auth.user.password: minio.rootPassword
+          auth.admin.name: minio.rootUser
+          auth.admin.password: minio.rootPassword
           persistence.enabled: minio.persistence.enabled
           persistence.size: minio.persistence.size
           metrics.enabled: minio.metrics.serviceMonitor.enabled
@@ -928,8 +928,8 @@ charts:
         # rootUser / rootPassword bake into the data dir on first init
         # — same auth-seed semantics as postgres / mariadb / redis.
         auth_seed_paths:
-          - auth.user.name
-          - auth.user.password
+          - auth.admin.name
+          - auth.admin.password
         # MinIO chart defaults `mode: distributed` (16 replicas, 500Gi
         # each) — wildly inappropriate for laptop dev. We override
         # to standalone mode via chart_defaults so a fresh project
@@ -947,13 +947,13 @@ charts:
           # this single field (matches MINIO_ENDPOINT in the upstream
           # client SDKs).
           - {key: url, template: "http://{{ .Release.Name }}-minio:9000"}
-          - {key: accessKey, from_dsl: auth.user.name, default: minioadmin, env_aliases: [user]}
-          - {key: secretKey, from_dsl: auth.user.password, required: true, env_aliases: [password]}
+          - {key: accessKey, from_dsl: auth.admin.name, default: minioadmin, env_aliases: [user]}
+          - {key: secretKey, from_dsl: auth.admin.password, required: true, env_aliases: [password]}
         scaffold:
-          auth.user.name:
+          auth.admin.name:
             default: "minioadmin"
             comment: "S3 access key (root user)"
-          auth.user.password:
+          auth.admin.password:
             default: ""
             comment: "S3 secret key (root password) — required, min 8 chars"
           persistence.enabled:
@@ -998,6 +998,8 @@ charts:
           auth.admin.password: vault.server.dev.devRootToken
           # Production HA backends (raft / consul) live in passthrough;
           # the DSL surface for vault stays minimal.
+          persistence.enabled: vault.server.dataStorage.enabled
+          persistence.size: vault.server.dataStorage.size
           ingress.enabled: vault.server.ingress.enabled
           ingress.hosts: vault.server.ingress.hosts
           metrics.enabled: vault.serverTelemetry.serviceMonitor.enabled
@@ -1030,6 +1032,10 @@ charts:
           auth.admin.password:
             default: "root"
             comment: "dev-mode root token (Vault unsealed at boot with this token)"
+          persistence.enabled:
+            default: true
+          persistence.size:
+            default: "1Gi"
           ingress.enabled:
             default: false
           ingress.hosts:
@@ -1222,7 +1228,7 @@ charts:
             wiring:
               harbor.redis.type: __literal:external
               harbor.redis.external.addr: __host__
-              harbor.redis.external.password: auth.password
+              harbor.redis.external.password: auth.user.password
         binding_secret:
           - {key: type, literal: harbor, skip_env: true}
           - {key: host, template: "{{ .Release.Name }}-harbor-core"}
