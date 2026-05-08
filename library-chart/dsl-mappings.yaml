@@ -60,8 +60,19 @@
 
 apiVersion: rda.suse.com/dsl-mapping/v1alpha1
 
+# Upstream compatibility:
+#   9 charts are DROP-IN with upstream (same values schema):
+#     prometheus, grafana, dex, minio, vault, opensearch, influxdb, harbor, apache-airflow
+#   6 charts are APPCO-NATIVE (own podTemplates schema, no upstream equivalent):
+#     postgresql, redis, mariadb, valkey, etcd, apache-kafka
+#   1 chart has MINOR DIFF with upstream:
+#     nats (upstream uses container.merge.resources, AppCo uses container.resources)
+
 charts:
   postgresql:
+    # UPSTREAM: AppCo-native (built from scratch, not a repackage)
+    # Bitnami upstream uses primary.resources — incompatible with AppCo's podTemplates schema
+    # upstream_repo: oci://registry-1.docker.io/bitnamicharts/postgresql (NOT compatible)
     default_branch: "17"
     branches:
       "18": {chart_version: "0.5.5-7.1"}
@@ -146,6 +157,8 @@ charts:
             default: "1Gi"
 
   redis:
+    # UPSTREAM: AppCo-native (podTemplates schema, not a Bitnami repackage)
+    # upstream_repo: oci://registry-1.docker.io/bitnamicharts/redis (NOT compatible — uses master.resources)
     versions:
       - constraint: ">=2.0.0 <3.0.0"
         # AppCo redis 2.x (chart packaging — redis binary 8.x lineage).
@@ -204,6 +217,10 @@ charts:
             default: "256Mi"
 
   prometheus:
+    # UPSTREAM: DROP-IN with prometheus-community/prometheus
+    # upstream_repo: https://prometheus-community.github.io/helm-charts
+    # upstream_oci: oci://ghcr.io/prometheus-community/charts/prometheus
+    # compatibility: values schema identical (server.resources, server.persistentVolume, etc.)
     versions:
       - constraint: ">=29.0.0"
         # AppCo prometheus 29.x (community chart 29.x lineage, prometheus
@@ -287,6 +304,9 @@ charts:
             default: "1Gi"
 
   grafana:
+    # UPSTREAM: DROP-IN with grafana/grafana
+    # upstream_repo: https://grafana.github.io/helm-charts
+    # compatibility: values schema identical (adminUser, adminPassword, ingress, persistence, resources)
     versions:
       - constraint: ">=12.0.0"
         # AppCo grafana 12.x. Service maps port 80 (chart default) to pod
@@ -345,6 +365,9 @@ charts:
             default: "512Mi"
 
   dex:
+    # UPSTREAM: DROP-IN with dexidp/dex
+    # upstream_repo: https://charts.dexidp.io
+    # compatibility: values schema identical (config.*, resources.*, ingress.*)
     versions:
       - constraint: ">=0.24.0 <1.0.0"
         # Dex 0.24.0 (app 2.44.0) via SUSE Application Collection.
@@ -717,6 +740,8 @@ charts:
                 - "http://localhost:18081/auth/callback"
 
   mariadb:
+    # UPSTREAM: AppCo-native (podTemplates schema, not a Bitnami repackage)
+    # upstream_repo: oci://registry-1.docker.io/bitnamicharts/mariadb (NOT compatible — uses primary.resources)
     versions:
       - constraint: ">=0.1.0 <1.0.0"
         # AppCo mariadb 0.1.x (chart from-scratch — see chart README).
@@ -790,6 +815,8 @@ charts:
             default: "1Gi"
 
   apache-kafka:
+    # UPSTREAM: AppCo-native (podTemplates schema, not a Bitnami repackage)
+    # upstream_repo: oci://registry-1.docker.io/bitnamicharts/kafka (NOT compatible — different persistence/resources paths)
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         # AppCo apache-kafka 1.x (KRaft mode, no zookeeper). Broker
@@ -844,6 +871,8 @@ charts:
             default: "1Gi"
 
   valkey:
+    # UPSTREAM: AppCo-native (podTemplates schema, not a Bitnami repackage)
+    # upstream_repo: oci://registry-1.docker.io/bitnamicharts/valkey (NOT compatible — uses primary.resources)
     versions:
       - constraint: ">=0.11.0 <1.0.0"
         # AppCo valkey 0.11.x (Valkey 9.x — the open-source Redis fork).
@@ -891,6 +920,9 @@ charts:
             default: "256Mi"
 
   minio:
+    # UPSTREAM: DROP-IN with minio community chart
+    # upstream_repo: https://charts.min.io
+    # compatibility: values schema identical (rootUser, rootPassword, persistence, resources, mode)
     versions:
       - constraint: ">=5.0.0 <6.0.0"
         # AppCo minio 5.x (chart based on the upstream minio/minio
@@ -978,6 +1010,9 @@ charts:
             default: "1Gi"
 
   vault:
+    # UPSTREAM: DROP-IN with hashicorp/vault
+    # upstream_repo: https://helm.releases.hashicorp.com
+    # compatibility: values schema identical (server.dev, server.resources, server.ingress, server.dataStorage)
     versions:
       - constraint: ">=0.31.0 <1.0.0"
         # AppCo vault 0.31.x / 0.32.x (HashiCorp Vault community edition,
@@ -1056,6 +1091,8 @@ charts:
   # ─── Charts added in 0.11.39 ────────────────────────────────────
 
   etcd:
+    # UPSTREAM: AppCo-native (podTemplates schema, not a Bitnami repackage)
+    # upstream_repo: oci://registry-1.docker.io/bitnamicharts/etcd (NOT compatible — uses top-level resources)
     versions:
       - constraint: ">=0.3.0 <1.0.0"
         service:
@@ -1092,6 +1129,9 @@ charts:
             default: "512Mi"
 
   nats:
+    # UPSTREAM: MINOR DIFF with nats-io/nats
+    # upstream_repo: https://nats-io.github.io/k8s/helm/charts/
+    # compatibility: close but upstream uses container.merge.resources instead of container.resources
     versions:
       - constraint: ">=2.0.0 <3.0.0"
         service:
@@ -1118,6 +1158,9 @@ charts:
             default: "256Mi"
 
   opensearch:
+    # UPSTREAM: DROP-IN with opensearch-project/opensearch
+    # upstream_repo: https://opensearch-project.github.io/helm-charts/
+    # compatibility: values schema identical (persistence, resources)
     versions:
       - constraint: ">=3.0.0 <4.0.0"
         service:
@@ -1150,6 +1193,9 @@ charts:
             default: "2Gi"
 
   influxdb:
+    # UPSTREAM: DROP-IN with influxdata/influxdb2
+    # upstream_repo: https://helm.influxdata.com
+    # compatibility: values schema identical (adminUser.*, persistence.*, resources.*)
     versions:
       - constraint: ">=2.0.0 <3.0.0"
         service:
@@ -1195,6 +1241,9 @@ charts:
             default: "1Gi"
 
   harbor:
+    # UPSTREAM: DROP-IN with goharbor/harbor
+    # upstream_repo: https://helm.goharbor.io
+    # compatibility: values schema identical (harborAdminPassword, expose.ingress, core.resources)
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         service:
@@ -1253,6 +1302,9 @@ charts:
             default: "1Gi"
 
   apache-airflow:
+    # UPSTREAM: DROP-IN with apache/airflow
+    # upstream_repo: https://airflow.apache.org
+    # compatibility: values schema identical (apiServer.resources, createUserJob, ingress.apiServer)
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         service:
