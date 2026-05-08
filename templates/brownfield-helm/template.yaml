@@ -1,0 +1,17 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: brownfield-helm
+  display_name: Brownfield (existing Helm chart)
+  language: none
+  description: |
+    Add RDA backing service management to an existing Helm chart project.
+    Scaffolds only the suse-library values block and .rda/project.yaml.
+    No Tiltfile, no Chart.yaml — the user already has their own.
+
+spec:
+  brownfield: true
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg

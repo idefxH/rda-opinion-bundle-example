@@ -1,0 +1,14 @@
+# RDA services[] DSL for {{ .Name }}.
+#
+# Merge this into your existing Helm values or use as a separate
+# values file: helm install ... -f deploy/values.yaml
+#
+# Add backing services:  rda service add <type> <binding>
+# Wire datasources:      rda service wire <source> --to <consumer>
+#
+# `rda render` projects services[] into .rda/values.generated.yaml.
+
+suse-library:
+  name: "{{ .Name }}"
+
+  env: {}

@@ -1,0 +1,21 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: brownfield-generic
+  display_name: Brownfield (existing source code)
+  language: auto
+  description: |
+    Add RDA deployment to an existing project with source code.
+    Scaffolds deploy/, Tiltfile, and .rda/ — source code untouched.
+    Language auto-detected from project files (package.json, go.mod,
+    pom.xml). Build via pack (same as greenfield).
+
+spec:
+  brownfield: true
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: Auto-detected from existing project files.
+      autoCompute: detect-from-files

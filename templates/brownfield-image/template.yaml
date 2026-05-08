@@ -1,0 +1,20 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: brownfield-image
+  display_name: Brownfield (pre-built image)
+  language: none
+  description: |
+    Deploy a pre-built container image on Kubernetes with RDA's backing
+    service management. No source code, no build step — just the image
+    ref and the Helm chart. Scaffolds deploy/, Tiltfile, and .rda/.
+
+spec:
+  brownfield: true
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    ImageRef:
+      description: Container image reference (e.g. registry.corp.com/my-app:v2.3.1).
+      prompt: "Container image to deploy"

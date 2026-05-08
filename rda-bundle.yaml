@@ -59,6 +59,30 @@ templates:
       Java 21 background worker — no HTTP server, no Service, no Ingress.
       Natural fit for Kafka consumers, batch processors, schedulers.
     path_in_bundle: templates/worker-java
+  - id: brownfield-generic
+    display_name: Brownfield (existing source code)
+    language: auto
+    description: |
+      Add RDA deployment to an existing project with source code.
+      Language auto-detected from project files. Build via pack.
+      Scaffolds deploy/, Tiltfile, .rda/ — source code untouched.
+    path_in_bundle: templates/brownfield-generic
+  - id: brownfield-image
+    display_name: Brownfield (pre-built image)
+    language: none
+    description: |
+      Deploy a pre-built container image on Kubernetes with RDA backing
+      service management. No build step — just helm deploy.
+      Scaffolds deploy/, Tiltfile, .rda/.
+    path_in_bundle: templates/brownfield-image
+  - id: brownfield-helm
+    display_name: Brownfield (existing Helm chart)
+    language: none
+    description: |
+      Add RDA backing service management to an existing Helm chart.
+      Scaffolds only the suse-library values block and .rda/.
+      No Tiltfile, no Chart.yaml — user has their own.
+    path_in_bundle: templates/brownfield-helm
 library_chart:
   # v1: file:// URI relative to bundle root. The rda HelmClient.PullChart
   # production implementation supports file:// URIs only — see the v1-gap

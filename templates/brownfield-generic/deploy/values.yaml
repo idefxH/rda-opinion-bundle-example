@@ -1,0 +1,27 @@
+# Project values for {{ .Name }}.
+#
+# Add backing services:  rda service add <type> <binding>
+# Wire datasources:      rda service wire <source> --to <consumer>
+#
+# `rda render` projects services[] into .rda/values.generated.yaml.
+# Don't edit values.generated.yaml — it's overwritten on each render.
+
+suse-library:
+  name: "{{ .Name }}"
+  replicas: 1
+  port: 8080
+
+  ingress:
+    enabled: true
+    hosts:
+      - "{{ .Name }}.localtest.me"
+
+  image:
+    repository: "{{ .Name }}"
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  imagePullSecrets:
+    - name: application-collection
+
+  env: {}

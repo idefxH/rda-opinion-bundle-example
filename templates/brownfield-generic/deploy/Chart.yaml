@@ -1,0 +1,11 @@
+apiVersion: v2
+name: {{ .Name }}
+description: {{ .Name }} — brownfield project managed by rda
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords: [rda, brownfield, {{ .Language }}]
+
+dependencies:
+  - name: suse-library
+    version: 0.15.0
