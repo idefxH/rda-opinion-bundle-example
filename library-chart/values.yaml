@@ -20,6 +20,7 @@ services: []
 name: ""
 replicas: 1
 port: 8080
+domain: ""
 
 image:
   repository: registry.suse.com/bci/bci-base

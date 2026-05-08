@@ -10,11 +10,12 @@ suse-library:
   name: "{{ .Name }}"
   replicas: 1
   port: 8080
+  domain: "localtest.me"
 
   ingress:
     enabled: true
     hosts:
-      - "{{ .Name }}.localtest.me"
+      - "{{ .Name }}.{{.domain}}"
 
   image:
     repository: "{{ .Name }}"
