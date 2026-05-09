@@ -1,4 +1,21 @@
+{{- /*
+  ingress.yaml — Multi-workload Ingress renderer (Design Orientation 0005).
+
+  Only generates rules for workloads that have BOTH a port AND
+  ingress.hosts defined. Each workload's ingress.hosts routes to that
+  workload's Service (<release>-<workload.name>).
+
+  Global ingress settings (className, annotations, tls) come from
+  .Values.ingress at chart level.
+*/ -}}
 {{- if .Values.ingress.enabled -}}
+{{- $hasAnyHosts := false -}}
+{{- range $wl := .Values.workloads_resolved | default list -}}
+  {{- if and $wl.port (index ($wl.ingress | default dict) "hosts") -}}
+    {{- $hasAnyHosts = true -}}
+  {{- end -}}
+{{- end -}}
+{{- if $hasAnyHosts }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -14,27 +31,26 @@ spec:
   ingressClassName: {{ . }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
+    {{- range $wl := .Values.workloads_resolved | default list }}
+    {{- if and $wl.port (index ($wl.ingress | default dict) "hosts") }}
+    {{- $wlName := printf "%s-%s" (include "suse-library.name" $) $wl.name }}
+    {{- range $wl.ingress.hosts }}
     - host: {{ . | quote }}
       http:
         paths:
-          - path: {{ $.Values.ingress.path | default "/" }}
-            pathType: {{ $.Values.ingress.pathType | default "Prefix" }}
+          - path: {{ index ($wl.ingress | default dict) "path" | default $.Values.ingress.path | default "/" }}
+            pathType: {{ index ($wl.ingress | default dict) "pathType" | default $.Values.ingress.pathType | default "Prefix" }}
             backend:
               service:
-                name: {{ include "suse-library.name" $ }}
+                name: {{ $wlName }}
                 port:
-                  # Use port NUMBER, not name. Traefik 2.x on k3s
-                  # (Rancher Desktop's default) fails to resolve
-                  # port-name references on Service backends, returning
-                  # 503 Service Unavailable with the misleading
-                  # `service not found` log. The Service template
-                  # hardcodes `port: 80`, so we mirror that here.
-                  # Future: parameterise both via .Values.service.port.
                   number: 80
+    {{- end }}
+    {{- end }}
     {{- end }}
   {{- with .Values.ingress.tls }}
   tls:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- end }}
 {{- end -}}

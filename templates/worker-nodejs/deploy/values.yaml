@@ -7,25 +7,18 @@
 
 suse-library:
   name: "{{ .Name }}"
-  replicas: 1
-  port: 8080
 
   ingress:
     enabled: false
-  service:
-    enabled: false
-
-  image:
-    repository: "{{ .Name }}"
-    tag: dev
-    pullPolicy: IfNotPresent
 
   imagePullSecrets:
     - name: application-collection
 
-  probes:
-    liveness:  {path: /health, initialDelaySeconds: 10, periodSeconds: 10}
-    readiness: null
-
-  env: {}
-
+  workloads:
+    - name: app
+      shape: worker
+      image:
+        repository: "{{ .Name }}"
+        tag: dev
+        pullPolicy: IfNotPresent
+      env: {}

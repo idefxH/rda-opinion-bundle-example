@@ -1,74 +1,233 @@
-apiVersion: apps/v1
-kind: Deployment
+{{- /*
+  deployment.yaml — Multi-workload renderer (Design Orientation 0005).
+
+  Iterates .Values.workloads_resolved[]. Each entry produces one K8s
+  resource whose kind depends on workload.kind:
+    Deployment (default) | CronJob | DaemonSet
+
+  Naming: <release>-<workload.name>
+  Env:    workload.env_resolved (per-workload, resolved by rda render)
+  Probes: workload.probes (null = skip)
+  Binding volumes stay chart-level (from services[], shared across workloads).
+  Per-workload volumes/volumeMounts are additive.
+*/ -}}
+{{- $enabled := include "suse-library.dsl.enabledServices" $ | fromJsonArray -}}
+{{- range $wl := .Values.workloads_resolved | default list }}
+{{- $wlName := printf "%s-%s" (include "suse-library.name" $) $wl.name }}
+{{- $kind := $wl.kind | default "Deployment" }}
+---
+{{- if eq $kind "CronJob" }}
+apiVersion: batch/v1
+kind: CronJob
 metadata:
-  name: {{ include "suse-library.name" . }}
+  name: {{ $wlName }}
   labels:
-    {{- include "suse-library.labels" . | nindent 4 }}
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    rda.suse.com/workload: {{ $wl.name | quote }}
 spec:
-  replicas: {{ .Values.replicas }}
+  schedule: {{ $wl.schedule | quote }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "suse-library.labels" $ | nindent 8 }}
+        rda.suse.com/workload: {{ $wl.name | quote }}
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "suse-library.selectorLabels" $ | nindent 12 }}
+            rda.suse.com/workload: {{ $wl.name | quote }}
+          annotations:
+            checksum/services: {{ $.Values.services | toJson | sha256sum }}
+            {{- with $wl.metrics }}
+            {{- if .enabled }}
+            prometheus.io/scrape: "true"
+            prometheus.io/path: {{ .path | quote }}
+            prometheus.io/port: {{ .port | default $wl.port | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with $.Values.podAnnotations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        spec:
+          restartPolicy: {{ $wl.restartPolicy | default "OnFailure" }}
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $wl.initContainers }}
+          initContainers:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: {{ $wl.name }}
+              image: "{{ $wl.image.repository }}:{{ $wl.image.tag }}"
+              imagePullPolicy: {{ $wl.image.pullPolicy | default "IfNotPresent" }}
+              {{- if $wl.port }}
+              ports:
+                - {name: http, containerPort: {{ $wl.port }}}
+              {{- end }}
+              env:
+                - {name: SERVICE_BINDING_ROOT, value: /bindings}
+                {{- if $wl.port }}
+                - {name: PORT, value: "{{ $wl.port }}"}
+                {{- end }}
+                {{- range $entry := $wl.env_resolved | default list }}
+                - name: {{ index $entry "name" }}
+                  {{- if eq (index $entry "kind") "secret" }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ index $entry "secretRef" }}
+                      key: {{ index $entry "secretKey" }}
+                  {{- else }}
+                  value: {{ index $entry "value" | quote }}
+                  {{- end }}
+                {{- end }}
+              volumeMounts:
+                {{- range $i, $svc := $enabled }}
+                {{- $prov := $svc.provisioning | default "deploy" }}
+                {{- $ep := $svc.credentials | default dict }}
+                {{- $secretRef := index $ep "secretRef" | default "" }}
+                {{- if or (and (ne $prov "connect") (ne $prov "external")) (ne $secretRef "") }}
+                - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
+                {{- end }}
+                {{- end }}
+                {{- with $wl.volumeMounts }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              {{- with $wl.probes }}
+              {{- with .liveness }}
+              livenessProbe:
+                httpGet: {path: {{ .path }}, port: http}
+                initialDelaySeconds: {{ .initialDelaySeconds }}
+                periodSeconds: {{ .periodSeconds }}
+              {{- end }}
+              {{- with .readiness }}
+              readinessProbe:
+                httpGet: {path: {{ .path }}, port: http}
+                initialDelaySeconds: {{ .initialDelaySeconds }}
+                periodSeconds: {{ .periodSeconds }}
+              {{- end }}
+              {{- end }}
+              {{- with $wl.securityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              resources: {{ toYaml $wl.resources | nindent 16 }}
+            {{- range $sc := $wl.sidecars | default list }}
+            - name: {{ $sc.name }}
+              image: {{ $sc.image }}
+              {{- with $sc.resources }}
+              resources: {{ toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with $sc.env }}
+              env: {{ toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with $sc.volumeMounts }}
+              volumeMounts: {{ toYaml . | nindent 16 }}
+              {{- end }}
+            {{- end }}
+          volumes:
+            {{- range $i, $svc := $enabled }}
+            {{- $prov := $svc.provisioning | default "deploy" }}
+            {{- $ep := $svc.credentials | default dict }}
+            {{- $secretRef := index $ep "secretRef" | default "" }}
+            {{- if and (ne $prov "connect") (ne $prov "external") }}
+            - name: {{ printf "binding-%s" $svc.binding }}
+              secret: {secretName: {{ printf "%s-%s-binding" (include "suse-library.name" $) $svc.binding }}}
+            {{- else if ne $secretRef "" }}
+            - name: {{ printf "binding-%s" $svc.binding }}
+              secret: {secretName: {{ $secretRef }}}
+            {{- end }}
+            {{- end }}
+            {{- with $wl.volumes }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+{{- else if eq $kind "DaemonSet" }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ $wlName }}
+  labels:
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    rda.suse.com/workload: {{ $wl.name | quote }}
+spec:
   selector:
     matchLabels:
-      {{- include "suse-library.selectorLabels" . | nindent 6 }}
+      {{- include "suse-library.selectorLabels" $ | nindent 6 }}
+      rda.suse.com/workload: {{ $wl.name | quote }}
   template:
     metadata:
       labels:
-        {{- include "suse-library.selectorLabels" . | nindent 8 }}
+        {{- include "suse-library.selectorLabels" $ | nindent 8 }}
+        rda.suse.com/workload: {{ $wl.name | quote }}
       annotations:
-        checksum/services: {{ .Values.services | toJson | sha256sum }}
-        {{- if .Values.metrics.enabled }}
+        checksum/services: {{ $.Values.services | toJson | sha256sum }}
+        {{- with $wl.metrics }}
+        {{- if .enabled }}
         prometheus.io/scrape: "true"
-        prometheus.io/path: {{ .Values.metrics.path | quote }}
-        prometheus.io/port: {{ .Values.metrics.port | default .Values.port | quote }}
+        prometheus.io/path: {{ .path | quote }}
+        prometheus.io/port: {{ .port | default $wl.port | quote }}
         {{- end }}
-        {{- with .Values.podAnnotations }}
+        {{- end }}
+        {{- with $.Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+      {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.podSecurityContext }}
+      {{- with $.Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.nodeSelector }}
+      {{- with $.Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
+      {{- with $.Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- with $.Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.initContainers }}
+      {{- with $wl.initContainers }}
       initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: app
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+        - name: {{ $wl.name }}
+          image: "{{ $wl.image.repository }}:{{ $wl.image.tag }}"
+          imagePullPolicy: {{ $wl.image.pullPolicy | default "IfNotPresent" }}
+          {{- if $wl.port }}
           ports:
-            - {name: http, containerPort: {{ .Values.port }}}
+            - {name: http, containerPort: {{ $wl.port }}}
+          {{- end }}
           env:
-            # Service Binding Spec mount root.
             - {name: SERVICE_BINDING_ROOT, value: /bindings}
-            # 12-factor PORT — user code MUST respect process.env.PORT.
-            - {name: PORT, value: "{{ .Values.port }}"}
-            {{- /* DSL Phase 1 (Design Orientation 0001 Appendix A): emit env
-                   vars from `.Values.env_resolved` — the structured list
-                   `rda render` (rda-cli 0.1.52+) produces from the dev's
-                   `suse-library.env:` block. Each entry carries `name`,
-                   `kind` (secret|value), and either `secretRef`+`secretKey`
-                   or `value`. The set is exactly what the dev declared —
-                   no surprise auto-projection. Empty/absent list is a
-                   valid no-op (workloads that don't read any binding). */ -}}
-            {{- $enabled := include "suse-library.dsl.enabledServices" $ | fromJsonArray }}
-            {{- range $entry := .Values.env_resolved | default list }}
+            {{- if $wl.port }}
+            - {name: PORT, value: "{{ $wl.port }}"}
+            {{- end }}
+            {{- range $entry := $wl.env_resolved | default list }}
             - name: {{ index $entry "name" }}
               {{- if eq (index $entry "kind") "secret" }}
               valueFrom:
@@ -80,14 +239,6 @@ spec:
               {{- end }}
             {{- end }}
           volumeMounts:
-            {{- /*
-                DSL binding mounts. Each services[] entry that isn't
-                `provisioning: connect` mounts its binding-secret at
-                /bindings/<binding>/, so apps following the Service Binding
-                Spec convention find their credentials there. external
-                services have no Secret to mount (the dev wired the
-                connection details elsewhere).
-            */}}
             {{- range $i, $svc := $enabled }}
             {{- $prov := $svc.provisioning | default "deploy" }}
             {{- $ep := $svc.credentials | default dict }}
@@ -96,38 +247,29 @@ spec:
             - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
             {{- end }}
             {{- end }}
-            {{- with .Values.volumeMounts }}
+            {{- with $wl.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- /*
-            Probes are conditionally rendered. Setting probes.liveness or
-            probes.readiness to null in values.yaml skips the corresponding
-            probe field on the container — needed for worker / batch shapes
-            that don't expose HTTP /health or /ready endpoints. Web shapes
-            keep both populated by default. Bundle 0.11.16+.
-          */}}
-          {{- with .Values.probes.liveness }}
+          {{- with $wl.probes }}
+          {{- with .liveness }}
           livenessProbe:
             httpGet: {path: {{ .path }}, port: http}
             initialDelaySeconds: {{ .initialDelaySeconds }}
             periodSeconds: {{ .periodSeconds }}
           {{- end }}
-          {{- with .Values.probes.readiness }}
+          {{- with .readiness }}
           readinessProbe:
             httpGet: {path: {{ .path }}, port: http}
             initialDelaySeconds: {{ .initialDelaySeconds }}
             periodSeconds: {{ .periodSeconds }}
           {{- end }}
-          {{- with .Values.securityContext }}
+          {{- end }}
+          {{- with $wl.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          resources: {{ toYaml .Values.resources | nindent 12 }}
-        {{- /* DO-0004 Phase 3b: sidecar containers injected by rda render
-               from services[] entries with inject: sidecar. Each entry in
-               .Values.sidecars becomes an additional container in this pod.
-               The sidecar shares the pod's network namespace and volumes. */ -}}
-        {{- range $sc := .Values.sidecars | default list }}
+          resources: {{ toYaml $wl.resources | nindent 12 }}
+        {{- range $sc := $wl.sidecars | default list }}
         - name: {{ $sc.name }}
           image: {{ $sc.image }}
           {{- with $sc.resources }}
@@ -141,10 +283,6 @@ spec:
           {{- end }}
         {{- end }}
       volumes:
-        {{- /*
-            DSL binding volumes — one Secret-backed volume per non-external
-            services[] entry. Pairs with the volumeMounts loop above.
-        */}}
         {{- range $i, $svc := $enabled }}
         {{- $prov := $svc.provisioning | default "deploy" }}
         {{- $ep := $svc.credentials | default dict }}
@@ -157,6 +295,148 @@ spec:
           secret: {secretName: {{ $secretRef }}}
         {{- end }}
         {{- end }}
-        {{- with .Values.volumes }}
+        {{- with $wl.volumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+{{- else }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $wlName }}
+  labels:
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    rda.suse.com/workload: {{ $wl.name | quote }}
+spec:
+  replicas: {{ $wl.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "suse-library.selectorLabels" $ | nindent 6 }}
+      rda.suse.com/workload: {{ $wl.name | quote }}
+  template:
+    metadata:
+      labels:
+        {{- include "suse-library.selectorLabels" $ | nindent 8 }}
+        rda.suse.com/workload: {{ $wl.name | quote }}
+      annotations:
+        checksum/services: {{ $.Values.services | toJson | sha256sum }}
+        {{- with $wl.metrics }}
+        {{- if .enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: {{ .path | quote }}
+        prometheus.io/port: {{ .port | default $wl.port | quote }}
+        {{- end }}
+        {{- end }}
+        {{- with $.Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $wl.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $wl.name }}
+          image: "{{ $wl.image.repository }}:{{ $wl.image.tag }}"
+          imagePullPolicy: {{ $wl.image.pullPolicy | default "IfNotPresent" }}
+          {{- if $wl.port }}
+          ports:
+            - {name: http, containerPort: {{ $wl.port }}}
+          {{- end }}
+          env:
+            - {name: SERVICE_BINDING_ROOT, value: /bindings}
+            {{- if $wl.port }}
+            - {name: PORT, value: "{{ $wl.port }}"}
+            {{- end }}
+            {{- range $entry := $wl.env_resolved | default list }}
+            - name: {{ index $entry "name" }}
+              {{- if eq (index $entry "kind") "secret" }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ index $entry "secretRef" }}
+                  key: {{ index $entry "secretKey" }}
+              {{- else }}
+              value: {{ index $entry "value" | quote }}
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+            {{- range $i, $svc := $enabled }}
+            {{- $prov := $svc.provisioning | default "deploy" }}
+            {{- $ep := $svc.credentials | default dict }}
+            {{- $secretRef := index $ep "secretRef" | default "" }}
+            {{- if or (and (ne $prov "connect") (ne $prov "external")) (ne $secretRef "") }}
+            - {name: {{ printf "binding-%s" $svc.binding }}, mountPath: {{ printf "/bindings/%s" $svc.binding }}, readOnly: true}
+            {{- end }}
+            {{- end }}
+            {{- with $wl.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with $wl.probes }}
+          {{- with .liveness }}
+          livenessProbe:
+            httpGet: {path: {{ .path }}, port: http}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+          {{- end }}
+          {{- with .readiness }}
+          readinessProbe:
+            httpGet: {path: {{ .path }}, port: http}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+          {{- end }}
+          {{- end }}
+          {{- with $wl.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources: {{ toYaml $wl.resources | nindent 12 }}
+        {{- range $sc := $wl.sidecars | default list }}
+        - name: {{ $sc.name }}
+          image: {{ $sc.image }}
+          {{- with $sc.resources }}
+          resources: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $sc.env }}
+          env: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $sc.volumeMounts }}
+          volumeMounts: {{ toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      volumes:
+        {{- range $i, $svc := $enabled }}
+        {{- $prov := $svc.provisioning | default "deploy" }}
+        {{- $ep := $svc.credentials | default dict }}
+        {{- $secretRef := index $ep "secretRef" | default "" }}
+        {{- if and (ne $prov "connect") (ne $prov "external") }}
+        - name: {{ printf "binding-%s" $svc.binding }}
+          secret: {secretName: {{ printf "%s-%s-binding" (include "suse-library.name" $) $svc.binding }}}
+        {{- else if ne $secretRef "" }}
+        - name: {{ printf "binding-%s" $svc.binding }}
+          secret: {secretName: {{ $secretRef }}}
+        {{- end }}
+        {{- end }}
+        {{- with $wl.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}
+{{- end }}

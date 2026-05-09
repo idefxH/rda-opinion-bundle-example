@@ -1,29 +1,23 @@
 {{- /*
-    Service rendering toggle. Defaults to true (web shapes always
-    expose a Service); workers / batch templates flip
-    `service.enabled: false` to skip the resource entirely. The
-    Deployment / binding-secret / Ingress decisions are independent —
-    Ingress also defaults off, but service-off is the rarer case
-    (workers without inbound traffic). Bundle 0.11.16+.
+  service.yaml — Multi-workload Service renderer (Design Orientation 0005).
 
-    `dig` walks an optional path; the third arg is the fallback when
-    any segment is missing. Equivalent to
-    `(default true .Values.service.enabled)` but tolerates the whole
-    `service:` block being absent (most projects don't write one).
+  One Service per workload that has a non-null port. Workers, crons, and
+  other port-less workloads are skipped. Named <release>-<workload.name>.
 
-    `.Values | toJson | fromJson` round-trip coerces the chartutil.Values
-    wrapper down to `map[string]interface{}`, which `dig` requires.
-    Without the round-trip, dig errors with "interface conversion:
-    interface {} is common.Values, not map[string]interface {}".
-    Tested helm 3.17+; cheap (single chart's values, ~µs).
-*/}}
-{{- if (dig "service" "enabled" true (.Values | toJson | fromJson)) }}
+  Binding-level services (sub-chart Services) are unaffected — they're
+  rendered by the sub-charts themselves.
+*/ -}}
+{{- range $wl := .Values.workloads_resolved | default list }}
+{{- if $wl.port }}
+{{- $wlName := printf "%s-%s" (include "suse-library.name" $) $wl.name }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "suse-library.name" . }}
+  name: {{ $wlName }}
   labels:
-    {{- include "suse-library.labels" . | nindent 4 }}
+    {{- include "suse-library.labels" $ | nindent 4 }}
+    rda.suse.com/workload: {{ $wl.name | quote }}
 spec:
   type: ClusterIP
   ports:
@@ -32,5 +26,7 @@ spec:
       targetPort: http
       protocol: TCP
   selector:
-    {{- include "suse-library.selectorLabels" . | nindent 4 }}
+    {{- include "suse-library.selectorLabels" $ | nindent 4 }}
+    rda.suse.com/workload: {{ $wl.name | quote }}
+{{- end }}
 {{- end }}

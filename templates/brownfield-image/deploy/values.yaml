@@ -10,8 +10,6 @@
 
 suse-library:
   name: "{{ .Name }}"
-  replicas: 1
-  port: 8080
   domain: "localtest.me"
 
   ingress:
@@ -19,12 +17,14 @@ suse-library:
     hosts:
       - "{{ .Name }}.{{.domain}}"
 
-  image:
-    repository: "{{ .Name }}"
-    tag: dev
-    pullPolicy: IfNotPresent
-
   imagePullSecrets:
     - name: application-collection
 
-  env: {}
+  workloads:
+    - name: app
+      image:
+        repository: "{{ .Name }}"
+        tag: dev
+        pullPolicy: IfNotPresent
+      port: 8080
+      env: {}

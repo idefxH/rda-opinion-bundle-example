@@ -1,0 +1,45 @@
+# Workload shape definitions (Design Orientation 0005).
+#
+# Shapes provide sensible defaults for common workload archetypes.
+# A workload's explicit config is deep-merged ON TOP of its shape —
+# shapes are defaults, not constraints.
+#
+# The render engine reads this file from the opinion bundle root and
+# applies shape defaults before emitting workloads_resolved[].
+
+shapes:
+  web:
+    port: 8080
+    replicas: 1
+    probes:
+      liveness:  {path: /health, initialDelaySeconds: 5, periodSeconds: 10}
+      readiness: {path: /ready, initialDelaySeconds: 3, periodSeconds: 5}
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits:   {memory: 512Mi}
+
+  worker:
+    port: null
+    replicas: 1
+    probes: null
+    resources:
+      requests: {cpu: 100m, memory: 128Mi}
+      limits:   {memory: 512Mi}
+
+  cron:
+    kind: CronJob
+    port: null
+    probes: null
+    restartPolicy: OnFailure
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits:   {memory: 256Mi}
+
+  daemon:
+    kind: DaemonSet
+    port: null
+    probes:
+      liveness: {path: /health, initialDelaySeconds: 10, periodSeconds: 30}
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits:   {memory: 128Mi}
