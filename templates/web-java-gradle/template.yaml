@@ -1,0 +1,19 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: web-java-gradle
+  display_name: Web Service (Java / Gradle)
+  language: java
+  description: |
+    Java 21 HTTP server with Gradle build. Same runtime as web-java
+    but uses build.gradle instead of pom.xml. Heroku/java buildpack
+    auto-detects Gradle from the wrapper script.
+
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier from the template metadata.
+      autoCompute: from-template-language

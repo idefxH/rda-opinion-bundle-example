@@ -43,6 +43,13 @@ templates:
       build, heroku/java buildpack via CNB. SUSE Application Collection
       Java images for production.
     path_in_bundle: templates/web-java
+  - id: web-java-gradle
+    display_name: Web Service (Java / Gradle)
+    language: java
+    description: |
+      Java 21 HTTP server with Gradle build. Same as web-java but uses
+      build.gradle instead of pom.xml.
+    path_in_bundle: templates/web-java-gradle
   - id: worker-go
     display_name: Worker / Consumer (Go)
     language: go
