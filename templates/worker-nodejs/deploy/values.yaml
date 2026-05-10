@@ -8,9 +8,6 @@
 suse-library:
   name: "{{ .Name }}"
 
-  ingress:
-    enabled: false
-
   imagePullSecrets:
     - name: application-collection
 

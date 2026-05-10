@@ -6,11 +6,6 @@ suse-library:
   name: "{{ .Name }}"
   domain: "localtest.me"
 
-  ingress:
-    enabled: true
-    hosts:
-      - "{{ .Name }}.{{.domain}}"
-
   imagePullSecrets:
     - name: application-collection
 
@@ -21,4 +16,7 @@ suse-library:
         tag: dev
         pullPolicy: IfNotPresent
       port: 8080
+      ingress:
+        hosts:
+          - "{{ .Name }}.{{.domain}}"
       env: {}

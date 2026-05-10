@@ -1,6 +1,4 @@
 services: []
-ingress:
-  enabled: true
 workloads_resolved:
   - name: web
     port: 8080

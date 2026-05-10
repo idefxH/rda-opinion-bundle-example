@@ -60,11 +60,10 @@ affinity: {}
 
 podAnnotations: {}
 
-# Application Ingress (one Ingress fronting the app's Service).
+# Application Ingress — shared settings (className, annotations, tls).
+# Per-workload ingress.hosts lives inside each workloads[] entry.
 ingress:
-  enabled: false
   ingressClassName: ""        # e.g. "traefik" on Rancher Desktop, "nginx" elsewhere
-  hosts: []                   # e.g. - demo.localhost
   path: /
   pathType: Prefix
   annotations: {}

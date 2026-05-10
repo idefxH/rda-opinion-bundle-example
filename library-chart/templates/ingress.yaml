@@ -1,14 +1,13 @@
 {{- /*
   ingress.yaml — Multi-workload Ingress renderer (Design Orientation 0005).
 
-  Only generates rules for workloads that have BOTH a port AND
-  ingress.hosts defined. Each workload's ingress.hosts routes to that
-  workload's Service (<release>-<workload.name>).
+  Generates an Ingress when at least one workload in workloads_resolved[]
+  has BOTH a port AND ingress.hosts defined. Each workload's ingress.hosts
+  routes to that workload's Service (<release>-<workload.name>).
 
-  Global ingress settings (className, annotations, tls) come from
-  .Values.ingress at chart level.
+  Shared ingress settings (className, annotations, tls) come from
+  .Values.ingress at chart level (no enabled flag required).
 */ -}}
-{{- if .Values.ingress.enabled -}}
 {{- $hasAnyHosts := false -}}
 {{- range $wl := .Values.workloads_resolved | default list -}}
   {{- if and $wl.port (index ($wl.ingress | default dict) "hosts") -}}
@@ -52,5 +51,4 @@ spec:
   tls:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-{{- end }}
 {{- end -}}
