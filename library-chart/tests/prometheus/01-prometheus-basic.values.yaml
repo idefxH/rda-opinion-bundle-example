@@ -14,21 +14,27 @@ services:
 prometheus:
   enabled: true
 
-# Phase 1 (DO 0001 Appendix A): the legacy auto-projection of every
-# binding_secret key as <BINDING>_<KEY> is gone. The dev controls which
-# env vars exist via env_resolved (produced by `rda render` from
-# `suse-library.env`). For this test we provide env_resolved directly,
-# simulating the rda render output.
-env_resolved:
-  - name: PROM_HOST
-    kind: secret
-    secretRef: testrel-prom-binding
-    secretKey: host
-  - name: PROM_PORT
-    kind: secret
-    secretRef: testrel-prom-binding
-    secretKey: port
-  - name: PROM_URL
-    kind: secret
-    secretRef: testrel-prom-binding
-    secretKey: url
+# Phase 2 (DO-0005): workloads_resolved replaces top-level env_resolved.
+# Each workload carries its own env_resolved list.
+workloads_resolved:
+  - name: app
+    image:
+      repository: myapp
+      tag: latest
+    port: 8080
+    resources:
+      limits: {cpu: 500m, memory: 512Mi}
+      requests: {cpu: 50m, memory: 128Mi}
+    env_resolved:
+      - name: PROM_HOST
+        kind: secret
+        secretRef: testrel-prom-binding
+        secretKey: host
+      - name: PROM_PORT
+        kind: secret
+        secretRef: testrel-prom-binding
+        secretKey: port
+      - name: PROM_URL
+        kind: secret
+        secretRef: testrel-prom-binding
+        secretKey: url
