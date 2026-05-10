@@ -1,7 +1,8 @@
 # RDA services[] DSL for {{ .Name }}.
 #
-# Merge this into your existing Helm values or use as a separate
-# values file: helm install ... -f deploy/values.yaml
+# Your existing Helm chart keeps its own Chart.yaml and templates.
+# RDA adds the suse-library as a dependency (injected by rda init)
+# and projects service bindings into your chart's values.
 #
 # Add backing services:  rda service add <type> <binding>
 # Wire datasources:      rda service wire <source> --to <consumer>
@@ -10,5 +11,15 @@
 
 suse-library:
   name: "{{ .Name }}"
+
+  # Where to inject env vars into YOUR chart's values.
+  # Set this to your chart's env path (most charts use one of these):
+  #   extraEnv           — bitnami charts
+  #   env                — simple charts
+  #   extraEnvVars       — some bitnami charts
+  #   app.extraEnv       — nested path
+  # rda render will write env_resolved entries at this path
+  # in the overlay so your chart picks them up.
+  env_injection_path: "extraEnv"
 
   env: {}
