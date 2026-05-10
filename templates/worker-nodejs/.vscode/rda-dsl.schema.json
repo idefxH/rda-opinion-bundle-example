@@ -1,0 +1,246 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rda.suse.com/schemas/rda-dsl.schema.json",
+  "title": "RDA DSL (suse-library block)",
+  "description": "JSON Schema for the suse-library: block of an RDA project's chart/values.yaml. Validates the unified DSL describing workloads, services, ingress, and per-stage overrides.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project / release name. Used as the default for workload labels and Helm release naming."
+    },
+    "domain": {
+      "type": "string",
+      "description": "Base DNS domain used to derive ingress hostnames when not explicitly set per-workload."
+    },
+    "ingress": {
+      "type": "object",
+      "description": "Ingress-controller-wide defaults (className, annotations, TLS) applied to every workload's ingress unless overridden.",
+      "additionalProperties": true
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "description": "List of imagePullSecret references injected on every workload's PodSpec.",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            },
+            "required": ["name"],
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "services": {
+      "type": "array",
+      "description": "Backing services this chart depends on. Each entry is a binding (e.g. database, cache, auth) backed by a chart type (postgresql, redis, dex, ...).",
+      "items": { "$ref": "#/definitions/service" }
+    },
+    "workloads": {
+      "type": "array",
+      "description": "Application workloads (deployments, jobs, cronjobs, daemonsets) this chart renders.",
+      "items": { "$ref": "#/definitions/workload" }
+    },
+    "overrides": {
+      "type": "object",
+      "description": "Per-stage deep-merge overlays. Keys are stage names (dev, staging, prod, ...); values are partial DSL maps merged into the top-level on `rda render --stage <stage>`.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  },
+  "definitions": {
+    "service": {
+      "type": "object",
+      "description": "A single backing-service binding.",
+      "required": ["type", "binding"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Service type as catalogued in dsl-mappings.yaml (e.g. postgresql, redis, dex, minio).",
+          "minLength": 1
+        },
+        "binding": {
+          "type": "string",
+          "description": "Logical binding name within the chart (e.g. database, auth, cache). Must be unique within services[].",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$"
+        },
+        "provisioning": {
+          "type": "string",
+          "description": "How the service is provisioned: 'deploy' renders the AppCo sub-chart inline; 'connect' expects an external instance configured via .connection; 'operator' delegates to a CRD-backed operator.",
+          "enum": ["deploy", "connect", "operator"]
+        },
+        "connection": {
+          "type": "object",
+          "description": "External connection parameters used in provisioning=connect mode. Shape depends on the service type; common fields are host/port/database/username/password.",
+          "additionalProperties": true,
+          "properties": {
+            "host": { "type": "string" },
+            "port": {
+              "oneOf": [
+                { "type": "integer", "minimum": 1, "maximum": 65535 },
+                { "type": "string" }
+              ]
+            },
+            "database": { "type": "string" },
+            "username": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        },
+        "passthrough": {
+          "type": "object",
+          "description": "Developer-set chart values forwarded verbatim into the AppCo sub-chart's values. Use to expose chart knobs the DSL doesn't model.",
+          "additionalProperties": true
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Toggle for the binding. Defaults to true; set to false to keep the entry in values.yaml without rendering it."
+        }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "description": "A single application workload.",
+      "required": ["name"],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Workload name. Must be unique within workloads[].",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "shape": {
+          "type": "string",
+          "description": "Workload shape. 'web' renders a Deployment + Service (and ingress when hosts are set); 'worker' is a long-running Deployment with no Service; 'cron' is a CronJob; 'daemon' is a DaemonSet.",
+          "enum": ["web", "worker", "cron", "daemon"]
+        },
+        "image": {
+          "type": "object",
+          "description": "Container image reference.",
+          "additionalProperties": true,
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": { "type": "string" },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"]
+            }
+          }
+        },
+        "port": {
+          "type": "integer",
+          "description": "Container port the workload listens on. Required when ingress.hosts is set.",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables injected into the main container, in addition to the binding-derived ones.",
+          "additionalProperties": true
+        },
+        "ingress": {
+          "type": "object",
+          "description": "Ingress configuration for this workload. Inherits suse-library.ingress defaults.",
+          "additionalProperties": true,
+          "properties": {
+            "hosts": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "properties": {
+                      "host": { "type": "string" },
+                      "paths": { "type": "array" }
+                    }
+                  }
+                ]
+              }
+            },
+            "className": { "type": "string" },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "tls": { "type": "array" }
+          }
+        },
+        "probes": {
+          "type": "object",
+          "description": "Liveness / readiness / startup probe configuration.",
+          "additionalProperties": true,
+          "properties": {
+            "liveness": { "type": "object", "additionalProperties": true },
+            "readiness": { "type": "object", "additionalProperties": true },
+            "startup": { "type": "object", "additionalProperties": true }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource requests and limits.",
+          "additionalProperties": true,
+          "properties": {
+            "requests": { "type": "object", "additionalProperties": true },
+            "limits": { "type": "object", "additionalProperties": true }
+          }
+        },
+        "replicas": {
+          "type": "integer",
+          "description": "Replica count for Deployment-shaped workloads. Ignored for cron/daemon shapes.",
+          "minimum": 0
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Cron schedule (5- or 6-field). Required when shape=cron."
+        },
+        "volumes": {
+          "type": "array",
+          "description": "Pod-level volumes."
+        },
+        "volumeMounts": {
+          "type": "array",
+          "description": "Container volumeMounts referencing entries from .volumes."
+        },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "args": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "serviceAccount": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "additionalProperties": true }
+          ]
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "shape": { "const": "cron" } }, "required": ["shape"] },
+          "then": { "required": ["schedule"] }
+        }
+      ]
+    }
+  }
+}
