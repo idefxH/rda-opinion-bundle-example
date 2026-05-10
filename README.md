@@ -13,15 +13,17 @@ rda-opinion-bundle-example/
 │   ├── Chart.yaml                     ← AppCo sub-chart dependencies
 │   ├── values.yaml                    ← defaults (each chart enabled: false)
 │   ├── templates/                     ← Helm templates (deployment, secrets, etc.)
-│   ├── tests/                         ← 18 invariant test suites
+│   ├── tests/                         ← 20 invariant test suites
 │   └── scripts/                       ← maintenance scripts
-└── templates/                         ← project scaffolding templates (9)
+└── templates/                         ← project scaffolding templates (11)
     ├── web-go/                        ← Go web service
     ├── web-nodejs/                    ← Node.js web service
     ├── web-java/                      ← Java web service
     ├── worker-go/                     ← Go background worker
     ├── worker-nodejs/                 ← Node.js background worker
     ├── worker-java/                   ← Java background worker
+    ├── multi-workload/                ← multi-container project (workloads[] DSL)
+    ├── infra-only/                    ← infrastructure services without an app workload
     ├── brownfield-generic/            ← existing source code (auto-detect language)
     ├── brownfield-image/              ← pre-built container image
     └── brownfield-helm/               ← existing Helm chart
@@ -39,13 +41,18 @@ rda-opinion-bundle-example/
 - What dependencies exist between charts
 - What capabilities each chart supports (auth.users, auth.clients, etc.)
 
+The library chart also provides:
+- **`workloads[]` DSL** — multi-container support (each workload gets its own image, port, ingress, probes)
+- **`domain` field** — top-level domain value available to ingress and auth templates
+- **Connection string helpers** — auto-generated `jdbc_url`, `connection_url` binding keys for postgresql, mariadb, and redis
+
 The CLI reads this file at runtime. **Adding a chart is a bundle change,
 not a CLI change.**
 
 ## Key commands
 
 ```bash
-# Run all 18 tests
+# Run all 20 tests
 for d in library-chart/tests/*/; do bash "$d/run.sh"; done
 
 # Check dsl-mappings ↔ Chart.yaml sync
