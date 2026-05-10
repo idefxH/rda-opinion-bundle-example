@@ -1,7 +1,14 @@
 services: []
 ingress:
   enabled: true
-  hosts:
-    - demo.localhost
+workloads_resolved:
+  - name: web
+    port: 8080
+    image:
+      repository: nginx
+      tag: latest
+    ingress:
+      hosts:
+        - demo.localhost
 grafana: {enabled: false}
 prometheus: {enabled: false}

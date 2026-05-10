@@ -86,11 +86,11 @@ run_one "$SCRIPT_DIR/05-custom-host.values.yaml" 1 "metrics.dev.local"
 # All charts disabled → 0 UI Ingresses
 run_one "$SCRIPT_DIR/06-all-disabled.values.yaml" 0
 
-# Project ingress.enabled=true is unrelated — should still render only the
-# project's own Ingress (1) plus 0 UI Ingresses when no UI charts enabled
+# Workload with ingress config → 1 workload Ingress,
+# 0 UI Ingresses (no UI charts enabled)
 run_one "$SCRIPT_DIR/07-project-ingress-no-ui.values.yaml" 1 "demo.localhost"
 
-# Project ingress + grafana UI → 2 Ingresses total
+# Workload ingress + grafana UI → 2 Ingresses total
 run_one "$SCRIPT_DIR/08-project-ingress-plus-grafana.values.yaml" 2 "grafana.testrel.localhost"
 
 echo ""

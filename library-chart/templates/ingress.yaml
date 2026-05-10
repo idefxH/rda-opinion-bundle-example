@@ -1,28 +1,21 @@
 {{- /*
   ingress.yaml — Multi-workload Ingress renderer (Design Orientation 0005).
 
-  Two paths coexist:
-
-  1. WORKLOAD-LEVEL: generates rules for workloads in workloads_resolved[]
-     that have BOTH a port AND ingress.hosts defined. Each workload's
-     ingress.hosts routes to that workload's Service (<release>-<workload.name>).
-
-  2. LEGACY PROJECT-LEVEL: when .Values.ingress.hosts is set, generates
-     rules pointing to the release-name Service (<release>). This is the
-     original behaviour before the workloads rewrite.
+  Only generates rules for workloads that have BOTH a port AND
+  ingress.hosts defined. Each workload's ingress.hosts routes to that
+  workload's Service (<release>-<workload.name>).
 
   Global ingress settings (className, annotations, tls) come from
   .Values.ingress at chart level.
 */ -}}
 {{- if .Values.ingress.enabled -}}
-{{- $hasWorkloadHosts := false -}}
+{{- $hasAnyHosts := false -}}
 {{- range $wl := .Values.workloads_resolved | default list -}}
   {{- if and $wl.port (index ($wl.ingress | default dict) "hosts") -}}
-    {{- $hasWorkloadHosts = true -}}
+    {{- $hasAnyHosts = true -}}
   {{- end -}}
 {{- end -}}
-{{- $hasProjectHosts := and .Values.ingress.enabled .Values.ingress.hosts -}}
-{{- if or $hasWorkloadHosts $hasProjectHosts }}
+{{- if $hasAnyHosts }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -38,20 +31,6 @@ spec:
   ingressClassName: {{ . }}
   {{- end }}
   rules:
-    {{- /* --- Legacy project-level hosts --- */}}
-    {{- range .Values.ingress.hosts }}
-    - host: {{ . | quote }}
-      http:
-        paths:
-          - path: {{ $.Values.ingress.path | default "/" }}
-            pathType: {{ $.Values.ingress.pathType | default "Prefix" }}
-            backend:
-              service:
-                name: {{ include "suse-library.name" $ }}
-                port:
-                  number: 80
-    {{- end }}
-    {{- /* --- Workload-level hosts --- */}}
     {{- range $wl := .Values.workloads_resolved | default list }}
     {{- if and $wl.port (index ($wl.ingress | default dict) "hosts") }}
     {{- $wlName := printf "%s-%s" (include "suse-library.name" $) $wl.name }}
