@@ -1,0 +1,19 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: multi-workload
+  display_name: Multi-Workload (API + Worker)
+  language: auto
+  description: |
+    Two-workload project: an API server (web shape, port 8080, ingress)
+    and a background worker (no port, no ingress). Both share the same
+    services[] bindings. One chart, one values.yaml, one helm install.
+
+spec:
+  placeholders:
+    Name:
+      description: The project name (lowercase-kebab).
+      autoCompute: from-cli-arg
+    Language:
+      description: The language identifier from the template metadata.
+      autoCompute: from-template-language

@@ -1,0 +1,17 @@
+apiVersion: rda.suse.com/v1
+kind: Template
+metadata:
+  id: infra-only
+  display_name: Infrastructure Only (services, no app)
+  language: none
+  description: |
+    Deploy a complete backing services environment without any application
+    workload. Use this as a Terraform replacement: one helm install gives
+    you PostgreSQL, Redis, Kafka, Prometheus, Grafana, Dex — whatever your
+    team needs. Applications connect via provisioning: connect.
+
+spec:
+  placeholders:
+    Name:
+      description: The environment name (e.g. dev-platform, staging-infra).
+      autoCompute: from-cli-arg

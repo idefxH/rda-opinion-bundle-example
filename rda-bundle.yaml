@@ -83,6 +83,21 @@ templates:
       Scaffolds only the suse-library values block and .rda/.
       No Tiltfile, no Chart.yaml — user has their own.
     path_in_bundle: templates/brownfield-helm
+  - id: multi-workload
+    display_name: Multi-Workload (API + Worker)
+    language: auto
+    description: |
+      Two-workload project: API server + background worker sharing the
+      same services[] bindings. One chart, one values.yaml, one deploy.
+    path_in_bundle: templates/multi-workload
+  - id: infra-only
+    display_name: Infrastructure Only (services, no app)
+    language: none
+    description: |
+      Deploy a complete backing services environment without any app
+      workload. Helm-as-Terraform: one install gives you the whole
+      services stack. Apps connect via provisioning: connect.
+    path_in_bundle: templates/infra-only
 library_chart:
   # v1: file:// URI relative to bundle root. The rda HelmClient.PullChart
   # production implementation supports file:// URIs only — see the v1-gap

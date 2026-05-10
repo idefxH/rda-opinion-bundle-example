@@ -1,0 +1,32 @@
+# Infrastructure environment: {{ .Name }}
+#
+# No application workloads — only backing services.
+# Use this chart to provision a complete services stack.
+# Applications connect via provisioning: connect + secretRef.
+#
+# Add services:     rda service add <type> <binding> --set enabled=true
+# Export for ops:   rda export --stage <stage> --output /tmp
+# Install:          helm rda install {{ .Name }} ./{{ .Name }}-0.1.0.tgz --stage dev
+
+suse-library:
+  name: "{{ .Name }}"
+  domain: "localtest.me"
+
+  imagePullSecrets:
+    - name: application-collection
+
+  overrides:
+    staging:
+      domain: "staging.example.com"
+    prod:
+      domain: "example.com"
+
+  # No workloads — this is an infrastructure-only chart.
+  workloads: []
+
+  # Add services below with: rda service add <type> <binding> --set enabled=true
+  # Example:
+  #   rda service add postgresql main-db --set enabled=true --set auth.user.password=dev
+  #   rda service add redis cache --set enabled=true --set auth.user.password=dev
+  #   rda service add prometheus metrics --set enabled=true
+  #   rda service add grafana dashboards --set enabled=true

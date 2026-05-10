@@ -1,0 +1,51 @@
+# Project values for {{ .Name }}.
+#
+# Two workloads: api (web server) + worker (background processor).
+# Both share the same services[] bindings.
+#
+# Add backing services:  rda service add <type> <binding>
+# Add workloads:         rda workload add <name> --shape <web|worker|cron>
+
+suse-library:
+  name: "{{ .Name }}"
+  domain: "localtest.me"
+
+  imagePullSecrets:
+    - name: application-collection
+
+  overrides:
+    staging:
+      domain: "staging.example.com"
+    prod:
+      domain: "example.com"
+
+  workloads:
+    - name: api
+      shape: web
+      image:
+        repository: "{{ .Name }}-api"
+        tag: dev
+        pullPolicy: IfNotPresent
+      port: 8080
+      replicas: 1
+      ingress:
+        hosts:
+          - "{{ .Name }}.{{.domain}}"
+      env: {}
+      overrides:
+        staging:
+          replicas: 2
+        prod:
+          replicas: 3
+
+    - name: worker
+      shape: worker
+      image:
+        repository: "{{ .Name }}-worker"
+        tag: dev
+        pullPolicy: IfNotPresent
+      replicas: 1
+      env: {}
+      overrides:
+        prod:
+          replicas: 2

@@ -1,0 +1,17 @@
+v1alpha1.extension_repo(
+    name='suse-rda',
+    url='https://github.com/idefxH/tilt-extension-suse-rda',
+    ref='{{ .ExtensionRef }}',
+)
+v1alpha1.extension(
+    name='suse-rda',
+    repo_name='suse-rda',
+    repo_path='suse_rda',
+)
+load('ext://suse-rda', 'suse_app')
+
+suse_app(
+    name='{{ .Name }}',
+    language='{{ .Language }}',
+    chart_path='deploy',
+)
