@@ -616,5 +616,25 @@ stringData:
 {{- end }}
 {{- end -}}
 {{- end }}
+{{- /* Connection string helpers — type-specific URL formats for apps that
+       need JDBC, MongoDB, or Redis connection strings instead of discrete
+       fields. Emitted for types that have auth.user.database (relational)
+       or known URL patterns. Available as ${binding:<name>.jdbc_url}, etc.
+       in the env block. */ -}}
+{{- $dbUser := "" }}{{- $dbPass := "" }}{{- $dbName := "" }}
+{{- if $svc.auth }}{{- if $svc.auth.user }}
+  {{- $dbUser = $svc.auth.user.name | default "" }}
+  {{- $dbPass = $svc.auth.user.password | default "" }}
+  {{- $dbName = $svc.auth.user.database | default "" }}
+{{- end }}{{- end }}
+{{- if eq $svc.type "postgresql" }}
+  jdbc_url: {{ printf "jdbc:postgresql://%s:%s/%s" $host $port $dbName | quote }}
+  connection_url: {{ printf "postgresql://%s:%s@%s:%s/%s" $dbUser $dbPass $host $port $dbName | quote }}
+{{- else if eq $svc.type "mariadb" }}
+  jdbc_url: {{ printf "jdbc:mariadb://%s:%s/%s" $host $port $dbName | quote }}
+  connection_url: {{ printf "mysql://%s:%s@%s:%s/%s" $dbUser $dbPass $host $port $dbName | quote }}
+{{- else if or (eq $svc.type "redis") (eq $svc.type "valkey") }}
+  connection_url: {{ printf "redis://:%s@%s:%s/0" $dbPass $host $port | quote }}
+{{- end }}
 {{- end -}}
 {{- end -}}
