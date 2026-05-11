@@ -358,7 +358,15 @@ charts:
           - {key: adminUser, from_dsl: auth.admin.name, default: admin}
           - {key: adminPassword, from_dsl: auth.admin.password, required: true}
 
+        dependencies:
+          - charts: [dex]
+            required: false
+            dsl_field: auth_provider
+
         scaffold:
+          auth_provider:
+            default: ""
+            comment: "optional — binding name of a dex service for OIDC login"
           auth.admin.name:
             default: "admin"
           auth.admin.password:
