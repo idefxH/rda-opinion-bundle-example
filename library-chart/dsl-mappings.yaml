@@ -300,8 +300,8 @@ charts:
           # edits needed; localtest.me wildcards resolve to 127.0.0.1.
           ingress.hosts:
             default:
-              - "{{.Binding}}.{{.ProjectName}}.localtest.me"
-            comment: "or use <binding>.<release>.localhost on macOS/Linux"
+              - "{{.Binding}}.{{.domain}}"
+            comment: "uses {{.domain}} from suse-library.domain"
           resources.requests.cpu:
             default: "100m"
           resources.requests.memory:
@@ -359,8 +359,8 @@ charts:
             default: false
           ingress.hosts:
             default:
-              - "{{.Binding}}.{{.ProjectName}}.localtest.me"
-            comment: "or use <binding>.<release>.localhost on macOS/Linux"
+              - "{{.Binding}}.{{.domain}}"
+            comment: "uses {{.domain}} from suse-library.domain"
           metrics.enabled:
             default: false
           resources.requests.cpu:
@@ -642,8 +642,8 @@ charts:
           ingress.enabled:
             default: true
           ingress.host:
-            default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
-            comment: "or use <binding>.<release>.localhost on macOS/Linux"
+            default: "{{.Binding}}.{{.domain}}"
+            comment: "uses {{.domain}} from suse-library.domain"
           resources.requests.cpu:
             default: "50m"
           resources.requests.memory:
@@ -1003,8 +1003,8 @@ charts:
             default: false
           ingress.hosts:
             default:
-              - "{{.Binding}}.{{.ProjectName}}.localtest.me"
-            comment: "or use <binding>.<release>.localhost on macOS/Linux"
+              - "{{.Binding}}.{{.domain}}"
+            comment: "uses {{.domain}} from suse-library.domain"
           resources.requests.cpu:
             default: "100m"
           resources.requests.memory:
@@ -1080,8 +1080,8 @@ charts:
             default: false
           ingress.hosts:
             default:
-              - "{{.Binding}}.{{.ProjectName}}.localtest.me"
-            comment: "or use <binding>.<release>.localhost on macOS/Linux"
+              - "{{.Binding}}.{{.domain}}"
+            comment: "uses {{.domain}} from suse-library.domain"
           metrics.enabled:
             default: false
           resources.requests.cpu:
@@ -1363,7 +1363,7 @@ charts:
           ingress.enabled:
             default: false
           ingress.host:
-            default: "{{.Binding}}.{{.ProjectName}}.localtest.me"
+            default: "{{.Binding}}.{{.domain}}"
           resources.requests.cpu:
             default: "250m"
           resources.requests.memory:
