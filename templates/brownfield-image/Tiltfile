@@ -10,27 +10,8 @@ v1alpha1.extension(
 )
 load('ext://suse-rda', 'suse_app')
 
-# ── Discover workloads from deploy/values.yaml ──────────────────────
-_vals = read_yaml('deploy/values.yaml')
-_lib = _vals.get('suse-library', {})
-_workloads = _lib.get('workloads', [])
-_release = _lib.get('name', '')
-
-# ── Helm chart deployment (pre-built image, no local build) ─────────
 suse_app(
-    name=_release,
+    name='{{ .Name }}',
     chart_path='deploy',
     image_ref='{{ .ImageRef }}',
 )
-
-# ── Per-workload: port-forward ──────────────────────────────────────
-for _wl in _workloads:
-    _wl_name = _wl['name']
-    _resource = '%s-%s' % (_release, _wl_name)
-    _port = _wl.get('port', None)
-
-    if _port:
-        k8s_resource(
-            _resource,
-            port_forwards=['%d:%d' % (int(_port), int(_port)),],
-        )
