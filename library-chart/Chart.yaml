@@ -126,3 +126,7 @@ dependencies:
     version: "1.21.0"
     repository: oci://dp.apps.rancher.io/charts
     condition: apache-airflow.enabled
+  - name: oauth2-proxy
+    version: "10.4.3"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: oauth2-proxy.enabled

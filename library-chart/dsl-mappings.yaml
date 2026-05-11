@@ -1395,3 +1395,75 @@ charts:
             default: "1"
           resources.limits.memory:
             default: "2Gi"
+
+  oauth2-proxy:
+    # BASED ON upstream: oauth2-proxy/oauth2-proxy
+    # AppCo chart: oci://dp.apps.rancher.io/charts/oauth2-proxy 10.4.3
+    # Auth-gating reverse proxy. Combined with Dex, lets devs SSO-protect
+    # any app that doesn't natively support OIDC — zero app code changes.
+    # Pattern: [Browser] → [Ingress] → [oauth2-proxy] → [App]
+    versions:
+      - constraint: ">=10.0.0"
+        service:
+          host: "{{ .Release.Name }}-oauth2-proxy.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 80
+        values_mapping:
+          auth.client_id: oauth2-proxy.config.clientID
+          auth.client_secret: oauth2-proxy.config.clientSecret
+          auth.cookie_secret: oauth2-proxy.config.cookieSecret
+          ingress.enabled: oauth2-proxy.ingress.enabled
+          ingress.host: oauth2-proxy.ingress.hosts[0]
+          ingress.hosts: oauth2-proxy.ingress.hosts
+          resources.requests.cpu: oauth2-proxy.resources.requests.cpu
+          resources.requests.memory: oauth2-proxy.resources.requests.memory
+          resources.limits.cpu: oauth2-proxy.resources.limits.cpu
+          resources.limits.memory: oauth2-proxy.resources.limits.memory
+        chart_defaults:
+          oauth2-proxy.config.emailDomains[0]: "*"
+          oauth2-proxy.redis-ha.enabled: false
+        binding_secret:
+          - {key: type, literal: oauth2-proxy, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-oauth2-proxy"}
+          - {key: port, literal: "80"}
+          - {key: url, template: "http://{{ .Release.Name }}-oauth2-proxy:80"}
+        dependencies:
+          - charts: [dex]
+            required: true
+            dsl_field: oidc_provider
+            wire_type: oidc
+            wiring:
+              oauth2-proxy.extraArgs.provider: "__literal:oidc"
+              oauth2-proxy.extraArgs.oidc-issuer-url: "__url__"
+              oauth2-proxy.extraArgs.cookie-secure: "__literal:false"
+              oauth2-proxy.extraArgs.email-domain: "__literal:*"
+              oauth2-proxy.extraArgs.pass-user-headers: "__literal:true"
+              oauth2-proxy.extraArgs.set-xauthrequest: "__literal:true"
+              oauth2-proxy.extraArgs.skip-provider-button: "__literal:true"
+        scaffold:
+          auth.client_id:
+            default: ""
+            comment: "OIDC client ID — set via 'rda service wire <auth-binding> --to <this-binding>'"
+          auth.client_secret:
+            default: ""
+            comment: "OIDC client secret — set via wire"
+          auth.cookie_secret:
+            default: ""
+            comment: "session cookie secret — generate: openssl rand -base64 32 | head -c 32"
+          oidc_provider:
+            default: ""
+            comment: "required — binding name of a dex service"
+          ingress.enabled:
+            default: true
+          ingress.hosts:
+            default:
+              - "{{.Binding}}.{{.domain}}"
+            comment: "uses {{.domain}} from suse-library.domain"
+          resources.requests.cpu:
+            default: "50m"
+          resources.requests.memory:
+            default: "64Mi"
+          resources.limits.cpu:
+            default: "100m"
+          resources.limits.memory:
+            default: "128Mi"

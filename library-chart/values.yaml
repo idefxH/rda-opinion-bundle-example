@@ -190,3 +190,6 @@ harbor:
 
 apache-airflow:
   enabled: false
+
+oauth2-proxy:
+  enabled: false
