@@ -90,7 +90,9 @@ postgresql:
     password: ""
   persistence:
     enabled: true
-    size: 1Gi
+    resources:
+      requests:
+        storage: 1Gi
   nodeCount: 1
   metrics:
     enabled: true
