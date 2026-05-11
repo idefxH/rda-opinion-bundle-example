@@ -129,7 +129,7 @@ spec:
               securityContext:
                 {{- toYaml . | nindent 16 }}
               {{- end }}
-              resources: {{ toYaml $wl.resources | nindent 16 }}
+              resources: {{ toYaml ($wl.resources | default dict) | nindent 16 }}
             {{- range $sc := $wl.sidecars | default list }}
             - name: {{ $sc.name }}
               image: {{ $sc.image }}
@@ -268,7 +268,7 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          resources: {{ toYaml $wl.resources | nindent 12 }}
+          resources: {{ toYaml ($wl.resources | default dict) | nindent 12 }}
         {{- range $sc := $wl.sidecars | default list }}
         - name: {{ $sc.name }}
           image: {{ $sc.image }}
@@ -408,7 +408,7 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          resources: {{ toYaml $wl.resources | nindent 12 }}
+          resources: {{ toYaml ($wl.resources | default dict) | nindent 12 }}
         {{- range $sc := $wl.sidecars | default list }}
         - name: {{ $sc.name }}
           image: {{ $sc.image }}
