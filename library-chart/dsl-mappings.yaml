@@ -1421,6 +1421,12 @@ charts:
         chart_defaults:
           oauth2-proxy.config.emailDomains[0]: "*"
           oauth2-proxy.redis-ha.enabled: false
+        derived_values:
+          - target: oauth2-proxy.extraArgs.redirect-url
+            template: >-
+              http://{{ with .Service.ingress }}{{ with .hosts }}{{ index . 0 }}{{ end }}{{ end }}/oauth2/callback
+          - target: oauth2-proxy.extraArgs.upstream
+            template: "http://{{ .Release.Name }}-app:80"
         binding_secret:
           - {key: type, literal: oauth2-proxy, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
@@ -1434,7 +1440,8 @@ charts:
             wire_type: oidc
             wiring:
               oauth2-proxy.extraArgs.provider: "__literal:oidc"
-              oauth2-proxy.extraArgs.oidc-issuer-url: "__binding:issuer__"
+              oauth2-proxy.extraArgs.oidc-issuer-url: "__url__"
+              oauth2-proxy.extraArgs.insecure-oidc-skip-issuer-verification: "__literal:true"
               oauth2-proxy.extraArgs.cookie-secure: "__literal:false"
               oauth2-proxy.extraArgs.email-domain: "__literal:*"
               oauth2-proxy.extraArgs.pass-user-headers: "__literal:true"
