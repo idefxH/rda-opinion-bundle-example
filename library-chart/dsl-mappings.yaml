@@ -654,7 +654,7 @@ charts:
         # in-memory storage (the scaffold default) — fine for dev, not for
         # staging/prod where dex state must survive restarts.
         dependencies:
-          - charts: [postgresql]
+          - charts: [postgresql, cnpg]
             required: false
             dsl_field: state_db
             wiring:
@@ -1451,7 +1451,7 @@ charts:
           resources.limits.cpu: apache-airflow.apiServer.resources.limits.cpu
           resources.limits.memory: apache-airflow.apiServer.resources.limits.memory
         dependencies:
-          - charts: [postgresql]
+          - charts: [postgresql, cnpg]
             required: true
             dsl_field: metadb
             wiring:

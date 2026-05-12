@@ -137,7 +137,7 @@ dependencies:
   # and community.
   - name: cloudnative-pg
     version: "0.28.2"
-    repository: oci://dp.apps.rancher.io/charts
+    repository: https://cloudnative-pg.github.io/charts
     condition: cnpg.operator.enabled
   - name: cluster
     alias: cnpg
