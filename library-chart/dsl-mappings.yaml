@@ -1589,6 +1589,18 @@ charts:
           resources.limits.memory:
             default: "128Mi"
 
+  # cloudnative-pg is the CNPG operator — not a DSL type, but needs
+  # source switching (community baseline → AppCo overlay). Listed here
+  # so rewriteChartRepos can find it by Chart.yaml dep name.
+  cloudnative-pg:
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts
+        chart_name: cloudnative-pg
+      community:
+        chart_ref: https://cloudnative-pg.github.io/charts
+    versions: []
+
   cnpg:
     # CloudNativePG — operator-managed PostgreSQL.
     # BASED ON upstream: cloudnative-pg.io (CNCF Sandbox project).
