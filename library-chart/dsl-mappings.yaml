@@ -807,6 +807,9 @@ charts:
       appco:
         chart_ref: oci://dp.apps.rancher.io/charts/mariadb
         requires_pull_secret: true
+    default_branch: "11.8"
+    branches:
+      "11.8": {chart_version: "0.1.7-10.1"}
     versions:
       - constraint: ">=0.1.0 <1.0.0"
         # AppCo mariadb 0.1.x (chart from-scratch — see chart README).
@@ -1188,6 +1191,9 @@ charts:
       appco:
         chart_ref: oci://dp.apps.rancher.io/charts/etcd
         requires_pull_secret: true
+    default_branch: "3"
+    branches:
+      "3": {chart_version: "0.3.16"}
     versions:
       - constraint: ">=0.3.0 <1.0.0"
         service:
