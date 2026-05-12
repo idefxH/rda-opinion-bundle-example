@@ -1428,6 +1428,8 @@ charts:
           - target: oauth2-proxy.extraArgs.upstream
             template: "http://{{ .Release.Name }}-app:80"
             skip_if: passthrough.extraArgs.upstream
+          - target: oauth2-proxy.extraArgs.cookie-domain
+            template: ".{{ .Domain }}"
         binding_secret:
           - {key: type, literal: oauth2-proxy, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
