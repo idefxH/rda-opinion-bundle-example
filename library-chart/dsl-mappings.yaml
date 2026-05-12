@@ -1441,8 +1441,7 @@ charts:
             wire_type: oidc
             wiring:
               oauth2-proxy.extraArgs.provider: "__literal:oidc"
-              oauth2-proxy.extraArgs.oidc-issuer-url: "__url__"
-              oauth2-proxy.extraArgs.insecure-oidc-skip-issuer-verification: "__literal:true"
+              oauth2-proxy.extraArgs.oidc-issuer-url: "__binding:issuer__"
               oauth2-proxy.extraArgs.cookie-secure: "__literal:false"
               oauth2-proxy.extraArgs.email-domain: "__literal:*"
               oauth2-proxy.extraArgs.pass-user-headers: "__literal:true"
