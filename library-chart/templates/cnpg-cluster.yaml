@@ -1,0 +1,33 @@
+{{/*
+  CNPG Cluster CR — rendered for each services[] entry with type=cnpg.
+
+  The operator (cloudnative-pg sub-chart) installs the CRDs + controller.
+  This template creates the Cluster CR that the operator reconciles into
+  PostgreSQL pods. All values come from the DSL projection under
+  suse-library.cnpg.cluster.* (or suse-library.cnpg-<binding>.cluster.*
+  for multi-instance).
+
+  Fully overridable via passthrough — any field the dev puts in
+  services[].passthrough.cluster.* ends up in the CR spec.
+*/}}
+{{- $sl := index .Values "suse-library" -}}
+{{- $services := $sl.services | default list -}}
+{{- range $svc := $services }}
+{{- if and (eq (default "" $svc.type) "cnpg") (default false $svc.enabled) }}
+{{- $binding := $svc.binding -}}
+{{- $alias := "cnpg" -}}
+{{- $vals := index $sl $alias | default dict -}}
+{{- $cluster := $vals.cluster | default dict -}}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ $.Release.Name }}-{{ $alias }}
+  labels:
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    rda.suse.com/binding: {{ $binding }}
+spec:
+  {{- toYaml $cluster | nindent 2 }}
+{{- end }}
+{{- end }}

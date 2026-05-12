@@ -1589,22 +1589,33 @@ charts:
           resources.limits.memory:
             default: "128Mi"
 
+  # cloudnative-pg is the CNPG operator — not a DSL type, but needs
+  # source switching (community baseline → AppCo overlay). Listed here
+  # so rewriteChartRepos can find it by Chart.yaml dep name.
+  cloudnative-pg:
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts
+        chart_name: cloudnative-pg
+      community:
+        chart_ref: https://cloudnative-pg.github.io/charts
+    versions: []
+
   cnpg:
     # CloudNativePG — operator-managed PostgreSQL.
     # BASED ON upstream: cloudnative-pg.io (CNCF Sandbox project).
     # Same chart in AppCo and community — only images differ.
     # Dev default: 1 instance, no HA, no backup (simple dev posture).
     # Prod: override instances=3, enable backups via passthrough.
-    # The cluster chart is community-only (cloudnative-pg.github.io).
-    # The operator (cloudnative-pg) IS in AppCo but it's a separate
-    # Chart.yaml dep, not the DSL type — no source switch needed.
-    sources:
-      community:
-        chart_ref: https://cloudnative-pg.github.io/charts
+    # No sub-chart source switching — the Cluster CR is rendered by the
+    # library chart template (cnpg-cluster.yaml). The operator dep
+    # (cloudnative-pg) is switched by rewriteChartRepos separately.
+    # Image switching (community ghcr.io vs AppCo dp.apps.rancher.io)
+    # is handled via derived_values imageName.
     default_branch: "17"
     branches:
-      "17": {chart_version: "0.6.0"}
-      "16": {chart_version: "0.6.0"}
+      "17": {}
+      "16": {}
     versions:
       - constraint: ">=0.1.0"
         operator_managed: true
@@ -1631,9 +1642,11 @@ charts:
         derived_values:
           - target: cnpg.cluster.initdb.secret.name
             template: "{{ .Release.Name }}-{{ .Binding }}-binding"
+          - target: cnpg.cluster.imageName
+            template: "ghcr.io/cloudnative-pg/postgresql:{{ with .Service.branch }}{{ . }}{{ else }}17{{ end }}"
+            skip_if: imageName
         chart_defaults:
           cnpg.cluster.instances: 1
-          cnpg.backups.enabled: false
           cnpg.cluster.affinity: {}
           cloudnative-pg.enabled: true
         binding_secret:

@@ -109,15 +109,12 @@ dependencies:
     version: "10.4.3"
     repository: https://oauth2-proxy.github.io/manifests
     condition: oauth2-proxy.enabled
-  # ── CloudNativePG: operator + cluster ──
-  # Operator in AppCo (cloudnative-pg); cluster chart community-only.
-  # Both use the same upstream repo as baseline.
+  # ── CloudNativePG ──
+  # Operator only — installs CRDs + controller. The Cluster CR is
+  # rendered by the library chart template (cnpg-cluster.yaml) from
+  # the DSL values, not by a sub-chart. This keeps everything in
+  # AppCo (operator chart) and fully overridable via passthrough.
   - name: cloudnative-pg
     version: "0.28.2"
     repository: https://cloudnative-pg.github.io/charts
-    condition: cnpg.operator.enabled
-  - name: cluster
-    alias: cnpg
-    version: "0.6.0"
-    repository: https://cloudnative-pg.github.io/charts
-    condition: cnpg.enabled
+    condition: cloudnative-pg.enabled
