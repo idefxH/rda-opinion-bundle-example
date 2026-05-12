@@ -193,3 +193,9 @@ apache-airflow:
 
 oauth2-proxy:
   enabled: false
+
+# CloudNativePG — operator + cluster
+cloudnative-pg:
+  enabled: false
+cnpg:
+  enabled: false

@@ -154,3 +154,5 @@ service_catalog:
     local_chart_ref: file://library-chart
   - type_name: oauth2-proxy
     local_chart_ref: file://library-chart
+  - type_name: cnpg
+    local_chart_ref: file://library-chart

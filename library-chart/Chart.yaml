@@ -130,3 +130,17 @@ dependencies:
     version: "10.4.3"
     repository: oci://dp.apps.rancher.io/charts
     condition: oauth2-proxy.enabled
+  # CloudNativePG: operator + cluster chart.
+  # The operator installs the CRD + controller. The cluster chart
+  # creates a Cluster CR that the operator reconciles into PG pods.
+  # Both are from the upstream cnpg project — same chart in AppCo
+  # and community.
+  - name: cloudnative-pg
+    version: "0.28.2"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: cnpg.operator.enabled
+  - name: cluster
+    alias: cnpg
+    version: "0.6.0"
+    repository: https://cloudnative-pg.github.io/charts
+    condition: cnpg.enabled

@@ -1587,3 +1587,70 @@ charts:
             default: "100m"
           resources.limits.memory:
             default: "128Mi"
+
+  cnpg:
+    # CloudNativePG — operator-managed PostgreSQL.
+    # BASED ON upstream: cloudnative-pg.io (CNCF Sandbox project).
+    # Same chart in AppCo and community — only images differ.
+    # Dev default: 1 instance, no HA, no backup (simple dev posture).
+    # Prod: override instances=3, enable backups via passthrough.
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/cloudnative-pg
+        requires_pull_secret: true
+      community:
+        chart_ref: https://cloudnative-pg.github.io/charts
+    default_branch: "17"
+    branches:
+      "17": {chart_version: "0.6.0"}
+      "16": {chart_version: "0.6.0"}
+    versions:
+      - constraint: ">=0.1.0"
+        service:
+          host: "{{ .Release.Name }}-cnpg-rw"
+          port: 5432
+        values_mapping:
+          auth.user.database: cnpg.cluster.initdb.database
+          auth.user.name: cnpg.cluster.initdb.owner
+          persistence.size: cnpg.cluster.storage.size
+          branch: cnpg.version.postgresql
+          resources.requests.cpu: cnpg.cluster.resources.requests.cpu
+          resources.requests.memory: cnpg.cluster.resources.requests.memory
+          resources.limits.cpu: cnpg.cluster.resources.limits.cpu
+          resources.limits.memory: cnpg.cluster.resources.limits.memory
+          metrics.enabled: cnpg.cluster.monitoring.enabled
+        chart_defaults:
+          cnpg.cluster.instances: 1
+          cnpg.backups.enabled: false
+          cnpg.cluster.affinity: {}
+          cloudnative-pg.enabled: true
+        binding_secret:
+          - {key: type, literal: postgresql, skip_env: true}
+          - {key: provider, literal: cnpg, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-cnpg-rw"}
+          - {key: port, literal: "5432"}
+          - {key: username, from_dsl: auth.user.name, default: app, env_aliases: [user]}
+          - {key: password, from_dsl: auth.user.password}
+          - {key: database, from_dsl: auth.user.database, default: app, env_aliases: [name]}
+        scaffold:
+          auth.user.name:
+            default: "app"
+            comment: "application user — your service connects as this"
+          auth.user.password:
+            default: ""
+            comment: "application user password — leave empty for auto-generated"
+          auth.user.database:
+            default: "app"
+            comment: "application database"
+          persistence.size:
+            default: "1Gi"
+          metrics.enabled:
+            default: false
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "256Mi"
+          resources.limits.cpu:
+            default: "500m"
+          resources.limits.memory:
+            default: "512Mi"
