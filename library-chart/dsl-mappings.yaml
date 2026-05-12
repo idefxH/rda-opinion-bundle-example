@@ -1606,6 +1606,14 @@ charts:
       "16": {chart_version: "0.6.0"}
     versions:
       - constraint: ">=0.1.0"
+        operator_managed: true
+        operator_resource: "{{ .Release.Name }}-cloudnative-pg"
+        cr_kind:
+          kind: Cluster
+          api_version: postgresql.cnpg.io/v1
+        pod_selector:
+          cnpg.io/cluster: "{{ .Release.Name }}-cnpg"
+        cr_object: "{{ .Release.Name }}-cnpg:cluster"
         service:
           host: "{{ .Release.Name }}-cnpg-rw"
           port: 5432
@@ -1619,6 +1627,9 @@ charts:
           resources.limits.cpu: cnpg.cluster.resources.limits.cpu
           resources.limits.memory: cnpg.cluster.resources.limits.memory
           metrics.enabled: cnpg.cluster.monitoring.enabled
+        derived_values:
+          - target: cnpg.cluster.initdb.secret.name
+            template: "{{ .Release.Name }}-{{ .Binding }}-binding"
         chart_defaults:
           cnpg.cluster.instances: 1
           cnpg.backups.enabled: false
