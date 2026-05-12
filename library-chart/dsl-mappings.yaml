@@ -364,7 +364,7 @@ charts:
               grafana.grafana.ini.auth.generic_oauth.client_id: "__bootstrap:auth.clients.id__"
               grafana.grafana.ini.auth.generic_oauth.client_secret: "__bootstrap:auth.clients.secret__"
               grafana.grafana.ini.auth.generic_oauth.scopes: "__literal:openid profile email"
-              grafana.grafana.ini.auth.generic_oauth.auth_url: "__url__/auth"
+              grafana.grafana.ini.auth.generic_oauth.auth_url: "__binding:public_url__/auth"
               grafana.grafana.ini.auth.generic_oauth.token_url: "__url__/token"
               grafana.grafana.ini.auth.generic_oauth.api_url: "__url__/userinfo"
 
