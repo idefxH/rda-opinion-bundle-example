@@ -12,8 +12,7 @@ suse-library:
   name: "{{ .Name }}"
   domain: "localtest.me"
 
-  imagePullSecrets:
-    - name: application-collection
+  {{ .ImagePullSecrets }}
 
   workloads:
     - name: app

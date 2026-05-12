@@ -83,6 +83,12 @@ charts:
   postgresql:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/postgresql)
     # No upstream chart equivalent — Bitnami uses primary.resources (incompatible)
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/postgresql
+        requires_pull_secret: true
+      community:
+        chart_ref: oci://registry-1.docker.io/bitnamicharts/postgresql
     default_branch: "17"
     branches:
       "18": {chart_version: "0.5.5-7.1"}
@@ -90,6 +96,7 @@ charts:
       "16": {chart_version: "0.2.1-7.1"}
     versions:
       - constraint: ">=0.1.0 <1.0.0"
+        source: appco
         # AppCo postgresql 0.4.x.
         # Service is named <release>-postgresql (no -primary / -master suffix).
         service:
@@ -170,10 +177,78 @@ charts:
           resources.limits.memory:
             default: "1Gi"
 
+      - constraint: ">=16.0.0 <17.0.0"
+        source: community
+        # Bitnami postgresql 16.x. Same DSL surface as AppCo; only the
+        # resources paths differ (primary.resources vs podTemplates).
+        service:
+          host: "{{ .Release.Name }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 5432
+        values_mapping:
+          auth.user.name: postgresql.auth.username
+          auth.user.password: postgresql.auth.password
+          auth.user.database: postgresql.auth.database
+          auth.admin.password: postgresql.auth.postgresPassword
+          persistence.enabled: postgresql.persistence.enabled
+          persistence.size: postgresql.persistence.resources.requests.storage
+          metrics.enabled: postgresql.metrics.enabled
+          resources.requests.cpu: postgresql.primary.resources.requests.cpu
+          resources.requests.memory: postgresql.primary.resources.requests.memory
+          resources.limits.cpu: postgresql.primary.resources.limits.cpu
+          resources.limits.memory: postgresql.primary.resources.limits.memory
+        auth_seed_paths:
+          - auth.user.name
+          - auth.user.password
+          - auth.user.database
+          - auth.admin.password
+        binding_secret:
+          - {key: type, literal: postgresql, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-postgresql"}
+          - {key: port, literal: "5432"}
+          - {key: username, from_dsl: auth.user.name, default: app, env_aliases: [user]}
+          - {key: password, from_dsl: auth.user.password, required: true}
+          - {key: database, from_dsl: auth.user.database, required: true, env_aliases: [name]}
+
+        scaffold:
+          auth.admin.password:
+            default: ""
+            comment: "admin (postgres user) password — required"
+          auth.user.name:
+            default: "app"
+            comment: "application user — your service connects as this"
+          auth.user.password:
+            default: ""
+            comment: "application user password — required"
+          auth.user.database:
+            default: ""
+            comment: "application database — required"
+          persistence.enabled:
+            default: false
+          persistence.size:
+            default: "1Gi"
+          metrics.enabled:
+            default: true
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "256Mi"
+          resources.limits.cpu:
+            default: "500m"
+          resources.limits.memory:
+            default: "1Gi"
+
   redis:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/redis)
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/redis
+        requires_pull_secret: true
+      community:
+        chart_ref: oci://registry-1.docker.io/bitnamicharts/redis
     versions:
       - constraint: ">=2.0.0 <3.0.0"
+        source: appco
         # AppCo redis 2.x (chart packaging — redis binary 8.x lineage).
         # Note: the constraint uses the AppCo helm chart version, not
         #
@@ -229,10 +304,58 @@ charts:
           resources.limits.memory:
             default: "256Mi"
 
+      - constraint: ">=20.0.0 <21.0.0"
+        source: community
+        # Bitnami redis 20.x. Same DSL surface as AppCo; only the
+        # resources paths differ (master.resources vs podTemplates).
+        service:
+          host: "{{ .Release.Name }}-redis.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 6379
+        values_mapping:
+          auth.user.password: redis.auth.user.password
+          persistence.enabled: redis.persistence.enabled
+          persistence.size: redis.persistence.resources.requests.storage
+          metrics.enabled: redis.metrics.enabled
+          resources.requests.cpu: redis.master.resources.requests.cpu
+          resources.requests.memory: redis.master.resources.requests.memory
+          resources.limits.cpu: redis.master.resources.limits.cpu
+          resources.limits.memory: redis.master.resources.limits.memory
+        auth_seed_paths:
+          - auth.user.password
+        binding_secret:
+          - {key: type, literal: redis, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-redis"}
+          - {key: port, literal: "6379"}
+          - {key: password, from_dsl: auth.user.password, required: true}
+
+        scaffold:
+          auth.user.password:
+            default: ""
+            comment: "redis password — required"
+          persistence.enabled:
+            default: false
+          metrics.enabled:
+            default: true
+          resources.requests.cpu:
+            default: "50m"
+          resources.requests.memory:
+            default: "128Mi"
+          resources.limits.cpu:
+            default: "200m"
+          resources.limits.memory:
+            default: "256Mi"
+
   prometheus:
     # BASED ON upstream: prometheus-community/prometheus
     # upstream_repo: https://prometheus-community.github.io/helm-charts
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/prometheus
+        requires_pull_secret: true
+      community:
+        chart_ref: https://prometheus-community.github.io/helm-charts
     versions:
       - constraint: ">=29.0.0"
         # AppCo prometheus 29.x (community chart 29.x lineage, prometheus
@@ -319,6 +442,12 @@ charts:
     # BASED ON upstream: grafana/grafana
     # upstream_repo: https://grafana.github.io/helm-charts
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/grafana
+        requires_pull_secret: true
+      community:
+        chart_ref: https://grafana.github.io/helm-charts
     versions:
       - constraint: ">=12.0.0"
         # AppCo grafana 12.x. Service maps port 80 (chart default) to pod
@@ -398,6 +527,12 @@ charts:
     # BASED ON upstream: dexidp/dex
     # upstream_repo: https://charts.dexidp.io
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/dex
+        requires_pull_secret: true
+      community:
+        chart_ref: https://charts.dexidp.io
     versions:
       - constraint: ">=0.24.0 <1.0.0"
         # Dex 0.24.0 (app 2.44.0) via SUSE Application Collection.
@@ -772,8 +907,15 @@ charts:
 
   mariadb:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/mariadb)
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/mariadb
+        requires_pull_secret: true
+      community:
+        chart_ref: oci://registry-1.docker.io/bitnamicharts/mariadb
     versions:
       - constraint: ">=0.1.0 <1.0.0"
+        source: appco
         # AppCo mariadb 0.1.x (chart from-scratch — see chart README).
         # Service: <release>-mariadb on port 3306. The chart deploys a
         # StatefulSet with 1 replica by default; passthrough.nodeCount
@@ -844,10 +986,78 @@ charts:
           resources.limits.memory:
             default: "1Gi"
 
+      - constraint: ">=20.0.0 <21.0.0"
+        source: community
+        # Bitnami mariadb 20.x. Same DSL surface as AppCo; only the
+        # resources paths differ (primary.resources vs podTemplates).
+        service:
+          host: "{{ .Release.Name }}-mariadb.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 3306
+        values_mapping:
+          auth.user.name: mariadb.auth.username
+          auth.user.password: mariadb.auth.password
+          auth.user.database: mariadb.auth.database
+          auth.admin.password: mariadb.auth.rootPassword
+          persistence.enabled: mariadb.persistence.enabled
+          persistence.size: mariadb.persistence.resources.requests.storage
+          metrics.enabled: mariadb.metrics.enabled
+          resources.requests.cpu: mariadb.primary.resources.requests.cpu
+          resources.requests.memory: mariadb.primary.resources.requests.memory
+          resources.limits.cpu: mariadb.primary.resources.limits.cpu
+          resources.limits.memory: mariadb.primary.resources.limits.memory
+        auth_seed_paths:
+          - auth.user.name
+          - auth.user.password
+          - auth.user.database
+          - auth.admin.password
+        binding_secret:
+          - {key: type, literal: mariadb, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-mariadb"}
+          - {key: port, literal: "3306"}
+          - {key: username, from_dsl: auth.user.name, default: app, env_aliases: [user]}
+          - {key: password, from_dsl: auth.user.password, required: true}
+          - {key: database, from_dsl: auth.user.database, required: true, env_aliases: [name]}
+
+        scaffold:
+          auth.admin.password:
+            default: ""
+            comment: "admin (root) password — required"
+          auth.user.name:
+            default: "app"
+            comment: "application user — your service connects as this"
+          auth.user.password:
+            default: ""
+            comment: "application user password — required"
+          auth.user.database:
+            default: ""
+            comment: "application database — required"
+          persistence.enabled:
+            default: false
+          persistence.size:
+            default: "1Gi"
+          metrics.enabled:
+            default: true
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "256Mi"
+          resources.limits.cpu:
+            default: "500m"
+          resources.limits.memory:
+            default: "1Gi"
+
   apache-kafka:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/apache-kafka)
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/apache-kafka
+        requires_pull_secret: true
+      community:
+        chart_ref: oci://registry-1.docker.io/bitnamicharts/kafka
     versions:
       - constraint: ">=1.0.0 <2.0.0"
+        source: appco
         # AppCo apache-kafka 1.x (KRaft mode, no zookeeper). Broker
         # service is <release>-apache-kafka-controller on 9092 (PLAINTEXT).
         # SASL / TLS are configurable via passthrough — the DSL surface
@@ -899,10 +1109,55 @@ charts:
           resources.limits.memory:
             default: "1Gi"
 
+      - constraint: ">=32.0.0 <33.0.0"
+        source: community
+        # Bitnami kafka 32.x. Same DSL surface as AppCo; only the
+        # resources paths differ (flat resources vs podTemplates).
+        service:
+          host: "{{ .Release.Name }}-apache-kafka-controller.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 9092
+        values_mapping:
+          persistence.enabled: apache-kafka.broker.persistence.enabled
+          persistence.size: apache-kafka.persistence.resources.requests.storage
+          metrics.enabled: apache-kafka.metrics.enabled
+          resources.requests.cpu: apache-kafka.resources.requests.cpu
+          resources.requests.memory: apache-kafka.resources.requests.memory
+          resources.limits.cpu: apache-kafka.resources.limits.cpu
+          resources.limits.memory: apache-kafka.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: apache-kafka, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-apache-kafka-controller"}
+          - {key: port, literal: "9092"}
+          - {key: bootstrap_servers, template: "{{ .Release.Name }}-apache-kafka-controller:9092"}
+
+        scaffold:
+          persistence.enabled:
+            default: false
+          persistence.size:
+            default: "1Gi"
+          metrics.enabled:
+            default: false
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "512Mi"
+          resources.limits.cpu:
+            default: "1"
+          resources.limits.memory:
+            default: "1Gi"
+
   valkey:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/valkey)
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/valkey
+        requires_pull_secret: true
+      community:
+        chart_ref: oci://registry-1.docker.io/bitnamicharts/valkey
     versions:
       - constraint: ">=0.11.0 <1.0.0"
+        source: appco
         # AppCo valkey 0.11.x (Valkey 9.x — the open-source Redis fork).
         # Service: <release>-valkey on port 6379. Sister chart to redis;
         # same DSL surface. Architecture defaults to standalone (single
@@ -947,10 +1202,57 @@ charts:
           resources.limits.memory:
             default: "256Mi"
 
+      - constraint: ">=2.0.0 <3.0.0"
+        source: community
+        # Bitnami valkey 2.x. Same DSL surface as AppCo; only the
+        # resources paths differ (master.resources vs podTemplates).
+        service:
+          host: "{{ .Release.Name }}-valkey.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 6379
+        values_mapping:
+          auth.user.password: valkey.auth.user.password
+          persistence.enabled: valkey.persistence.enabled
+          persistence.size: valkey.persistence.resources.requests.storage
+          metrics.enabled: valkey.metrics.enabled
+          resources.requests.cpu: valkey.master.resources.requests.cpu
+          resources.requests.memory: valkey.master.resources.requests.memory
+          resources.limits.cpu: valkey.master.resources.limits.cpu
+          resources.limits.memory: valkey.master.resources.limits.memory
+        auth_seed_paths:
+          - auth.user.password
+        binding_secret:
+          - {key: type, literal: valkey, skip_env: true}
+          - {key: provider, literal: rda-appco, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-valkey"}
+          - {key: port, literal: "6379"}
+          - {key: password, from_dsl: auth.user.password, required: true}
+        scaffold:
+          auth.user.password:
+            default: ""
+            comment: "valkey password — required"
+          persistence.enabled:
+            default: false
+          metrics.enabled:
+            default: true
+          resources.requests.cpu:
+            default: "50m"
+          resources.requests.memory:
+            default: "128Mi"
+          resources.limits.cpu:
+            default: "200m"
+          resources.limits.memory:
+            default: "256Mi"
+
   minio:
     # BASED ON upstream: minio community chart
     # upstream_repo: https://charts.min.io
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/minio
+        requires_pull_secret: true
+      community:
+        chart_ref: https://charts.min.io
     versions:
       - constraint: ">=5.0.0 <6.0.0"
         # AppCo minio 5.x (chart based on the upstream minio/minio
@@ -1041,6 +1343,12 @@ charts:
     # BASED ON upstream: hashicorp/vault
     # upstream_repo: https://helm.releases.hashicorp.com
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/vault
+        requires_pull_secret: true
+      community:
+        chart_ref: https://helm.releases.hashicorp.com
     versions:
       - constraint: ">=0.31.0 <1.0.0"
         # AppCo vault 0.31.x / 0.32.x (HashiCorp Vault community edition,
@@ -1120,8 +1428,15 @@ charts:
 
   etcd:
     # MADE FROM SCRATCH by SUSE (uses podTemplates pattern like postgresql/redis/mariadb)
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/etcd
+        requires_pull_secret: true
+      community:
+        chart_ref: oci://registry-1.docker.io/bitnamicharts/etcd
     versions:
       - constraint: ">=0.3.0 <1.0.0"
+        source: appco
         service:
           host: "{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local"
           port: 2379
@@ -1155,10 +1470,53 @@ charts:
           resources.limits.memory:
             default: "512Mi"
 
+      - constraint: ">=11.0.0 <12.0.0"
+        source: community
+        # Bitnami etcd 11.x. Same DSL surface as AppCo; only the
+        # resources paths differ (flat resources vs podTemplates).
+        service:
+          host: "{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 2379
+        values_mapping:
+          auth.rbac.rootPassword: etcd.auth.rbac.rootPassword
+          persistence.enabled: etcd.persistence.enabled
+          persistence.size: etcd.persistence.size
+          resources.requests.cpu: etcd.resources.requests.cpu
+          resources.requests.memory: etcd.resources.requests.memory
+          resources.limits.cpu: etcd.resources.limits.cpu
+          resources.limits.memory: etcd.resources.limits.memory
+        binding_secret:
+          - {key: type, literal: etcd, skip_env: true}
+          - {key: host, template: "{{ .Release.Name }}-etcd"}
+          - {key: port, literal: "2379"}
+          - {key: url, template: "http://{{ .Release.Name }}-etcd:2379"}
+        scaffold:
+          auth.rbac.rootPassword:
+            default: ""
+            comment: "etcd root password — required"
+          persistence.enabled:
+            default: false
+          persistence.size:
+            default: "2Gi"
+          resources.requests.cpu:
+            default: "100m"
+          resources.requests.memory:
+            default: "128Mi"
+          resources.limits.cpu:
+            default: "500m"
+          resources.limits.memory:
+            default: "512Mi"
+
   nats:
     # BASED ON upstream: nats-io/nats (docs.apps.rancher.io confirms)
     # upstream_repo: https://nats-io.github.io/k8s/helm/charts/
     # MINOR DIFF: upstream uses container.merge.resources, AppCo uses container.resources
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/nats
+        requires_pull_secret: true
+      community:
+        chart_ref: https://nats-io.github.io/k8s/helm/charts
     versions:
       - constraint: ">=2.0.0 <3.0.0"
         service:
@@ -1188,6 +1546,12 @@ charts:
     # BASED ON upstream: opensearch-project/opensearch
     # upstream_repo: https://opensearch-project.github.io/helm-charts/
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/opensearch
+        requires_pull_secret: true
+      community:
+        chart_ref: https://opensearch-project.github.io/helm-charts
     versions:
       - constraint: ">=3.0.0 <4.0.0"
         service:
@@ -1223,6 +1587,12 @@ charts:
     # BASED ON upstream: influxdata/influxdb2 (docs.apps.rancher.io confirms)
     # upstream_repo: https://helm.influxdata.com
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/influxdb
+        requires_pull_secret: true
+      community:
+        chart_ref: https://helm.influxdata.com
     versions:
       - constraint: ">=2.0.0 <3.0.0"
         service:
@@ -1271,6 +1641,12 @@ charts:
     # BASED ON upstream: goharbor/harbor
     # upstream_repo: https://helm.goharbor.io
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/harbor
+        requires_pull_secret: true
+      community:
+        chart_ref: https://helm.goharbor.io
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         service:
@@ -1332,6 +1708,12 @@ charts:
     # BASED ON upstream: apache/airflow
     # upstream_repo: https://airflow.apache.org
     # DROP-IN: same values schema
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/apache-airflow
+        requires_pull_secret: true
+      community:
+        chart_ref: https://airflow.apache.org
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         service:
@@ -1402,6 +1784,12 @@ charts:
     # Auth-gating reverse proxy. Combined with Dex, lets devs SSO-protect
     # any app that doesn't natively support OIDC — zero app code changes.
     # Pattern: [Browser] → [Ingress] → [oauth2-proxy] → [App]
+    sources:
+      appco:
+        chart_ref: oci://dp.apps.rancher.io/charts/oauth2-proxy
+        requires_pull_secret: true
+      community:
+        chart_ref: https://oauth2-proxy.github.io/manifests
     versions:
       - constraint: ">=10.0.0"
         service:

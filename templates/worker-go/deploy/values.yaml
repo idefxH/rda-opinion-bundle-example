@@ -7,8 +7,7 @@
 suse-library:
   name: "{{ .Name }}"
 
-  imagePullSecrets:
-    - name: application-collection
+  {{ .ImagePullSecrets }}
 
   workloads:
     - name: app
