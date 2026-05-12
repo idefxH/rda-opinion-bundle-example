@@ -1,10 +1,10 @@
 # Defaults for any chart depending on suse-library.
 
 # Helm globals — propagated to every sub-chart automatically.
-# Keeping imagePullSecrets here means every AppCo dep picks it up.
+# Community baseline: no imagePullSecrets needed. When source=appco,
+# `rda upgrade --source appco` adds the application-collection secret.
 global:
-  imagePullSecrets:
-    - application-collection
+  imagePullSecrets: []
 
 # ─── Unified DSL ───
 # services[] is the single source of truth for catalogued sub-charts.

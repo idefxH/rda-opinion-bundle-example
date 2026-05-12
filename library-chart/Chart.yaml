@@ -32,48 +32,22 @@ maintainers: [{name: idefxH, email: fx.houard@gmail.com}]
 # the INTERNAL version, so the Tilt extension's
 # _align_subchart_versions.py post-processor rewrites every pulled
 # tgz to align internal version with declared version.
+  # Community-first baseline: every chart with a community source
+  # uses the upstream helm repo here. `rda upgrade --source appco`
+  # rewrites repos to OCI AppCo refs + adjusts chart names/versions.
+  # Charts without a community source (postgresql, redis, mariadb,
+  # kafka, valkey, etcd) stay on AppCo OCI — they require a SUSE
+  # Application Collection subscription.
 dependencies:
+  # ── AppCo-only charts (no community equivalent) ──
   - name: postgresql
     version: "0.4.4-29.1"
     repository: oci://dp.apps.rancher.io/charts
     condition: postgresql.enabled
-  - name: prometheus
-    version: "29.3.0-7.1"
-    repository: oci://dp.apps.rancher.io/charts
-    condition: prometheus.enabled
-  - name: grafana
-    version: "12.2.1-8.1"
-    repository: oci://dp.apps.rancher.io/charts
-    condition: grafana.enabled
   - name: redis
     version: "2.6.1-3.1"
     repository: oci://dp.apps.rancher.io/charts
     condition: redis.enabled
-  # dex (OIDC + OAuth2) via SUSE Application Collection.
-  #
-  #   - The upstream dex Helm chart at charts.dexidp.io is published
-  #     by the dex maintainers; AppCo packages the same chart as
-  #     `dex-idp` (chart name + scanned image). Switching to AppCo
-  #     gives us a single registry for everything (postgres, redis,
-  #     dex, ...) — no separate HTTP repo to bootstrap, image scanned
-  #     by SUSE, supported commercially.
-  #
-  #   - `alias: dex` keeps the on-disk dependency dir at
-  #     deploy/charts/dex/, and the chart's _helpers.tpl uses
-  #     `dex.fullname` (NOT `dex-idp.fullname` — checked in 0.24.0).
-  #     With the alias, .Chart.Name = "dex" inside the chart's
-  #     templates, so resource names stay <release>-dex (matching
-  #     dsl-mappings.yaml's service.host = {{ .Release.Name }}-dex).
-  #     User-facing values.yaml API is unchanged: still .dex.* under
-  #     suse-library: namespace.
-  #
-  # Internal version aligns with the upstream tag (AppCo follows
-  # upstream) so Tilt's _align_subchart_versions is a no-op.
-  - name: dex-idp
-    alias: dex
-    version: "0.24.0"
-    repository: oci://dp.apps.rancher.io/charts
-    condition: dex.enabled
   - name: mariadb
     version: "0.1.7-10.1"
     repository: oci://dp.apps.rancher.io/charts
@@ -82,59 +56,62 @@ dependencies:
     version: "1.3.0-11.1"
     repository: oci://dp.apps.rancher.io/charts
     condition: apache-kafka.enabled
-  # valkey/minio/vault — added in 0.11.17 to round out the catalog
-  # towards the AppCo charts most projects ask for. valkey is the
-  # open-source Redis fork (same DSL surface as redis); minio is
-  # S3-compatible object storage; vault is HashiCorp's secrets engine
-  # in dev-mode posture.
   - name: valkey
     version: "0.11.5-6.1"
     repository: oci://dp.apps.rancher.io/charts
     condition: valkey.enabled
-  - name: minio
-    version: "5.4.0-11.1"
-    repository: oci://dp.apps.rancher.io/charts
-    condition: minio.enabled
-  - name: vault
-    version: "0.32.0-1.1"
-    repository: oci://dp.apps.rancher.io/charts
-    condition: vault.enabled
-  # etcd/nats/opensearch/influxdb/harbor — added in 0.11.39 to expand
-  # the catalog with the remaining AppCo charts relevant for
-  # cloud-native dev workflows.
   - name: etcd
     version: "0.3.16"
     repository: oci://dp.apps.rancher.io/charts
     condition: etcd.enabled
+  # ── Community-baseline charts (AppCo overlay available) ──
+  - name: prometheus
+    version: "29.3.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+  - name: grafana
+    version: "12.2.1"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+  - name: dex
+    version: "0.24.0"
+    repository: https://charts.dexidp.io
+    condition: dex.enabled
+  - name: minio
+    version: "5.4.0"
+    repository: https://charts.min.io
+    condition: minio.enabled
+  - name: vault
+    version: "0.32.0"
+    repository: https://helm.releases.hashicorp.com
+    condition: vault.enabled
   - name: nats
     version: "2.12.6"
-    repository: oci://dp.apps.rancher.io/charts
+    repository: https://nats-io.github.io/k8s/helm/charts
     condition: nats.enabled
   - name: opensearch
     version: "3.6.0"
-    repository: oci://dp.apps.rancher.io/charts
+    repository: https://opensearch-project.github.io/helm-charts
     condition: opensearch.enabled
   - name: influxdb
     version: "2.1.2"
-    repository: oci://dp.apps.rancher.io/charts
+    repository: https://helm.influxdata.com
     condition: influxdb.enabled
   - name: harbor
     version: "1.18.3"
-    repository: oci://dp.apps.rancher.io/charts
+    repository: https://helm.goharbor.io
     condition: harbor.enabled
   - name: apache-airflow
     version: "1.21.0"
-    repository: oci://dp.apps.rancher.io/charts
+    repository: https://airflow.apache.org
     condition: apache-airflow.enabled
   - name: oauth2-proxy
     version: "10.4.3"
-    repository: oci://dp.apps.rancher.io/charts
+    repository: https://oauth2-proxy.github.io/manifests
     condition: oauth2-proxy.enabled
-  # CloudNativePG: operator + cluster chart.
-  # The operator installs the CRD + controller. The cluster chart
-  # creates a Cluster CR that the operator reconciles into PG pods.
-  # Both are from the upstream cnpg project — same chart in AppCo
-  # and community.
+  # ── CloudNativePG: operator + cluster ──
+  # Operator in AppCo (cloudnative-pg); cluster chart community-only.
+  # Both use the same upstream repo as baseline.
   - name: cloudnative-pg
     version: "0.28.2"
     repository: https://cloudnative-pg.github.io/charts
