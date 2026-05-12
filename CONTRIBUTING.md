@@ -104,6 +104,22 @@ catch step 3 if you forget; nothing else is automated.
 
 No rda-cli change needed — the CLI auto-discovers from dsl-mappings.yaml.
 
+### Extra steps for operator-managed charts
+
+If the chart's workloads are created by a CRD operator (e.g. CNPG)
+rather than directly by `helm template`:
+
+8. **`operator_managed: true`** in the version entry, plus all companion
+   fields: `operator_resource`, `cr_kind` (with `kind` + `api_version`),
+   `pod_selector`, `cr_object`. The `operator-managed-consistency` test
+   enforces completeness.
+9. **Credential wiring** — if the operator auto-generates passwords,
+   add a `derived_values` entry pointing the chart's credential secret
+   reference to the binding secret (e.g. `cnpg.cluster.initdb.secret.name`
+   → `{{ .Release.Name }}-{{ .Binding }}-binding`). Without this, the
+   operator's password won't match the binding secret. The
+   `cnpg-initdb-secret` test catches this for known charts.
+
 ## Anatomy of a good PR description
 
 Mirror what `rda-cli` PRs do (look at recent merges for examples):

@@ -85,7 +85,7 @@ charts:
     # No upstream chart equivalent — Bitnami uses primary.resources (incompatible)
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/postgresql
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
     default_branch: "17"
     branches:
@@ -178,7 +178,7 @@ charts:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/redis)
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/redis
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
     default_branch: "8"
     branches:
@@ -247,7 +247,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/prometheus
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://prometheus-community.github.io/helm-charts
@@ -339,7 +339,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/grafana
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://grafana.github.io/helm-charts
@@ -424,7 +424,8 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/dex-idp
+        chart_ref: oci://dp.apps.rancher.io/charts
+        chart_name: dex-idp
         requires_pull_secret: true
       community:
         chart_ref: https://charts.dexidp.io
@@ -805,7 +806,7 @@ charts:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/mariadb)
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/mariadb
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
     default_branch: "11.8"
     branches:
@@ -886,7 +887,7 @@ charts:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/apache-kafka)
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/apache-kafka
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
     default_branch: "4"
     branches:
@@ -949,7 +950,7 @@ charts:
     # MADE FROM SCRATCH by SUSE (docs.apps.rancher.io/reference-guides/valkey)
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/valkey
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
     default_branch: "9"
     branches:
@@ -1008,7 +1009,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/minio
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://charts.min.io
@@ -1104,7 +1105,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/vault
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://helm.releases.hashicorp.com
@@ -1189,7 +1190,7 @@ charts:
     # MADE FROM SCRATCH by SUSE (uses podTemplates pattern like postgresql/redis/mariadb)
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/etcd
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
     default_branch: "3"
     branches:
@@ -1235,7 +1236,7 @@ charts:
     # MINOR DIFF: upstream uses container.merge.resources, AppCo uses container.resources
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/nats
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://nats-io.github.io/k8s/helm/charts
@@ -1270,7 +1271,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/opensearch
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://opensearch-project.github.io/helm-charts
@@ -1311,7 +1312,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/influxdb
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://helm.influxdata.com
@@ -1365,7 +1366,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/harbor
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://helm.goharbor.io
@@ -1432,7 +1433,7 @@ charts:
     # DROP-IN: same values schema
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/apache-airflow
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://airflow.apache.org
@@ -1508,7 +1509,7 @@ charts:
     # Pattern: [Browser] → [Ingress] → [oauth2-proxy] → [App]
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/oauth2-proxy
+        chart_ref: oci://dp.apps.rancher.io/charts
         requires_pull_secret: true
       community:
         chart_ref: https://oauth2-proxy.github.io/manifests
@@ -1596,10 +1597,12 @@ charts:
     # Prod: override instances=3, enable backups via passthrough.
     sources:
       appco:
-        chart_ref: oci://dp.apps.rancher.io/charts/cloudnative-pg
+        chart_ref: oci://dp.apps.rancher.io/charts
+        chart_name: cloudnative-pg
         requires_pull_secret: true
       community:
         chart_ref: https://cloudnative-pg.github.io/charts
+        chart_name: cluster
     default_branch: "17"
     branches:
       "17": {chart_version: "0.6.0"}
