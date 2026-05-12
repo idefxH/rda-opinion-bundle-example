@@ -671,7 +671,7 @@ charts:
               dex.config.storage.config.user: auth.user.name
               dex.config.storage.config.password: auth.user.password
               dex.config.storage.config.database: auth.user.database
-              dex.config.storage.config.ssl.mode: __literal:disable
+              dex.config.storage.config.ssl.mode: "__literal:false"
 
         scaffold:
           # DSL fields (mapped via values_mapping)
