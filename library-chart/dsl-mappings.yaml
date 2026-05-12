@@ -1447,6 +1447,7 @@ charts:
               oauth2-proxy.extraArgs.pass-user-headers: "__literal:true"
               oauth2-proxy.extraArgs.set-xauthrequest: "__literal:true"
               oauth2-proxy.extraArgs.skip-provider-button: "__literal:true"
+              oauth2-proxy.extraArgs.approval-prompt: "__literal:auto"
         scaffold:
           auth.client_id:
             default: ""
