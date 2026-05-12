@@ -180,6 +180,10 @@ charts:
       appco:
         chart_ref: oci://dp.apps.rancher.io/charts/redis
         requires_pull_secret: true
+    default_branch: "8"
+    branches:
+      "8": {chart_version: "2.6.1-3.1"}
+      "7": {chart_version: "1.0.6-12.1"}
     versions:
       - constraint: ">=2.0.0 <3.0.0"
         # AppCo redis 2.x (chart packaging — redis binary 8.x lineage).
@@ -881,6 +885,10 @@ charts:
       appco:
         chart_ref: oci://dp.apps.rancher.io/charts/apache-kafka
         requires_pull_secret: true
+    default_branch: "4"
+    branches:
+      "4": {chart_version: "1.3.0-11.1"}
+      "3": {chart_version: "0.5.0-21.1"}
     versions:
       - constraint: ">=1.0.0 <2.0.0"
         # AppCo apache-kafka 1.x (KRaft mode, no zookeeper). Broker
@@ -940,6 +948,11 @@ charts:
       appco:
         chart_ref: oci://dp.apps.rancher.io/charts/valkey
         requires_pull_secret: true
+    default_branch: "9"
+    branches:
+      "9": {chart_version: "0.11.5-6.1"}
+      "8": {chart_version: "0.10.3-17.1"}
+      "7": {chart_version: "0.4.0-1.1"}
     versions:
       - constraint: ">=0.11.0 <1.0.0"
         # AppCo valkey 0.11.x (Valkey 9.x — the open-source Redis fork).
