@@ -1595,14 +1595,12 @@ charts:
     # Same chart in AppCo and community — only images differ.
     # Dev default: 1 instance, no HA, no backup (simple dev posture).
     # Prod: override instances=3, enable backups via passthrough.
+    # The cluster chart is community-only (cloudnative-pg.github.io).
+    # The operator (cloudnative-pg) IS in AppCo but it's a separate
+    # Chart.yaml dep, not the DSL type — no source switch needed.
     sources:
-      appco:
-        chart_ref: oci://dp.apps.rancher.io/charts
-        chart_name: cloudnative-pg
-        requires_pull_secret: true
       community:
         chart_ref: https://cloudnative-pg.github.io/charts
-        chart_name: cluster
     default_branch: "17"
     branches:
       "17": {chart_version: "0.6.0"}
