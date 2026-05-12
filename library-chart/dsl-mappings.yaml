@@ -729,7 +729,7 @@ charts:
         # a capability declared (kubernetes-storage tuning, custom
         # connector blocks, etc).
         #
-        # The CLI (`rda service bootstrap auth.users add ...` / `rda bootstrap
+        # The CLI (`rda service bootstrap auth.users add ...` / `rda service bootstrap
         # auth.clients add ...`) edits this same `bootstrap.<cap>` list
         # in values.yaml, with field-validation against the schema below.
         capabilities:
@@ -1427,6 +1427,7 @@ charts:
               http://{{ with .Service.ingress }}{{ with .hosts }}{{ index . 0 }}{{ end }}{{ end }}/oauth2/callback
           - target: oauth2-proxy.extraArgs.upstream
             template: "http://{{ .Release.Name }}-app:80"
+            skip_if: passthrough.extraArgs.upstream
         binding_secret:
           - {key: type, literal: oauth2-proxy, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}

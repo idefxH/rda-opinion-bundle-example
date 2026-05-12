@@ -8,4 +8,4 @@ keywords: [rda, brownfield, {{ .Language }}]
 
 dependencies:
   - name: suse-library
-    version: 0.15.0
+    version: 0.16.0

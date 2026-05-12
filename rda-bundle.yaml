@@ -110,7 +110,7 @@ library_chart:
   # production implementation supports file:// URIs only — see the v1-gap
   # issue tracking oci:// support.
   oci_ref: file://library-chart
-  version: 0.15.0
+  version: 0.16.0
 # Tilt extension version. Injected into scaffolded Tiltfiles at
 # `rda new` time. `rda upgrade` bumps existing Tiltfiles when this
 # changes. Single source of truth for the extension ref — templates

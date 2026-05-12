@@ -1099,7 +1099,7 @@ Status: in-progress
      `<project>-client / dev-secret`) made the demo work in 2
      commands but introduced 3 real problems:
 
-     - **Pedagogy lost**: devs never discover `rda bootstrap
+     - **Pedagogy lost**: devs never discover `rda service bootstrap
        auth.users add` because the project "just works".
      - **Dev→prod anti-pattern**: pre-filled `staticPasswords` is
        dev-only and dex-specific. In prod, auth uses connectors +
