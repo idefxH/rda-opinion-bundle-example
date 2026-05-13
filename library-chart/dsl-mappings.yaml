@@ -1623,6 +1623,35 @@ charts:
       "16": {}
     versions:
       - constraint: ">=0.1.0"
+        source: appco
+        operator_managed: true
+        operator_resource: "{{ .Release.Name }}-cloudnative-pg"
+        cr_kind:
+          kind: Cluster
+          api_version: postgresql.cnpg.io/v1
+        pod_selector:
+          cnpg.io/cluster: "{{ .Release.Name }}-cnpg"
+        cr_object: "{{ .Release.Name }}-cnpg:cluster"
+        service:
+          host: "{{ .Release.Name }}-cnpg-rw"
+          port: 5432
+        values_mapping:
+          auth.user.database: cnpg.cluster.initdb.database
+          auth.user.name: cnpg.cluster.initdb.owner
+          persistence.size: cnpg.cluster.storage.size
+          branch: cnpg.version.postgresql
+          resources.requests.cpu: cnpg.cluster.resources.requests.cpu
+          resources.requests.memory: cnpg.cluster.resources.requests.memory
+          resources.limits.cpu: cnpg.cluster.resources.limits.cpu
+          resources.limits.memory: cnpg.cluster.resources.limits.memory
+          metrics.enabled: cnpg.cluster.monitoring.enabled
+        derived_values:
+          - target: cnpg.cluster.initdb.secret.name
+            template: "{{ .Release.Name }}-{{ .Binding }}-binding"
+          - target: cnpg.cluster.imageName
+            template: "dp.apps.rancher.io/containers/postgresql:{{ with .Service.branch }}{{ . }}{{ else }}17{{ end }}"
+            skip_if: imageName
+      - constraint: ">=0.1.0"
         operator_managed: true
         operator_resource: "{{ .Release.Name }}-cloudnative-pg"
         cr_kind:
