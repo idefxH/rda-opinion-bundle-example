@@ -1041,8 +1041,8 @@ charts:
           persistence.enabled: minio.persistence.enabled
           persistence.size: minio.persistence.size
           metrics.enabled: minio.metrics.serviceMonitor.enabled
-          ingress.enabled: minio.ingress.enabled
-          ingress.hosts: minio.ingress.hosts
+          ingress.enabled: minio.consoleIngress.enabled
+          ingress.hosts: minio.consoleIngress.hosts
           resources.requests.cpu: minio.resources.requests.cpu
           resources.requests.memory: minio.resources.requests.memory
           resources.limits.cpu: minio.resources.limits.cpu
