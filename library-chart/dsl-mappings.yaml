@@ -1082,7 +1082,7 @@ charts:
               # derives authorization_endpoint from it — which the browser
               # follows. Must be the public Dex URL (ingress), not in-cluster.
               minio.oidc.enabled: "__literal:true"
-              minio.oidc.configUrl: "__binding:public_url__/.well-known/openid-configuration"
+              minio.oidc.configUrl: "__url__/.well-known/openid-configuration"
               minio.oidc.clientId: "__bootstrap:auth.clients.id__"
               minio.oidc.clientSecret: "__bootstrap:auth.clients.secret__"
               minio.oidc.scopes: "__literal:openid,profile,email"
