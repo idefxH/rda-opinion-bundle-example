@@ -1071,6 +1071,24 @@ charts:
           - {key: url, template: "http://{{ .Release.Name }}-minio:9000"}
           - {key: accessKey, from_dsl: auth.admin.name, default: minioadmin, env_aliases: [user]}
           - {key: secretKey, from_dsl: auth.admin.password, required: true, env_aliases: [password]}
+        dependencies:
+          - charts: [dex]
+            required: false
+            dsl_field: oidc_provider
+            wire_type: oidc
+            wiring:
+              # MinIO reads configUrl to fetch the discovery document and
+              # derives authorization_endpoint from it — which the browser
+              # follows. Must be the public Dex URL (ingress), not in-cluster.
+              minio.oidc.enabled: "__literal:true"
+              minio.oidc.configUrl: "__binding:public_url__/.well-known/openid-configuration"
+              minio.oidc.clientId: "__bootstrap:auth.clients.id__"
+              minio.oidc.clientSecret: "__bootstrap:auth.clients.secret__"
+              minio.oidc.scopes: "__literal:openid,profile,email"
+              minio.oidc.displayName: "__literal:Dex"
+              # MinIO uses the "policy" claim to map OIDC groups → bucket policies.
+              # Override via passthrough if your Dex config uses a different claim.
+              minio.oidc.claimName: "__literal:policy"
         scaffold:
           auth.admin.name:
             default: "minioadmin"
@@ -1098,6 +1116,9 @@ charts:
             default: "500m"
           resources.limits.memory:
             default: "1Gi"
+          oidc_provider:
+            default: ""
+            comment: "optional — binding name of a dex service for OIDC login"
 
   vault:
     # BASED ON upstream: hashicorp/vault
