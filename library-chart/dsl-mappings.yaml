@@ -1651,6 +1651,10 @@ charts:
           - target: cnpg.cluster.imageName
             template: "dp.apps.rancher.io/containers/postgresql:{{ with .Service.branch }}{{ . }}{{ else }}17{{ end }}"
             skip_if: imageName
+        chart_defaults:
+          cnpg.cluster.instances: 1
+          cnpg.cluster.affinity: {}
+          cloudnative-pg.enabled: true
       - constraint: ">=0.1.0"
         operator_managed: true
         operator_resource: "{{ .Release.Name }}-cloudnative-pg"
