@@ -1067,6 +1067,10 @@ charts:
         chart_defaults:
           minio.mode: "standalone"
           minio.replicas: 1
+        derived_values:
+          - target: minio.oidc.redirectUrl
+            template: >-
+              http://{{ with .Service.ingress }}{{ with .hosts }}{{ index . 0 }}{{ end }}{{ end }}/oauth_callback
         binding_secret:
           - {key: type, literal: minio, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
