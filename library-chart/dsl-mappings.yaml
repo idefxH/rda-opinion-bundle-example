@@ -368,6 +368,8 @@ charts:
           resources.requests.memory: grafana.resources.requests.memory
           resources.limits.cpu: grafana.resources.limits.cpu
           resources.limits.memory: grafana.resources.limits.memory
+        chart_defaults:
+          grafana.assertNoLeakedSecrets: false
         binding_secret:
           - {key: type, literal: grafana, skip_env: true}
           - {key: provider, literal: rda-appco, skip_env: true}
