@@ -198,6 +198,9 @@ def main():
 
     # Test 1: Each chart individually
     for chart_type in sorted(doc["charts"].keys()):
+        entry = doc["charts"][chart_type]
+        if entry.get("infra_only"):
+            continue
         tmpdir = tempfile.mkdtemp(prefix=f"helm-smoke-{chart_type}-")
         try:
             values = build_values(chart_type, doc)

@@ -293,6 +293,8 @@ def main():
             err(errors, "charts", "must be a non-empty dict of chart-name -> chart-block")
         else:
             for chart, body in charts.items():
+                if isinstance(body, dict) and body.get("infra_only"):
+                    continue
                 check_chart(errors, chart, body)
 
     if errors:

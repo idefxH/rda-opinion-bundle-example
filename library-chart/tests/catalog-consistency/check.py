@@ -84,7 +84,7 @@ def chart_names_from_mapping(path):
     charts = doc.get("charts")
     if not isinstance(charts, dict):
         return set()
-    return set(charts.keys())
+    return {k for k, v in charts.items() if not (isinstance(v, dict) and v.get("infra_only"))}
 
 
 def chart_names_from_catalog(path):

@@ -1593,13 +1593,18 @@ charts:
   # source switching (community baseline → AppCo overlay). Listed here
   # so rewriteChartRepos can find it by Chart.yaml dep name.
   cloudnative-pg:
+    infra_only: true
     sources:
       appco:
         chart_ref: oci://dp.apps.rancher.io/charts
         chart_name: cloudnative-pg
       community:
         chart_ref: https://cloudnative-pg.github.io/charts
-    versions: []
+    versions:
+      - constraint: ">=0.1.0"
+        service:
+          host: "{{ .Release.Name }}-cloudnative-pg"
+          port: 443
 
   cnpg:
     # CloudNativePG — operator-managed PostgreSQL.
