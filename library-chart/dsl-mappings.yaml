@@ -361,7 +361,7 @@ charts:
           # bracket-notation (closes rda-cli#75). Both writeable.
           ingress.host: grafana.ingress.hosts[0]
           ingress.hosts: grafana.ingress.hosts
-          metrics.enabled: grafana.grafana.ini.metrics.enabled
+          metrics.enabled: grafana.grafana\.ini.metrics.enabled
           persistence.enabled: grafana.persistence.enabled
           persistence.size: grafana.persistence.size
           resources.requests.cpu: grafana.resources.requests.cpu
@@ -383,14 +383,14 @@ charts:
             dsl_field: auth_provider
             wire_type: oidc
             wiring:
-              grafana.grafana.ini.auth.generic_oauth.enabled: "__literal:true"
-              grafana.grafana.ini.auth.generic_oauth.name: "__literal:Dex"
-              grafana.grafana.ini.auth.generic_oauth.client_id: "__bootstrap:auth.clients.id__"
-              grafana.grafana.ini.auth.generic_oauth.client_secret: "__bootstrap:auth.clients.secret__"
-              grafana.grafana.ini.auth.generic_oauth.scopes: "__literal:openid profile email"
-              grafana.grafana.ini.auth.generic_oauth.auth_url: "__binding:public_url__/auth"
-              grafana.grafana.ini.auth.generic_oauth.token_url: "__binding:cluster_url__/token"
-              grafana.grafana.ini.auth.generic_oauth.api_url: "__binding:cluster_url__/userinfo"
+              grafana.grafana\.ini.auth\.generic_oauth.enabled: "__literal:true"
+              grafana.grafana\.ini.auth\.generic_oauth.name: "__literal:Dex"
+              grafana.grafana\.ini.auth\.generic_oauth.client_id: "__bootstrap:auth.clients.id__"
+              grafana.grafana\.ini.auth\.generic_oauth.client_secret: "__bootstrap:auth.clients.secret__"
+              grafana.grafana\.ini.auth\.generic_oauth.scopes: "__literal:openid profile email"
+              grafana.grafana\.ini.auth\.generic_oauth.auth_url: "__binding:public_url__/auth"
+              grafana.grafana\.ini.auth\.generic_oauth.token_url: "__binding:cluster_url__/token"
+              grafana.grafana\.ini.auth\.generic_oauth.api_url: "__binding:cluster_url__/userinfo"
 
         scaffold:
           auth_provider:
