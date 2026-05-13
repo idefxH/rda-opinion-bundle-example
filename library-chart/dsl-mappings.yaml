@@ -1076,6 +1076,7 @@ charts:
             required: false
             dsl_field: oidc_provider
             wire_type: oidc
+            redirect_uri_path: /oauth_callback
             wiring:
               # MinIO reads configUrl to fetch the discovery document and
               # derives authorization_endpoint from it — which the browser
