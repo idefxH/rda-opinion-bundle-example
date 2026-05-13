@@ -71,3 +71,4 @@ python3 library-chart/scripts/sync-from-dsl-mappings.py
 | `library_chart.version` | Pinned version |
 | `tilt_extension.ref` | Tilt extension version (injected into scaffolded Tiltfiles) |
 | `service_catalog[]` | Chart types surfaced by the CLI |
+# test
