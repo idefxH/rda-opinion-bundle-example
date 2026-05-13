@@ -389,8 +389,8 @@ charts:
               grafana.grafana.ini.auth.generic_oauth.client_secret: "__bootstrap:auth.clients.secret__"
               grafana.grafana.ini.auth.generic_oauth.scopes: "__literal:openid profile email"
               grafana.grafana.ini.auth.generic_oauth.auth_url: "__binding:public_url__/auth"
-              grafana.grafana.ini.auth.generic_oauth.token_url: "__url__/token"
-              grafana.grafana.ini.auth.generic_oauth.api_url: "__url__/userinfo"
+              grafana.grafana.ini.auth.generic_oauth.token_url: "__binding:cluster_url__/token"
+              grafana.grafana.ini.auth.generic_oauth.api_url: "__binding:cluster_url__/userinfo"
 
         scaffold:
           auth_provider:
@@ -538,6 +538,13 @@ charts:
               {{- else -}}
               http://{{ .Release.Name }}-dex:5556
               {{- end -}}
+          # cluster_url is the in-cluster base URL of the dex service, using
+          # only the short service name (no {{ .Release.Namespace }}).
+          # Use __binding:cluster_url__/path for cross-chart wiring where the
+          # value ends up in a sub-chart config (not a Helm template expression)
+          # — Helm doesn't expand {{ .Release.Namespace }} in values files.
+          cluster_url:
+            template: "http://{{ .Release.Name }}-dex:5556"
         # Chart-required fields the DSL doesn't surface (because they
         # don't vary across deployments). `rda render` writes these
         # AFTER applying values_mapping, only when at least one
@@ -1078,11 +1085,13 @@ charts:
             wire_type: oidc
             redirect_uri_path: /oauth_callback
             wiring:
-              # MinIO reads configUrl to fetch the discovery document and
-              # derives authorization_endpoint from it — which the browser
-              # follows. Must be the public Dex URL (ingress), not in-cluster.
+              # MinIO fetches the discovery document server-side (in-cluster).
+              # Use cluster_url (short hostname, no {{ .Release.Namespace }})
+              # so the URL is fully resolved at rda render time. Dex's
+              # config.issuer is the public URL, so the discovery doc's
+              # authorization_endpoint is publicly accessible for browser redirects.
               minio.oidc.enabled: "__literal:true"
-              minio.oidc.configUrl: "__url__/.well-known/openid-configuration"
+              minio.oidc.configUrl: "__binding:cluster_url__/.well-known/openid-configuration"
               minio.oidc.clientId: "__bootstrap:auth.clients.id__"
               minio.oidc.clientSecret: "__bootstrap:auth.clients.secret__"
               minio.oidc.scopes: "__literal:openid,profile,email"
