@@ -1068,7 +1068,7 @@ charts:
           minio.mode: "standalone"
           minio.replicas: 1
         derived_values:
-          - target: minio.oidc.redirectUrl
+          - target: minio.oidc.redirectUri
             template: >-
               http://{{ with .Service.ingress }}{{ with .hosts }}{{ index . 0 }}{{ end }}{{ end }}/oauth_callback
         binding_secret:
