@@ -529,6 +529,9 @@ metadata:
     service.binding/binding-name: {{ $svc.binding }}
     service.binding/binding-type: {{ $svc.type }}
     rda.suse.com/provisioning: {{ $provisioning | quote }}
+    {{- if eq $svc.type "cnpg" }}
+    cnpg.io/reload: "true"
+    {{- end }}
   annotations:
     # rda.suse.com/source documents which DSL key this resource was generated from.
     # Manifesto principle: learning. Devs who inspect a Secret can trace it back

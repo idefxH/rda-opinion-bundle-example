@@ -2,6 +2,10 @@
   CNPG Cluster CR — rendered when cnpg is enabled.
   All spec fields come from the DSL projection under cnpg.cluster.*.
   Fully overridable via passthrough.
+
+  Two safety layers guarantee password synchronization:
+  1. initdb.secret.name always set → correct password at bootstrap
+  2. managed.roles → continuous reconciliation from binding secret
 */}}
 {{- $cnpg := .Values.cnpg | default dict -}}
 {{- if $cnpg.enabled }}
@@ -12,6 +16,21 @@
     {{- $binding = default "db" $svc.binding -}}
   {{- end -}}
 {{- end -}}
+{{- $spec := deepCopy $cluster -}}
+{{- $owner := dig "initdb" "owner" "app" $spec -}}
+{{- $secretName := printf "%s-%s-binding" .Release.Name $binding -}}
+{{- /* Layer 1: guarantee initdb.secret.name is always set */ -}}
+{{- if not (dig "initdb" "secret" "name" "" $spec) -}}
+  {{- $initdb := default dict (get $spec "initdb") -}}
+  {{- $_ := set $initdb "secret" (dict "name" $secretName) -}}
+  {{- $_ := set $spec "initdb" $initdb -}}
+{{- end -}}
+{{- /* Layer 2: managed.roles — continuous password reconciliation */ -}}
+{{- $role := dict "name" $owner "ensure" "present" "login" true "passwordSecret" (dict "name" $secretName) -}}
+{{- $managed := default dict (get $spec "managed") -}}
+{{- $existingRoles := default list (get $managed "roles") -}}
+{{- $_ := set $managed "roles" (append $existingRoles $role) -}}
+{{- $_ := set $spec "managed" $managed -}}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -23,5 +42,5 @@ metadata:
     rda.suse.com/binding: {{ $binding }}
     {{- end }}
 spec:
-  {{- toYaml $cluster | nindent 2 }}
+  {{- toYaml $spec | nindent 2 }}
 {{- end }}
