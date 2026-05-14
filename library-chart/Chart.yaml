@@ -101,7 +101,8 @@ dependencies:
     version: "1.18.3"
     repository: https://helm.goharbor.io
     condition: harbor.enabled
-  - name: apache-airflow
+  - name: airflow
+    alias: apache-airflow
     version: "1.21.0"
     repository: https://airflow.apache.org
     condition: apache-airflow.enabled
