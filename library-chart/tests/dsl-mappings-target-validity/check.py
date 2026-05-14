@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Assert every values_mapping target path in dsl-mappings.yaml parses
+r"""Assert every values_mapping target path in dsl-mappings.yaml parses
 under the bracket-notation rules `rda render` enforces.
 
 Why: see SPEC.md BEHAVIOR/dsl-mappings-target-validity. The projection
 package in rda-cli (internal/render/projection.go) walks each target
 path component-by-component:
-- segments separated by `.`
+- segments separated by `.` (unescaped)
+- escaped dots (`\.`) are literal dots within a segment (e.g.
+  `grafana\.ini` is one map key containing a dot)
 - each segment is either `name` (map key) or `name[N]` (list index)
 - malformed brackets (`name[`, `name[]`, `name[abc]`) are rejected loud
 
@@ -20,7 +22,7 @@ Layout: same as the other library-chart/tests/* (run.sh + check.py).
 import os
 import re
 import sys
-from typing import Optional
+from typing import List, Optional
 
 try:
     import yaml
@@ -32,10 +34,31 @@ except ImportError:
 
 
 # Per-segment shape: name OR name[N] where N is non-negative integer.
-SEGMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*(?:\[[0-9]+\])?$")
-DOUBLE_DOT_RE = re.compile(r"\.\.")
+# The name part may contain escaped dots (backslash-dot), which represent
+# literal dots in Helm key names (e.g. grafana\.ini).
+SEGMENT_RE = re.compile(r"^[A-Za-z_](?:[A-Za-z0-9_-]|\\.)*(?:\[[0-9]+\])?$")
 EMPTY_BRACKET_RE = re.compile(r"\[\]")
 NON_NUMERIC_BRACKET_RE = re.compile(r"\[[^0-9\]][^\]]*\]")
+
+
+def split_path(path: str) -> List[str]:
+    r"""Split a path on unescaped dots, preserving escaped dots (`\.`)."""
+    segments = []
+    current = []
+    i = 0
+    while i < len(path):
+        if path[i] == '\\' and i + 1 < len(path) and path[i + 1] == '.':
+            current.append('\\.')
+            i += 2
+        elif path[i] == '.':
+            segments.append(''.join(current))
+            current = []
+            i += 1
+        else:
+            current.append(path[i])
+            i += 1
+    segments.append(''.join(current))
+    return segments
 
 
 def validate_path(path: str) -> Optional[str]:
@@ -43,14 +66,17 @@ def validate_path(path: str) -> Optional[str]:
     if not path:
         return "empty path"
     if path.startswith(".") or path.endswith("."):
-        return f"leading or trailing dot in {path!r}"
-    if DOUBLE_DOT_RE.search(path):
-        return f"empty segment (double dot) in {path!r}"
+        # Check for unescaped leading/trailing dot
+        if path[-1] == '.' and (len(path) < 2 or path[-2] != '\\'):
+            return f"trailing dot in {path!r}"
+        if path[0] == '.':
+            return f"leading dot in {path!r}"
     if EMPTY_BRACKET_RE.search(path):
         return f"empty bracket `[]` in {path!r}"
     if NON_NUMERIC_BRACKET_RE.search(path):
         return f"non-numeric bracket index in {path!r}"
-    for seg in path.split("."):
+    segments = split_path(path)
+    for seg in segments:
         if not seg:
             return f"empty segment in {path!r}"
         if not SEGMENT_RE.fullmatch(seg):
@@ -116,6 +142,17 @@ def main() -> int:
                             f"template should be a string, got {type(tpl).__name__}"
                         )
 
+            # Also validate derived_values target fields.
+            for dv in version.get("derived_values") or []:
+                target = dv.get("target")
+                if target:
+                    err = validate_path(target)
+                    if err:
+                        failures.append(
+                            f"{chart_name} v{vidx} derived_values "
+                            f"target: {err}"
+                        )
+
     if failures:
         sys.stderr.write(
             "FAIL: dsl-mappings.yaml has invalid values_mapping target path(s).\n"
@@ -128,7 +165,8 @@ def main() -> int:
             sys.stderr.write(f"  {line}\n")
         sys.stderr.write(
             "\nFix: paths use `.` to separate map keys, `name[N]` for list "
-            "indices (N is non-negative integer). No empty segments, no "
+            "indices (N is non-negative integer). Escaped dots (backslash-dot) "
+            "represent literal dots in key names. No empty segments, no "
             "trailing/leading dots, no non-numeric bracket indices.\n"
         )
         return 1
