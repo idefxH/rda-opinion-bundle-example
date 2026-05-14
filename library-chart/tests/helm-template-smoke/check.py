@@ -190,6 +190,10 @@ def run_helm_template(deploy_dir, overlay):
     return result.returncode, result.stdout, result.stderr
 
 def main():
+    if shutil.which("rda") is None:
+        print("SKIP: rda binary not found on PATH, skipping helm-template-smoke")
+        return 0
+
     lib_dir = sys.argv[1] if len(sys.argv) > 1 else "."
     doc = load_dsl_mappings(lib_dir)
 
