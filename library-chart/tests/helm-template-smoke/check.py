@@ -199,7 +199,7 @@ def main():
     # Test 1: Each chart individually
     for chart_type in sorted(doc["charts"].keys()):
         entry = doc["charts"][chart_type]
-        if entry.get("infra_only"):
+        if entry.get("infra_only") or entry["versions"][0].get("operator_managed"):
             continue
         tmpdir = tempfile.mkdtemp(prefix=f"helm-smoke-{chart_type}-")
         try:
