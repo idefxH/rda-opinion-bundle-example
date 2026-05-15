@@ -674,7 +674,18 @@ charts:
             wiring:
               dex.config.storage.type: __literal:postgres
               dex.config.storage.config.host: __host_short__
-              dex.config.storage.config.port: __port__
+              # Dex decodes its config.yaml into a Go struct where
+              # `Port` is uint16, so `port: "5432"` (string) fails
+              # unmarshal with `json: cannot unmarshal string into
+              # Go struct field Postgres.NetworkDB.Port of type
+              # uint16`. `__port__` projects as a string (the
+              # binding-secret port value is always quoted, per
+              # Secret stringData convention), so we write the int
+              # literal directly. Both postgresql and cnpg pin
+              # service.port: 5432 unconditionally — there is no
+              # DSL knob to customize it — so hardcoding here is
+              # equivalent to reading from service.port.
+              dex.config.storage.config.port: 5432
               dex.config.storage.config.user: auth.user.name
               dex.config.storage.config.password: auth.user.password
               dex.config.storage.config.database: auth.user.database
@@ -685,7 +696,9 @@ charts:
             wiring:
               dex.config.storage.type: __literal:mysql
               dex.config.storage.config.host: __host_short__
-              dex.config.storage.config.port: __port__
+              # Same int-vs-string issue as the postgres branch
+              # above. mariadb service.port: 3306 is fixed.
+              dex.config.storage.config.port: 3306
               dex.config.storage.config.user: auth.user.name
               dex.config.storage.config.password: auth.user.password
               dex.config.storage.config.database: auth.user.database
