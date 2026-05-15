@@ -1495,9 +1495,16 @@ charts:
         chart_defaults:
           apache-airflow.postgresql.enabled: false
           apache-airflow.redis.enabled: false
+        # metadb and broker are NOT required: chart_defaults above already
+        # disable the embedded postgresql / redis sub-charts, so airflow
+        # renders cleanly even when the dev hasn't wired them yet (no
+        # duplicate Secret on shared namespaces with a standalone cnpg/
+        # postgresql/redis). The dev still needs to wire them before the
+        # pod starts — `rda doctor` and the scaffold hints flag that —
+        # but `rda render` no longer blocks a partial configuration.
         dependencies:
           - charts: [postgresql, cnpg]
-            required: true
+            required: false
             dsl_field: metadb
             wiring:
               apache-airflow.postgresql.enabled: __literal:false
@@ -1507,7 +1514,7 @@ charts:
               apache-airflow.data.metadataConnection.pass: auth.user.password
               apache-airflow.data.metadataConnection.db: auth.user.database
           - charts: [redis]
-            required: true
+            required: false
             dsl_field: broker
             wiring:
               apache-airflow.redis.enabled: __literal:false
