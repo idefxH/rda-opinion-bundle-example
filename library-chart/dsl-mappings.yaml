@@ -344,8 +344,8 @@ charts:
       community:
         chart_ref: https://grafana.github.io/helm-charts
     versions:
-      - constraint: ">=12.0.0"
-        # AppCo grafana 12.x. Service maps port 80 (chart default) to pod
+      - constraint: ">=7.0.0"
+        # Grafana chart (community 10.x / AppCo 12.x). Service maps port 80
         # port 3000. The library's auto-Ingress (issue #8) uses port 80.
         datasources_target: grafana.datasources
         service:
