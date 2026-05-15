@@ -1,6 +1,6 @@
 # Library Chart Tests
 
-18 invariant test suites that guard the library chart's contracts.
+19 invariant test suites that guard the library chart's contracts.
 Run all: `for d in */; do bash "$d/run.sh"; done`
 
 | Test | What it guards |
@@ -9,6 +9,7 @@ Run all: `for d in */; do bash "$d/run.sh"; done`
 | `auto-ingress-ui` | UI Ingress only when `ui.expose: true` |
 | `binding-secret-multiport-render` | Multi-port binding projection |
 | `catalog-consistency` | dsl-mappings ↔ rda-docs catalog parity |
+| `chart-source-overlay-sync` | appco-overlay.yaml ↔ Chart.yaml AppCo block parity |
 | `dep-defaults-presence` | Every Chart.yaml dep has `<name>.enabled: false` in values.yaml |
 | `dsl-mappings-schema` | YAML schema validation of dsl-mappings.yaml |
 | `dsl-mappings-target-validity` | values_mapping targets exist |

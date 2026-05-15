@@ -8,13 +8,14 @@ Contains the chart catalog, project templates, and the library chart.
 ```
 rda-opinion-bundle-example/
 ├── rda-bundle.yaml                    ← bundle manifest
+├── scripts/                           ← bundle-level helpers (community-mode toggle)
 ├── library-chart/                     ← the Helm library chart
 │   ├── dsl-mappings.yaml              ← THE SOURCE OF TRUTH (16 chart types)
-│   ├── Chart.yaml                     ← AppCo sub-chart dependencies
+│   ├── Chart.yaml                     ← sub-chart dependencies (AppCo OCI + community)
 │   ├── values.yaml                    ← defaults (each chart enabled: false)
 │   ├── templates/                     ← Helm templates (deployment, secrets, etc.)
 │   ├── tests/                         ← 20 invariant test suites
-│   └── scripts/                       ← maintenance scripts
+│   └── scripts/                       ← maintenance scripts (incl. chart-source.py)
 └── templates/                         ← project scaffolding templates (11)
     ├── web-go/                        ← Go web service
     ├── web-nodejs/                    ← Node.js web service
@@ -61,6 +62,28 @@ python3 library-chart/scripts/sync-from-dsl-mappings.py
 # DSL reference
 # See: https://github.com/idefxH/rda-docs/blob/main/reference/dsl.md
 ```
+
+## Chart source (AppCo vs community)
+
+`library-chart/Chart.yaml` ships with both AppCo OCI deps (postgresql,
+redis, mariadb, apache-kafka, valkey, etcd — require a SUSE Application
+Collection subscription) and community Helm-repo deps. `helm dep update`
+resolves every dep regardless of its `condition:` gate, so the AppCo
+entries require `helm registry login` against `oci://dp.apps.rancher.io`
+even when no scenario enables them.
+
+To make the bundle render without those credentials (CI, contributors
+without an AppCo subscription, community consumers):
+
+```bash
+scripts/use-community-charts.sh        # strips AppCo OCI deps
+scripts/use-appco-charts.sh            # restores them (or: git checkout library-chart/Chart.yaml)
+```
+
+Both are idempotent. The AppCo dep list is sourced from
+`library-chart/scripts/appco-overlay.yaml`; see
+[library-chart/scripts/README.md](library-chart/scripts/README.md)
+for details and the underlying `chart-source.py`.
 
 ## Bundle manifest (rda-bundle.yaml)
 

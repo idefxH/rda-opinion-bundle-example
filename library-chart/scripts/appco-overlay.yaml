@@ -1,0 +1,42 @@
+# AppCo OCI overlay — dependencies that require a SUSE Application
+# Collection subscription. No community equivalent in this bundle's
+# catalog (postgres is migrated to the cloudnative-pg operator in
+# community mode; the rest have no swap and `rda service add <type>`
+# is rejected at CLI time when chart_source=community).
+#
+# Used by scripts/chart-source.py:
+#   --mode community → strip these blocks from Chart.yaml
+#   --mode appco     → restore these blocks into Chart.yaml
+#
+# Editing notes:
+#   - Keep entries in sync with the AppCo block in library-chart/Chart.yaml.
+#     `python3 library-chart/scripts/chart-source.py --check` will fail
+#     loudly when this file and Chart.yaml drift.
+#   - Versions here are AppCo OCI tags (e.g. "0.4.4-29.1"); the Tilt
+#     extension's _align_subchart_versions.py post-processor rewrites
+#     pulled tgzs to align internal version with declared version.
+dependencies:
+  - name: postgresql
+    version: "0.4.4-29.1"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: postgresql.enabled
+  - name: redis
+    version: "2.6.1-3.1"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: redis.enabled
+  - name: mariadb
+    version: "0.1.7-10.1"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: mariadb.enabled
+  - name: apache-kafka
+    version: "1.3.0-11.1"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: apache-kafka.enabled
+  - name: valkey
+    version: "0.11.5-6.1"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: valkey.enabled
+  - name: etcd
+    version: "0.3.16"
+    repository: oci://dp.apps.rancher.io/charts
+    condition: etcd.enabled

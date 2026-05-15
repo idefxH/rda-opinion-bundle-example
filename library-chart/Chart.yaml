@@ -32,12 +32,24 @@ maintainers: [{name: idefxH, email: fx.houard@gmail.com}]
 # the INTERNAL version, so the Tilt extension's
 # _align_subchart_versions.py post-processor rewrites every pulled
 # tgz to align internal version with declared version.
-  # Community-first baseline: every chart with a community source
-  # uses the upstream helm repo here. `rda upgrade --source appco`
-  # rewrites repos to OCI AppCo refs + adjusts chart names/versions.
-  # Charts without a community source (postgresql, redis, mariadb,
-  # kafka, valkey, etcd) stay on AppCo OCI — they require a SUSE
-  # Application Collection subscription.
+#
+# Chart source modes:
+#   - Committed default = "appco": ships both AppCo OCI deps and
+#     community deps. `helm dep update` against this needs
+#     `helm registry login` for oci://dp.apps.rancher.io.
+#   - "community": run `scripts/use-community-charts.sh` (or
+#     `python3 library-chart/scripts/chart-source.py --mode community`)
+#     to drop the AppCo-only entries. The 6 stripped deps are
+#     reconstructible from library-chart/scripts/appco-overlay.yaml.
+#     Reverse with `scripts/use-appco-charts.sh` or
+#     `git checkout library-chart/Chart.yaml`.
+#
+# Community-first baseline: every chart with a community source uses
+# the upstream helm repo here. `rda upgrade --source appco` rewrites
+# repos to OCI AppCo refs + adjusts chart names/versions. Charts
+# without a community source (postgresql, redis, mariadb, kafka,
+# valkey, etcd) stay on AppCo OCI — they require a SUSE Application
+# Collection subscription, hence the community-mode strip above.
 dependencies:
   # ── AppCo-only charts (no community equivalent) ──
   - name: postgresql
