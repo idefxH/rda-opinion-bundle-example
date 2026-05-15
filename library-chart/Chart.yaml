@@ -93,7 +93,8 @@ dependencies:
     version: "3.6.0"
     repository: https://opensearch-project.github.io/helm-charts
     condition: opensearch.enabled
-  - name: influxdb
+  - name: influxdb2
+    alias: influxdb
     version: "2.1.2"
     repository: https://helm.influxdata.com
     condition: influxdb.enabled
