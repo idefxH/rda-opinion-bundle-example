@@ -1679,8 +1679,8 @@ charts:
           host: "{{ .Release.Name }}-cnpg-rw"
           port: 5432
         values_mapping:
-          auth.user.database: cnpg.cluster.initdb.database
-          auth.user.name: cnpg.cluster.initdb.owner
+          auth.user.database: cnpg.cluster.bootstrap.initdb.database
+          auth.user.name: cnpg.cluster.bootstrap.initdb.owner
           persistence.size: cnpg.cluster.storage.size
           branch: cnpg.version.postgresql
           resources.requests.cpu: cnpg.cluster.resources.requests.cpu
@@ -1689,7 +1689,7 @@ charts:
           resources.limits.memory: cnpg.cluster.resources.limits.memory
           metrics.enabled: cnpg.cluster.monitoring.enabled
         derived_values:
-          - target: cnpg.cluster.initdb.secret.name
+          - target: cnpg.cluster.bootstrap.initdb.secret.name
             template: "{{ .Release.Name }}-{{ .Binding }}-binding"
           - target: cnpg.cluster.imageName
             template: >-

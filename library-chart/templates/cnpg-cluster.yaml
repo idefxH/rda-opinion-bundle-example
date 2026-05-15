@@ -4,7 +4,7 @@
   Fully overridable via passthrough.
 
   Two safety layers guarantee password synchronization:
-  1. initdb.secret.name always set → correct password at bootstrap
+  1. bootstrap.initdb.secret.name always set → correct password at bootstrap
   2. managed.roles → continuous reconciliation from binding secret
 */}}
 {{- $cnpg := .Values.cnpg | default dict -}}
@@ -17,13 +17,15 @@
   {{- end -}}
 {{- end -}}
 {{- $spec := deepCopy $cluster -}}
-{{- $owner := dig "initdb" "owner" "app" $spec -}}
+{{- $owner := dig "bootstrap" "initdb" "owner" "app" $spec -}}
 {{- $secretName := printf "%s-%s-binding" .Release.Name $binding -}}
-{{- /* Layer 1: guarantee initdb.secret.name is always set */ -}}
-{{- if not (dig "initdb" "secret" "name" "" $spec) -}}
-  {{- $initdb := default dict (get $spec "initdb") -}}
+{{- /* Layer 1: guarantee bootstrap.initdb.secret.name is always set */ -}}
+{{- if not (dig "bootstrap" "initdb" "secret" "name" "" $spec) -}}
+  {{- $bootstrap := default dict (get $spec "bootstrap") -}}
+  {{- $initdb := default dict (get $bootstrap "initdb") -}}
   {{- $_ := set $initdb "secret" (dict "name" $secretName) -}}
-  {{- $_ := set $spec "initdb" $initdb -}}
+  {{- $_ := set $bootstrap "initdb" $initdb -}}
+  {{- $_ := set $spec "bootstrap" $bootstrap -}}
 {{- end -}}
 {{- /* Layer 2: managed.roles — continuous password reconciliation */ -}}
 {{- $role := dict "name" $owner "ensure" "present" "login" true "passwordSecret" (dict "name" $secretName) -}}
