@@ -1492,6 +1492,9 @@ charts:
           resources.requests.memory: apache-airflow.apiServer.resources.requests.memory
           resources.limits.cpu: apache-airflow.apiServer.resources.limits.cpu
           resources.limits.memory: apache-airflow.apiServer.resources.limits.memory
+        chart_defaults:
+          apache-airflow.postgresql.enabled: false
+          apache-airflow.redis.enabled: false
         dependencies:
           - charts: [postgresql, cnpg]
             required: true
