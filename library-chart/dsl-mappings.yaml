@@ -684,7 +684,7 @@ charts:
           - charts: [postgresql, cnpg]
             required: false
             dsl_field: state_db
-            env_inject: dex.env
+            env_inject: dex.envVars
             wiring:
               dex.config.storage.type: __literal:postgres
               dex.config.storage.config.host: __host_short__
@@ -707,7 +707,7 @@ charts:
           - charts: [mariadb]
             required: false
             dsl_field: state_db
-            env_inject: dex.env
+            env_inject: dex.envVars
             wiring:
               dex.config.storage.type: __literal:mysql
               dex.config.storage.config.host: __host_short__
