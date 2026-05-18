@@ -11,16 +11,46 @@ new chart = one YAML entry; the helpers below loop over it generically.
 {{- default .Release.Name .Values.name -}}
 {{- end -}}
 
+{{/*
+suse-library.labelValue — coerce an arbitrary string into a valid Kubernetes
+label value.
+
+K8s rules (RFC 1123-ish):
+  - charset: [A-Za-z0-9._-]
+  - must start AND end with an alphanumeric
+  - max 63 chars
+
+Replaces every disallowed character with '-', truncates to 63, then strips
+leading/trailing non-alphanumerics. Idempotent: a value that's already valid
+passes through unchanged, so existing call sites stay rendering-equivalent
+(important for the tilt-extension-suse-rda path, which feeds the chart the
+same way DevSpace does).
+
+Why this matters: callers occasionally end up with an image ref like
+'demo:dev' or 'reg.io/x@sha256:abc' bound to a name field (selector lookups,
+chart-name overrides, runtime-injected helm values). Without the coercion,
+helm install fails admission with `Invalid value "demo:dev": a valid label
+must consist of alphanumeric characters, '-', '_' or '.'`.
+*/}}
+{{- define "suse-library.labelValue" -}}
+{{- $s := . | toString -}}
+{{- $s = regexReplaceAll "[^A-Za-z0-9._-]" $s "-" -}}
+{{- $s = trunc 63 $s -}}
+{{- $s = regexReplaceAll "^[^A-Za-z0-9]+" $s "" -}}
+{{- $s = regexReplaceAll "[^A-Za-z0-9]+$" $s "" -}}
+{{- $s -}}
+{{- end -}}
+
 {{- define "suse-library.labels" -}}
-app.kubernetes.io/name: {{ include "suse-library.name" . }}
-app.kubernetes.io/managed-by: {{ .Release.Service | default "Helm" }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-rda.suse.com/library-version: {{ .Chart.Version }}
+app.kubernetes.io/name: {{ include "suse-library.labelValue" (include "suse-library.name" .) }}
+app.kubernetes.io/managed-by: {{ include "suse-library.labelValue" (.Release.Service | default "Helm") }}
+app.kubernetes.io/instance: {{ include "suse-library.labelValue" .Release.Name }}
+rda.suse.com/library-version: {{ include "suse-library.labelValue" .Chart.Version }}
 {{- end -}}
 
 {{- define "suse-library.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "suse-library.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/name: {{ include "suse-library.labelValue" (include "suse-library.name" .) }}
+app.kubernetes.io/instance: {{ include "suse-library.labelValue" .Release.Name }}
 {{- end -}}
 
 {{/* ──────────────────────────────────────────────────────────────────────
@@ -526,9 +556,9 @@ metadata:
   name: {{ $name }}
   labels:
     {{- include "suse-library.labels" $root | nindent 4 }}
-    service.binding/binding-name: {{ $svc.binding }}
-    service.binding/binding-type: {{ $svc.type }}
-    rda.suse.com/provisioning: {{ $provisioning | quote }}
+    service.binding/binding-name: {{ include "suse-library.labelValue" $svc.binding }}
+    service.binding/binding-type: {{ include "suse-library.labelValue" $svc.type }}
+    rda.suse.com/provisioning: {{ include "suse-library.labelValue" $provisioning | quote }}
     {{- if eq $svc.type "cnpg" }}
     cnpg.io/reload: "true"
     {{- end }}

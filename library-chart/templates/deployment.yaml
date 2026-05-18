@@ -23,20 +23,20 @@ metadata:
   name: {{ $wlName }}
   labels:
     {{- include "suse-library.labels" $ | nindent 4 }}
-    rda.suse.com/workload: {{ $wl.name | quote }}
+    rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
 spec:
   schedule: {{ $wl.schedule | quote }}
   jobTemplate:
     metadata:
       labels:
         {{- include "suse-library.labels" $ | nindent 8 }}
-        rda.suse.com/workload: {{ $wl.name | quote }}
+        rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
     spec:
       template:
         metadata:
           labels:
             {{- include "suse-library.selectorLabels" $ | nindent 12 }}
-            rda.suse.com/workload: {{ $wl.name | quote }}
+            rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
           annotations:
             checksum/services: {{ $.Values.services | toJson | sha256sum }}
             {{- with $wl.metrics }}
@@ -166,17 +166,17 @@ metadata:
   name: {{ $wlName }}
   labels:
     {{- include "suse-library.labels" $ | nindent 4 }}
-    rda.suse.com/workload: {{ $wl.name | quote }}
+    rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
 spec:
   selector:
     matchLabels:
       {{- include "suse-library.selectorLabels" $ | nindent 6 }}
-      rda.suse.com/workload: {{ $wl.name | quote }}
+      rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
   template:
     metadata:
       labels:
         {{- include "suse-library.selectorLabels" $ | nindent 8 }}
-        rda.suse.com/workload: {{ $wl.name | quote }}
+        rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
       annotations:
         checksum/services: {{ $.Values.services | toJson | sha256sum }}
         {{- with $wl.metrics }}
@@ -305,18 +305,18 @@ metadata:
   name: {{ $wlName }}
   labels:
     {{- include "suse-library.labels" $ | nindent 4 }}
-    rda.suse.com/workload: {{ $wl.name | quote }}
+    rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
 spec:
   replicas: {{ $wl.replicas | default 1 }}
   selector:
     matchLabels:
       {{- include "suse-library.selectorLabels" $ | nindent 6 }}
-      rda.suse.com/workload: {{ $wl.name | quote }}
+      rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
   template:
     metadata:
       labels:
         {{- include "suse-library.selectorLabels" $ | nindent 8 }}
-        rda.suse.com/workload: {{ $wl.name | quote }}
+        rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
       annotations:
         checksum/services: {{ $.Values.services | toJson | sha256sum }}
         {{- with $wl.metrics }}

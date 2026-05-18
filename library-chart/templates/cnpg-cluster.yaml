@@ -38,10 +38,10 @@ kind: Cluster
 metadata:
   name: {{ .Release.Name }}-cnpg
   labels:
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ include "suse-library.labelValue" .Release.Service }}
+    app.kubernetes.io/instance: {{ include "suse-library.labelValue" .Release.Name }}
     {{- if $binding }}
-    rda.suse.com/binding: {{ $binding }}
+    rda.suse.com/binding: {{ include "suse-library.labelValue" $binding }}
     {{- end }}
 spec:
   {{- toYaml $spec | nindent 2 }}

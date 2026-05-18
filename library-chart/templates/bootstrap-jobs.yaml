@@ -47,8 +47,8 @@ metadata:
   labels:
     {{- include "suse-library.labels" $ | nindent 4 }}
     rda.suse.com/bootstrap-job: "true"
-    rda.suse.com/bootstrap-binding: {{ $binding | quote }}
-    rda.suse.com/bootstrap-type: {{ $entry.type | quote }}
+    rda.suse.com/bootstrap-binding: {{ include "suse-library.labelValue" $binding | quote }}
+    rda.suse.com/bootstrap-type: {{ include "suse-library.labelValue" $entry.type | quote }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "5"
@@ -61,7 +61,7 @@ spec:
       labels:
         {{- include "suse-library.selectorLabels" $ | nindent 8 }}
         rda.suse.com/bootstrap-job: "true"
-        rda.suse.com/bootstrap-binding: {{ $binding | quote }}
+        rda.suse.com/bootstrap-binding: {{ include "suse-library.labelValue" $binding | quote }}
     spec:
       restartPolicy: {{ $restartPolicy }}
       {{- with $.Values.imagePullSecrets }}

@@ -17,7 +17,7 @@ metadata:
   name: {{ $wlName }}
   labels:
     {{- include "suse-library.labels" $ | nindent 4 }}
-    rda.suse.com/workload: {{ $wl.name | quote }}
+    rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
 spec:
   type: ClusterIP
   ports:
@@ -27,6 +27,6 @@ spec:
       protocol: TCP
   selector:
     {{- include "suse-library.selectorLabels" $ | nindent 4 }}
-    rda.suse.com/workload: {{ $wl.name | quote }}
+    rda.suse.com/workload: {{ include "suse-library.labelValue" $wl.name | quote }}
 {{- end }}
 {{- end }}

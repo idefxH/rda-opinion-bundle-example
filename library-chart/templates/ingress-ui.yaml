@@ -40,7 +40,7 @@ metadata:
   name: {{ printf "%s-%s-ui" $rel $chart }}
   labels:
     {{- include "suse-library.labels" $ | nindent 4 }}
-    rda.suse.com/ui-for-chart: {{ $chart | quote }}
+    rda.suse.com/ui-for-chart: {{ include "suse-library.labelValue" $chart | quote }}
   annotations:
     rda.suse.com/source: {{ printf "%s.ui.expose" $chart | quote }}
 spec:
