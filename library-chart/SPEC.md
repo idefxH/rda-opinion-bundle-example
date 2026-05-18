@@ -1141,3 +1141,31 @@ Status: in-progress
     alignment, server-side gate on `/`, ingress port.number).
 
 - Spec library-chart version 0.11.37 → 0.11.38.
+
+## MILESTONE: 0.11.39
+
+- DEX state_db wiring switches to **env_inject** for both postgresql
+  and mariadb dependency entries. Adds `env_inject: dex.env` to the
+  two `dependencies` entries under the dex chart in
+  `library-chart/dsl-mappings.yaml`.
+
+- Why: with `provisioning: connect` + `credentials.secretRef`, the
+  prior wiring depended on a kubectl read of the external Secret at
+  render time. When the cluster was unreachable or the Secret hadn't
+  been applied yet (e.g. cold-start staging, CI render-only smoke),
+  the read silently failed and dex got baked literal values from the
+  in-cluster chart default — leaving it hitting the wrong postgres
+  IP after a binding switched from `deploy` to `connect`.
+
+- How env_inject works (requires render-engine v0.7.0+): when set
+  AND the source binding exposes a K8s Secret (secretRef OR auto-
+  generated binding-secret in `provisioning: deploy`), each wiring
+  target gets a `$RDA_DEP_<FIELD>_<KEY>` placeholder and a matching
+  secretKeyRef env entry is appended at the target's env list
+  (here: `dex.env`). dex's config-file env expansion resolves the
+  placeholders at pod start, matching how workload
+  `${binding:NAME.field}` env refs already work. Sentinels that
+  don't map to a single secret key (`__literal:`,
+  `__bootstrap:`, `__url__/suffix`) keep render-time literal baking.
+
+- Spec library-chart version 0.11.38 → 0.11.39.

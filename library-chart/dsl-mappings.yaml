@@ -667,10 +667,24 @@ charts:
         # the external postgresql connection. Without this field, dex uses
         # in-memory storage (the scaffold default) — fine for dev, not for
         # staging/prod where dex state must survive restarts.
+        #
+        # env_inject: dex.env — host/port/credentials are injected as
+        # secretKeyRef env vars on the dex container (one per wiring
+        # target). The wiring targets are written as `$RDA_DEP_STATE_DB_*`
+        # placeholders that dex's config-file env expansion resolves at
+        # pod start. Critical for `provisioning: connect` with secretRef:
+        # without env_inject the wiring depended on a kubectl read of the
+        # external Secret at render time — silent fallback to the in-
+        # cluster default left dex hitting the old in-cluster postgres
+        # IP when the user switched a postgres binding from deploy to
+        # connect. With env_inject the dex pod reads shared-pg directly
+        # at start, matching how workload `${binding:db.host}` env refs
+        # already work via secretKeyRef.
         dependencies:
           - charts: [postgresql, cnpg]
             required: false
             dsl_field: state_db
+            env_inject: dex.env
             wiring:
               dex.config.storage.type: __literal:postgres
               dex.config.storage.config.host: __host_short__
@@ -693,6 +707,7 @@ charts:
           - charts: [mariadb]
             required: false
             dsl_field: state_db
+            env_inject: dex.env
             wiring:
               dex.config.storage.type: __literal:mysql
               dex.config.storage.config.host: __host_short__
