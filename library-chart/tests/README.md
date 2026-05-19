@@ -1,6 +1,6 @@
 # Library Chart Tests
 
-19 invariant test suites that guard the library chart's contracts.
+20 invariant test suites that guard the library chart's contracts.
 Run all: `for d in */; do bash "$d/run.sh"; done`
 
 | Test | What it guards |
@@ -24,3 +24,8 @@ Run all: `for d in */; do bash "$d/run.sh"; done`
 | `template-nodejs-package-lock-present` | package-lock.json presence |
 | `template-pack-build-smoke` | Buildpack build smoke test |
 | `template-procfile-package-consistency` | Procfile consistency |
+| `template-version-sync` | Templates pin the same library-chart version as `library-chart/Chart.yaml` |
+
+To bump the library-chart version everywhere in lockstep:
+`bash scripts/bump-version.sh <new-version>` (see the script's header
+for what it touches).

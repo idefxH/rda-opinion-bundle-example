@@ -40,8 +40,16 @@ bugs (see SPEC.md LESSONS).
 - [ ] `rda-bundle.yaml`'s `library_chart.version` bumped to match.
       `rda upgrade` reads THIS field — drift makes it silently lie.
       The `tests/manifest-version-sync/` test asserts equality.
-- [ ] `templates/web-nodejs/chart/Chart.yaml`'s `suse-library` dep
-      version bumped. Fresh `rda new` projects pin to this.
+- [ ] Every `templates/*/deploy/Chart.yaml`'s `version` AND
+      `suse-library` dep version bumped. Fresh `rda new` projects
+      pin to this. The `tests/template-version-sync/` test asserts
+      equality across all templates.
+
+> **Shortcut**: `bash scripts/bump-version.sh <new-version>` updates
+> all four pinning sites (Chart.yaml, rda-bundle.yaml, every template's
+> chart version, every template's suse-library dep) in one shot. It
+> still leaves SPEC.md (META.Version + MILESTONE block) for you to
+> write by hand — that part needs a narrative.
 
 ### 4. Tests
 
@@ -59,6 +67,7 @@ These tests run on every PR — make sure your change doesn't trip them:
 | Test | What it asserts | Failed historically by |
 |---|---|---|
 | `manifest-version-sync` | `Chart.yaml.version == rda-bundle.yaml.library_chart.version` | PRs #71/#73/#75 (manifest stuck at 0.11.4 across 4 bumps) |
+| `template-version-sync` | Every `templates/*/deploy/Chart.yaml` pins the same library-chart version (top-level `version` + `suse-library` dep) as `library-chart/Chart.yaml` | 0.16.1 bump that left every template stuck at 0.16.0 |
 | `services-iteration-grep` | Every chart template iterates services[] via `enabledServices` helper | PR #71 (deployment.yaml iterated raw `.Values.services`, broke disabled-service pods) |
 | `dep-defaults-presence` | Every Helm dep in `Chart.yaml` has `<name>.enabled: false` default in `values.yaml` | PR #71 (redis dep added without default — loaded unconditionally) |
 | `catalog-consistency` | `dsl-mappings.yaml` ↔ `rda-docs/reference/catalog.md` consistency (every chart in the YAML is listed in the doc's `## Catalogued charts` table) | (pre-existing) |
