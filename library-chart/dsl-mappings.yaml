@@ -1697,8 +1697,17 @@ charts:
     # No sub-chart source switching — the Cluster CR is rendered by the
     # library chart template (cnpg-cluster.yaml). The operator dep
     # (cloudnative-pg) is switched by rewriteChartRepos separately.
-    # Image switching (community ghcr.io vs AppCo dp.apps.rancher.io)
-    # is handled via derived_values imageName.
+    # Image switching (community ghcr.io/cloudnative-pg/postgresql vs
+    # AppCo dp.apps.rancher.io/containers/postgresql) lives IN the
+    # library chart template: cnpg-cluster.yaml inspects
+    # `.Values.global.imagePullSecrets` and picks the matching registry
+    # when `imageName` is not user-overridden. Doing it in the template
+    # (not via derived_values) makes it independent of whether
+    # `rda render` ran or whether `.rda/project.yaml` has chart_source
+    # persisted — `helm template` alone produces the right image.
+    # The community image is REQUIRED with the community CNPG operator:
+    # AppCo postgresql:17 uses UID 26 which `initdb` rejects on the
+    # community operator with `could not look up effective user ID 26`.
     default_branch: "17"
     branches:
       "17": {}
@@ -1729,10 +1738,6 @@ charts:
         derived_values:
           - target: cnpg.cluster.bootstrap.initdb.secret.name
             template: "{{ .Release.Name }}-{{ .Binding }}-binding"
-          - target: cnpg.cluster.imageName
-            template: >-
-              {{ if eq .ChartSource "appco" }}dp.apps.rancher.io/containers/postgresql{{ else }}ghcr.io/cloudnative-pg/postgresql{{ end }}:{{ with .Service.branch }}{{ . }}{{ else }}17{{ end }}
-            skip_if: imageName
         chart_defaults:
           cnpg.cluster.instances: 1
           cnpg.cluster.affinity: {}

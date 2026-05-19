@@ -6,6 +6,15 @@
   Two safety layers guarantee password synchronization:
   1. bootstrap.initdb.secret.name always set → correct password at bootstrap
   2. managed.roles → continuous reconciliation from binding secret
+
+  Image selection is performed HERE (not via derived_values) so that
+  `helm template` alone yields the correct image regardless of whether
+  `rda render` ran or whether `.rda/project.yaml` has chart_source
+  persisted. Signal: `global.imagePullSecrets` containing
+  `application-collection` ⇒ AppCo registry; otherwise community
+  (ghcr.io/cloudnative-pg/postgresql). The community CNPG operator
+  rejects the AppCo image (`initdb: could not look up effective user
+  ID 26`), so a wrong choice here crash-loops the cluster pod.
 */}}
 {{- $cnpg := .Values.cnpg | default dict -}}
 {{- if $cnpg.enabled }}
@@ -26,6 +35,30 @@
   {{- $_ := set $initdb "secret" (dict "name" $secretName) -}}
   {{- $_ := set $bootstrap "initdb" $initdb -}}
   {{- $_ := set $spec "bootstrap" $bootstrap -}}
+{{- end -}}
+{{- /* Image selection: pick AppCo vs community registry from
+       global.imagePullSecrets unless the user pinned an imageName
+       explicitly (via passthrough or values_mapping). */ -}}
+{{- if not (dig "imageName" "" $spec) -}}
+  {{- $branch := dig "version" "postgresql" "17" $cnpg -}}
+  {{- if not $branch -}}{{- $branch = "17" -}}{{- end -}}
+  {{- $isAppco := false -}}
+  {{- $global := default dict .Values.global -}}
+  {{- range (default list (get $global "imagePullSecrets")) -}}
+    {{- $entry := . -}}
+    {{- if kindIs "map" $entry -}}
+      {{- if eq (default "" (get $entry "name")) "application-collection" -}}
+        {{- $isAppco = true -}}
+      {{- end -}}
+    {{- else -}}
+      {{- if eq (toString $entry) "application-collection" -}}
+        {{- $isAppco = true -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $registry := "ghcr.io/cloudnative-pg/postgresql" -}}
+  {{- if $isAppco -}}{{- $registry = "dp.apps.rancher.io/containers/postgresql" -}}{{- end -}}
+  {{- $_ := set $spec "imageName" (printf "%s:%s" $registry (toString $branch)) -}}
 {{- end -}}
 {{- /* Layer 2: managed.roles — continuous password reconciliation */ -}}
 {{- $role := dict "name" $owner "ensure" "present" "login" true "passwordSecret" (dict "name" $secretName) -}}

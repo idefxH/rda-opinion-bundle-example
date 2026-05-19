@@ -1169,3 +1169,62 @@ Status: in-progress
   `__bootstrap:`, `__url__/suffix`) keep render-time literal baking.
 
 - Spec library-chart version 0.11.38 → 0.11.39.
+
+## MILESTONE: 0.11.40
+
+- BUGFIX: CNPG `Cluster.spec.imageName` is now selected by the library
+  chart template, not by a `derived_values` projection. The old
+  projection read `.ChartSource` from the render context; rda-cli's
+  `resolveChartSource()` falls back to `"appco"` when
+  `.rda/project.yaml` doesn't carry `chart_source: community`. Result:
+  a project that flipped Chart.yaml deps via
+  `scripts/use-community-charts.sh` (or the `chart-source.py` script)
+  but never persisted the project-level chart_source still got
+  `imageName: dp.apps.rancher.io/containers/postgresql:17`, which
+  crash-loops the cluster on the **community** CNPG operator with
+  `initdb: could not look up effective user ID 26: user does not exist`
+  (AppCo's postgres image bakes UID 26 that the community operator
+  rejects).
+
+- New mechanism in `templates/cnpg-cluster.yaml`: when no `imageName`
+  is set in `cnpg.cluster` (either via DSL or passthrough), the template
+  inspects `.Values.global.imagePullSecrets` and picks the registry to
+  match:
+    - contains `application-collection` → AppCo
+      (`dp.apps.rancher.io/containers/postgresql`)
+    - otherwise (community baseline) →
+      (`ghcr.io/cloudnative-pg/postgresql`)
+  Tag comes from `cnpg.version.postgresql` (set by `branch:` in the
+  service entry) or defaults to `17`. Explicit overrides via passthrough
+  (`cnpg.cluster.imageName: my-registry/pg:tag`) win, since the
+  template only fills in when the field is empty.
+
+- Why owned by the template, not by `rda render`: the template path
+  has access to the post-merge values (which reflect what `rda upgrade
+  --source <mode>` did to `global.imagePullSecrets`) and works the
+  same way under raw `helm template`. The projection path depended on
+  whether `rda render` ran AND on whether the user persisted
+  chart_source. The bundle now owns this contract end-to-end.
+
+- Removed the `cnpg.cluster.imageName` entry from
+  `derived_values:` under `cnpg` in `library-chart/dsl-mappings.yaml`.
+  The `bootstrap.initdb.secret.name` derivation stays — that one only
+  needs `.Release.Name` and `.Binding`, both unambiguous.
+
+- TESTS:
+  - `tests/cnpg-image-source-switch/` (new): renders the CNPG template
+    with 6 value shapes (community baseline; AppCo via `- name:` map;
+    AppCo via bare string; community + `cnpg.version.postgresql: "16"`;
+    explicit `imageName` override; explicit override + AppCo signal)
+    and asserts the rendered `imageName` matches the expected
+    registry/tag. Guards regression in both directions.
+
+- DEPENDENCY: e2e harness (rda-e2e-tests) must extend scenario
+  coverage to exercise BOTH chart sources (community via
+  `scripts/use-community-charts.sh`, appco via the AppCo OCI baseline)
+  for any scenario that wires a CNPG cluster. Single-mode coverage
+  hides this exact class of bug. Tracking under
+  rda-e2e-tests follow-up. Until that lands, the bundle test
+  `cnpg-image-source-switch` is the only safety net.
+
+- Spec library-chart version 0.11.39 → 0.11.40.

@@ -10,6 +10,7 @@ Run all: `for d in */; do bash "$d/run.sh"; done`
 | `binding-secret-multiport-render` | Multi-port binding projection |
 | `catalog-consistency` | dsl-mappings ↔ rda-docs catalog parity |
 | `chart-source-overlay-sync` | appco-overlay.yaml ↔ Chart.yaml AppCo block parity |
+| `cnpg-image-source-switch` | CNPG postgres image matches active chart source |
 | `dep-defaults-presence` | Every Chart.yaml dep has `<name>.enabled: false` in values.yaml |
 | `dsl-mappings-schema` | YAML schema validation of dsl-mappings.yaml |
 | `dsl-mappings-target-validity` | values_mapping targets exist |
