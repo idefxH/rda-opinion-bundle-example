@@ -110,8 +110,41 @@ fi
 WORK="$(mktemp -d -t cnpg-bundled.XXXXXX)"
 trap 'rm -rf "$WORK"; rm -f "$TMP_CHART"' EXIT
 
+# Build a self-contained library-chart copy with only the
+# cloudnative-pg sub-chart declared. `helm dep update` against the
+# source Chart.yaml would try to authenticate against the AppCo OCI
+# registry (dp.apps.rancher.io) and fail in CI / on fresh clones.
+# Stripping the deps down to just cloudnative-pg lets dep update
+# fetch from the community helm repo only, with no credentials.
+TMP_LIB="$WORK/library-chart"
+cp -R "$LIB" "$TMP_LIB"
+rm -rf "$TMP_LIB/charts" "$TMP_LIB/Chart.lock"
+
+python3 - "$TMP_LIB/Chart.yaml" <<'PY'
+import sys, yaml
+p = sys.argv[1]
+with open(p) as f:
+    chart = yaml.safe_load(f)
+chart["dependencies"] = [
+    d for d in chart.get("dependencies", []) if d.get("name") == "cloudnative-pg"
+]
+with open(p, "w") as f:
+    yaml.safe_dump(chart, f, sort_keys=False)
+PY
+
+if ! helm dep update "$TMP_LIB" >"$WORK/dep-update.log" 2>&1; then
+  echo "ERROR: helm dep update failed for the cnpg-only library-chart copy"
+  cat "$WORK/dep-update.log"
+  exit 1
+fi
+if ! ls "$TMP_LIB"/charts/cloudnative-pg-*.tgz >/dev/null 2>&1; then
+  echo "ERROR: helm dep update did not fetch the cloudnative-pg subchart"
+  cat "$WORK/dep-update.log"
+  exit 1
+fi
+
 mkdir -p "$WORK/deploy/templates" "$WORK/deploy/charts"
-ln -s "$LIB" "$WORK/deploy/charts/suse-library"
+ln -s "$TMP_LIB" "$WORK/deploy/charts/suse-library"
 touch "$WORK/deploy/templates/.gitkeep"
 cat > "$WORK/deploy/Chart.yaml" <<EOF
 apiVersion: v2
