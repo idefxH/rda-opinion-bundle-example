@@ -1516,6 +1516,16 @@ charts:
         chart_defaults:
           apache-airflow.postgresql.enabled: false
           apache-airflow.redis.enabled: false
+          # `data.brokerUrlSecretName` MUST be set or the chart's helm-
+          # template-time `required` check fires with `You must set one
+          # of the values data.brokerUrlSecretName or data.brokerUrl`.
+          # We bake a fixed name here and have the library chart emit
+          # that Secret when a `broker:` binding is wired (see
+          # templates/airflow-broker-secret.yaml). When no broker is
+          # wired the airflow workload won't start anyway (CeleryExecutor
+          # needs a broker), and `rda doctor` flags it — but `helm
+          # template` no longer aborts at the required check.
+          apache-airflow.data.brokerUrlSecretName: airflow-broker-url
         # metadb and broker are NOT required: chart_defaults above already
         # disable the embedded postgresql / redis sub-charts, so airflow
         # renders cleanly even when the dev hasn't wired them yet (no
