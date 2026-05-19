@@ -1,0 +1,48 @@
+# Verify the four library-chart version pinning sites stay in lockstep
+# on every PR and main push:
+#   1. library-chart/Chart.yaml
+#   2. rda-bundle.yaml's library_chart.version
+#   3. templates/*/deploy/Chart.yaml top-level version
+#   4. templates/*/deploy/Chart.yaml suse-library dep pin
+#
+# This is the backstop for contributors who haven't installed the
+# .githooks/pre-commit hook (or skipped it with --no-verify). When it
+# fails, the test output tells the reader exactly which file drifted
+# and points at `bash scripts/bump-version.sh <version>` as the fix.
+name: version-sync
+
+on:
+  pull_request:
+    paths:
+      - 'library-chart/Chart.yaml'
+      - 'rda-bundle.yaml'
+      - 'templates/**/deploy/Chart.yaml'
+      - 'library-chart/tests/manifest-version-sync/**'
+      - 'library-chart/tests/template-version-sync/**'
+      - 'scripts/bump-version.sh'
+      - '.github/workflows/version-sync.yml'
+  push:
+    branches: [main]
+
+jobs:
+  version-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PyYAML
+        run: python -m pip install --quiet pyyaml
+
+      - name: manifest-version-sync (Chart.yaml ↔ rda-bundle.yaml)
+        run: bash library-chart/tests/manifest-version-sync/run.sh
+
+      - name: template-version-sync (Chart.yaml ↔ templates/*/deploy/Chart.yaml)
+        run: |
+          if ! bash library-chart/tests/template-version-sync/run.sh; then
+            echo "::error title=Library-chart version drift::Run 'bash scripts/bump-version.sh <version>' to align rda-bundle.yaml and every templates/*/deploy/Chart.yaml with library-chart/Chart.yaml. Or install the pre-commit hook once with 'bash scripts/install-hooks.sh' to make this automatic on future bumps."
+            exit 1
+          fi

@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Pre-commit hook — keep the library-chart version aligned across all
+# four pinning sites (Chart.yaml, rda-bundle.yaml, templates/*/deploy/
+# Chart.yaml chart version + suse-library dep) whenever a bump is
+# being committed.
+#
+# Trigger: any commit that stages library-chart/Chart.yaml.
+# Action:  if the manifest-version-sync or template-version-sync tests
+#          currently fail, run scripts/bump-version.sh <Chart.yaml version>
+#          and re-stage the files it modifies. Otherwise no-op.
+# Idempotent: if everything is already aligned, the tests pass and the
+#             hook exits 0 without touching anything — no infinite loop
+#             when the user ran scripts/bump-version.sh themselves.
+#
+# Install:  bash scripts/install-hooks.sh   (or git config core.hooksPath .githooks)
+# Bypass:   RDA_SKIP_VERSION_HOOK=1 git commit ...   (also: --no-verify)
+#           CI runs the same checks and will fail the PR if you skip
+#           and drift the versions.
+
+set -euo pipefail
+
+if [ "${RDA_SKIP_VERSION_HOOK:-0}" = "1" ]; then
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Early exit — most commits don't touch the library chart. Cheaper
+# than spinning up python3 + running the tests every time.
+if ! git diff --cached --name-only -z \
+     | tr '\0' '\n' \
+     | grep -qx 'library-chart/Chart.yaml'; then
+  exit 0
+fi
+
+# The bumper operates on the working tree, so refuse if Chart.yaml has
+# unstaged edits — running the bumper would either overwrite those
+# edits or smuggle them into the commit. Either is surprising.
+if ! git diff --quiet -- library-chart/Chart.yaml; then
+  cat >&2 <<'EOF'
+pre-commit (version-sync): library-chart/Chart.yaml has unstaged changes.
+
+scripts/bump-version.sh rewrites the working tree, which would either
+overwrite your unstaged edits or commit them silently. Stage or stash
+them first, then re-run the commit.
+
+Bypass (use sparingly — CI will still fail on drift):
+  RDA_SKIP_VERSION_HOOK=1 git commit ...
+  git commit --no-verify ...
+EOF
+  exit 1
+fi
+
+# Worktree == index for Chart.yaml now, so reading the worktree value
+# gives us the version the commit is asking for.
+VERSION="$(python3 -c 'import yaml; \
+print(yaml.safe_load(open("library-chart/Chart.yaml"))["version"])')"
+
+if [ -z "$VERSION" ]; then
+  echo "pre-commit (version-sync): could not extract version from library-chart/Chart.yaml" >&2
+  exit 1
+fi
+
+# Idempotency gate: if both invariant tests already pass, the staged
+# state is consistent. Nothing to do. This is the path taken when the
+# user ran scripts/bump-version.sh themselves before committing.
+if bash library-chart/tests/manifest-version-sync/run.sh >/dev/null 2>&1 \
+   && bash library-chart/tests/template-version-sync/run.sh >/dev/null 2>&1; then
+  exit 0
+fi
+
+echo "pre-commit (version-sync): aligning rda-bundle.yaml and templates/*/deploy/Chart.yaml to library-chart ${VERSION}..."
+
+bash scripts/bump-version.sh "$VERSION"
+
+# Re-stage only the files the bumper can touch. We enumerate them
+# rather than `git add -u` so we don't sweep up unrelated working-tree
+# changes the user deliberately kept out of this commit.
+FILES=(library-chart/Chart.yaml rda-bundle.yaml)
+for f in templates/*/deploy/Chart.yaml; do
+  FILES+=("$f")
+done
+
+added_any=0
+for f in "${FILES[@]}"; do
+  [ -f "$f" ] || continue
+  if ! git diff --quiet -- "$f"; then
+    git add -- "$f"
+    echo "  re-staged: $f"
+    added_any=1
+  fi
+done
+
+if [ "$added_any" = "1" ]; then
+  echo "pre-commit (version-sync): aligned. Continuing commit."
+fi

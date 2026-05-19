@@ -50,6 +50,13 @@ bugs (see SPEC.md LESSONS).
 > chart version, every template's suse-library dep) in one shot. It
 > still leaves SPEC.md (META.Version + MILESTONE block) for you to
 > write by hand — that part needs a narrative.
+>
+> **Even shorter**: install the pre-commit hook once with
+> `bash scripts/install-hooks.sh`. From then on, any commit that
+> stages a `library-chart/Chart.yaml` version bump auto-runs the
+> bumper and re-stages `rda-bundle.yaml` + every template Chart.yaml
+> before the commit lands. CI (`.github/workflows/version-sync.yml`)
+> is the backstop for contributors who skip the hook.
 
 ### 4. Tests
 
