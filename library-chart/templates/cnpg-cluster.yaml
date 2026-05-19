@@ -33,6 +33,13 @@
 {{- $existingRoles := default list (get $managed "roles") -}}
 {{- $_ := set $managed "roles" (append $existingRoles $role) -}}
 {{- $_ := set $spec "managed" $managed -}}
+{{- /* Propagate top-level imagePullSecrets — the CNPG operator copies
+       spec.imagePullSecrets onto each pod it spawns. Without this the
+       AppCo cnpg image fails with ImagePullBackOff in the rendered
+       cluster, even though chart-managed Deployments get the secret. */ -}}
+{{- if and (not (dig "imagePullSecrets" false $spec)) ($.Values.imagePullSecrets) -}}
+  {{- $_ := set $spec "imagePullSecrets" $.Values.imagePullSecrets -}}
+{{- end -}}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
