@@ -1,8 +1,8 @@
 apiVersion: v2
 name: "{{ .Name }}"
-version: "0.16.0"
+version: "0.16.2"
 type: application
 dependencies:
   - name: suse-library
-    version: 0.16.0
+    version: 0.16.2
     repository: file://library-chart

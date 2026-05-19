@@ -2,10 +2,10 @@ apiVersion: v2
 name: {{ .Name }}
 description: {{ .Name }} — brownfield pre-built image managed by rda
 type: application
-version: "0.16.0"
+version: "0.16.2"
 appVersion: "0.1.0"
 keywords: [rda, brownfield]
 
 dependencies:
   - name: suse-library
-    version: 0.16.0
+    version: 0.16.2
