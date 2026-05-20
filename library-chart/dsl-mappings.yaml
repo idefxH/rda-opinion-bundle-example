@@ -144,17 +144,17 @@ charts:
           # multiple charts (mariadb, redis), auto-classified as such by
           # the scaffold formatter via IsCommonField cardinality.
           auth.admin.password:
-            default: ""
-            comment: "admin (postgres user) password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           auth.user.name:
             default: "app"
             comment: "application user — your service connects as this"
           auth.user.password:
-            default: ""
-            comment: "application user password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           auth.user.database:
-            default: ""
-            comment: "application database — required"
+            default: "{{.Binding}}"
+            comment: "application database — defaults to the binding name"
           # Persistence-off scaffold default (issue #60). Dev flips to true
           # once they have data worth keeping; the size pre-set means the
           # flip is a one-line change. Auth-seed annotation (bundle #63)
@@ -224,8 +224,8 @@ charts:
 
         scaffold:
           auth.user.password:
-            default: ""
-            comment: "redis password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           # Persistence-off default — flip to true for durable AOF/RDB
           # snapshots (auth-seed annotation guards drift when on).
           persistence.enabled:
@@ -405,8 +405,8 @@ charts:
           auth.admin.name:
             default: "admin"
           auth.admin.password:
-            default: ""
-            comment: "grafana admin password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           ingress.enabled:
             default: false
           ingress.hosts:
@@ -891,17 +891,17 @@ charts:
 
         scaffold:
           auth.admin.password:
-            default: ""
-            comment: "admin (root) password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           auth.user.name:
             default: "app"
             comment: "application user — your service connects as this"
           auth.user.password:
-            default: ""
-            comment: "application user password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           auth.user.database:
-            default: ""
-            comment: "application database — required"
+            default: "{{.Binding}}"
+            comment: "application database — defaults to the binding name"
           persistence.enabled:
             default: false
           persistence.size:
@@ -1022,8 +1022,8 @@ charts:
           - {key: password, from_dsl: auth.user.password, required: true}
         scaffold:
           auth.user.password:
-            default: ""
-            comment: "valkey password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           persistence.enabled:
             default: false
           metrics.enabled:
@@ -1135,8 +1135,8 @@ charts:
             default: "minioadmin"
             comment: "S3 access key (root user)"
           auth.admin.password:
-            default: ""
-            comment: "S3 secret key (root password) — required, min 8 chars"
+            default: "minioadmin"
+            comment: "default credentials — customize if needed (min 8 chars)"
           persistence.enabled:
             default: false
           persistence.size:
@@ -1277,8 +1277,8 @@ charts:
           - {key: url, template: "http://{{ .Release.Name }}-etcd:2379"}
         scaffold:
           auth.rbac.rootPassword:
-            default: ""
-            comment: "etcd root password — required"
+            default: "changeit"
+            comment: "default credentials — customize if needed"
           persistence.enabled:
             default: false
           persistence.size:
@@ -1403,8 +1403,8 @@ charts:
           - {key: bucket, from_dsl: auth.admin.bucket}
         scaffold:
           auth.admin.token:
-            default: ""
-            comment: "InfluxDB admin API token — required"
+            default: "{{random:hex:32}}"
+            comment: "InfluxDB admin API token — auto-generated random hex"
           auth.admin.org:
             default: "default-org"
           auth.admin.bucket:
@@ -1474,8 +1474,8 @@ charts:
           - {key: admin_password, from_dsl: auth.admin.password, required: true}
         scaffold:
           auth.admin.password:
-            default: ""
-            comment: "Harbor admin password — required"
+            default: "Harbor12345"
+            comment: "default credentials — customize if needed (8+ chars with uppercase, lowercase, and a number)"
           ingress.enabled:
             default: true
           persistence.enabled:
@@ -1562,8 +1562,8 @@ charts:
             default: "admin"
             comment: "Airflow webserver admin username"
           auth.user.password:
-            default: ""
-            comment: "Airflow webserver admin password — required"
+            default: "admin"
+            comment: "default credentials — customize if needed"
           metadb:
             default: ""
             comment: "binding name of your postgresql service (required for metadata DB)"
@@ -1651,8 +1651,8 @@ charts:
             default: ""
             comment: "OIDC client secret — set via wire"
           auth.cookie_secret:
-            default: ""
-            comment: "session cookie secret — generate: openssl rand -base64 32 | head -c 32"
+            default: "{{random:hex:32}}"
+            comment: "session cookie secret — auto-generated random hex (32 chars)"
           oidc_provider:
             default: ""
             comment: "required — binding name of a dex service"
