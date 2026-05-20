@@ -9,3 +9,4 @@ templates/*/chart/charts/
 templates/*/chart/Chart.lock
 library-chart/charts/
 library-chart/Chart.lock
+.claude/
